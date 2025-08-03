@@ -1,9 +1,8 @@
 <?php
 /**
- * Booking Manager Class - ENHANCED WITH USER ROLES
+ * Booking Manager Class - UPDATED WITH NEW LOCATIONS
  * 
- * Handles all booking-related operations with integration of custom user roles
- * and enhanced customer management.
+ * Updated with the two specific locations for Costabilerent.
  * 
  * @package CustomRentalCarManager
  * @author Totaliweb
@@ -15,6 +14,22 @@ if (!defined('ABSPATH')) {
 }
 
 class CRCM_Booking_Manager {
+    
+    /**
+     * Predefined locations for Costabilerent
+     */
+    private $locations = array(
+        'ischia_porto' => array(
+            'name' => 'Ischia Porto',
+            'address' => 'Via Iasolino 94, Ischia',
+            'short_name' => 'Ischia Porto'
+        ),
+        'forio' => array(
+            'name' => 'Forio',
+            'address' => 'Via Filippo di Lustro 19, Forio',
+            'short_name' => 'Forio'
+        )
+    );
     
     /**
      * Constructor
@@ -121,18 +136,6 @@ class CRCM_Booking_Manager {
             'orderby' => 'title',
             'order' => 'ASC',
         ));
-        
-        // Get predefined locations (hardcoded for Ischia)
-        $locations = array(
-            'ischia_porto' => 'Ischia Porto',
-            'ischia_centro' => 'Ischia Centro', 
-            'casamicciola' => 'Casamicciola Terme',
-            'lacco_ameno' => 'Lacco Ameno',
-            'forio' => 'Forio',
-            'serrara' => 'Serrara Fontana',
-            'barano' => 'Barano d\'Ischia',
-            'sant_angelo' => 'Sant\'Angelo',
-        );
         ?>
         
         <table class="form-table">
@@ -213,12 +216,17 @@ class CRCM_Booking_Manager {
                 <td>
                     <select id="pickup_location" name="booking_data[pickup_location]">
                         <option value=""><?php _e('Select Location', 'custom-rental-manager'); ?></option>
-                        <?php foreach ($locations as $key => $location): ?>
+                        <?php foreach ($this->locations as $key => $location): ?>
                             <option value="<?php echo $key; ?>" <?php selected($booking_data['pickup_location'], $key); ?>>
-                                <?php echo esc_html($location); ?>
+                                <?php echo esc_html($location['name']); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
+                    <p class="description">
+                        <?php foreach ($this->locations as $key => $location): ?>
+                            <small><strong><?php echo esc_html($location['name']); ?>:</strong> <?php echo esc_html($location['address']); ?></small><br>
+                        <?php endforeach; ?>
+                    </p>
                 </td>
             </tr>
             
@@ -227,9 +235,9 @@ class CRCM_Booking_Manager {
                 <td>
                     <select id="return_location" name="booking_data[return_location]">
                         <option value=""><?php _e('Same as pickup', 'custom-rental-manager'); ?></option>
-                        <?php foreach ($locations as $key => $location): ?>
+                        <?php foreach ($this->locations as $key => $location): ?>
                             <option value="<?php echo $key; ?>" <?php selected($booking_data['return_location'], $key); ?>>
-                                <?php echo esc_html($location); ?>
+                                <?php echo esc_html($location['name']); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -275,7 +283,7 @@ class CRCM_Booking_Manager {
     }
     
     /**
-     * Customer selection meta box - NEW: Only show rental customers
+     * Customer selection meta box - Only show rental customers
      */
     public function customer_selection_meta_box($post) {
         $selected_customer_id = get_post_meta($post->ID, '_crcm_customer_user_id', true);
@@ -1100,6 +1108,13 @@ class CRCM_Booking_Manager {
         <?php
         $content = ob_get_clean();
         wp_send_json_success($content);
+    }
+    
+    /**
+     * Get locations array
+     */
+    public function get_locations() {
+        return $this->locations;
     }
 }
 
