@@ -1,9 +1,10 @@
 <?php
 /**
- * Vehicle Manager Class - COMPLETELY REDESIGNED
+ * Vehicle Manager Class - OPTIMIZED & CLEANED
  * 
  * Handles all vehicle-related operations with custom user roles,
  * dynamic vehicle types, and advanced availability management.
+ * Removed taxonomies, editor, gallery and fixed all issues.
  * 
  * @package CustomRentalCarManager
  * @author Totaliweb
@@ -48,19 +49,33 @@ class CRCM_Vehicle_Manager {
     );
     
     /**
+     * Predefined locations for Costabilerent
+     */
+    private $locations = array(
+        'ischia_porto' => array(
+            'name' => 'Ischia Porto',
+            'address' => 'Via Iasolino 94, Ischia',
+            'short_name' => 'Ischia Porto'
+        ),
+        'forio' => array(
+            'name' => 'Forio',
+            'address' => 'Via Filippo di Lustro 19, Forio',
+            'short_name' => 'Forio'
+        )
+    );
+    
+    /**
      * Constructor
      */
     public function __construct() {
         add_action('init', array($this, 'create_user_roles'));
+        add_action('init', array($this, 'remove_vehicle_supports'), 20);
         add_action('add_meta_boxes', array($this, 'add_meta_boxes'));
         add_action('save_post', array($this, 'save_vehicle_meta'));
         add_action('wp_ajax_crcm_search_vehicles', array($this, 'ajax_search_vehicles'));
         add_action('wp_ajax_nopriv_crcm_search_vehicles', array($this, 'ajax_search_vehicles'));
         add_filter('manage_crcm_vehicle_posts_columns', array($this, 'vehicle_columns'));
         add_action('manage_crcm_vehicle_posts_custom_column', array($this, 'vehicle_column_content'), 10, 2);
-        
-        // Remove editor support from vehicle post type
-        add_action('init', array($this, 'remove_vehicle_editor'));
         
         // AJAX handlers
         add_action('wp_ajax_crcm_get_vehicle_fields', array($this, 'ajax_get_vehicle_fields'));
@@ -105,10 +120,11 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
-     * Remove editor from vehicle post type
+     * Remove editor and other supports from vehicle post type
      */
-    public function remove_vehicle_editor() {
+    public function remove_vehicle_supports() {
         remove_post_type_support('crcm_vehicle', 'editor');
+        remove_post_type_support('crcm_vehicle', 'excerpt');
     }
     
     /**
@@ -177,15 +193,6 @@ class CRCM_Vehicle_Manager {
             'side',
             'default'
         );
-        
-        add_meta_box(
-            'crcm_vehicle_gallery',
-            __('Vehicle Gallery', 'custom-rental-manager'),
-            array($this, 'gallery_meta_box'),
-            'crcm_vehicle',
-            'side',
-            'default'
-        );
     }
     
     /**
@@ -213,7 +220,7 @@ class CRCM_Vehicle_Manager {
         
         <div class="crcm-vehicle-details-tabs">
             <!-- Vehicle Type Selection -->
-            <table class="form-table">
+            <table class="form-table crcm-main-table">
                 <tr>
                     <th><label for="vehicle_type"><?php _e('Tipo di Veicolo', 'custom-rental-manager'); ?> *</label></th>
                     <td>
@@ -250,12 +257,34 @@ class CRCM_Vehicle_Manager {
                     success: function(response) {
                         if (response.success) {
                             $('#crcm-dynamic-fields').html(response.data);
+                            // Trigger features update
+                            $('#crcm-dynamic-fields').trigger('vehicle_type_changed', [vehicleType]);
                         }
                     }
                 });
             });
         });
         </script>
+        
+        <style>
+        .crcm-main-table {
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+        }
+        
+        .crcm-vehicle-type-selector {
+            width: 200px;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        #crcm-dynamic-fields .form-table {
+            margin-top: 0;
+        }
+        </style>
         <?php
     }
     
@@ -576,7 +605,7 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
-     * Dynamic features meta box
+     * Dynamic features meta box - FIXED: Now properly detects vehicle type
      */
     public function features_meta_box($post) {
         $features = get_post_meta($post->ID, '_crcm_vehicle_features', true);
@@ -590,7 +619,7 @@ class CRCM_Vehicle_Manager {
         $available_features = $this->vehicle_types[$vehicle_type]['features'];
         ?>
         
-        <div class="crcm-features-container" data-vehicle-type="<?php echo esc_attr($vehicle_type); ?>">
+        <div class="crcm-features-container" id="crcm-features-container" data-vehicle-type="<?php echo esc_attr($vehicle_type); ?>">
             <div class="crcm-features-grid">
                 <?php foreach ($available_features as $key => $label): ?>
                     <div class="crcm-feature-item">
@@ -603,6 +632,33 @@ class CRCM_Vehicle_Manager {
                 <?php endforeach; ?>
             </div>
         </div>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            // Listen for vehicle type changes from the dynamic fields section
+            $(document).on('vehicle_type_changed', '#crcm-dynamic-fields', function(e, vehicleType) {
+                updateFeatures(vehicleType);
+            });
+            
+            function updateFeatures(vehicleType) {
+                $.ajax({
+                    url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                    type: 'POST',
+                    data: {
+                        action: 'crcm_get_vehicle_features',
+                        vehicle_type: vehicleType,
+                        nonce: '<?php echo wp_create_nonce('crcm_admin_nonce'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $('#crcm-features-container .crcm-features-grid').html(response.data);
+                            $('#crcm-features-container').attr('data-vehicle-type', vehicleType);
+                        }
+                    }
+                });
+            }
+        });
+        </script>
         
         <style>
         .crcm-features-grid {
@@ -635,7 +691,7 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
-     * Advanced availability meta box
+     * Advanced availability meta box - FIXED: JavaScript now works properly
      */
     public function availability_meta_box($post) {
         $availability_data = get_post_meta($post->ID, '_crcm_availability_data', true);
@@ -672,7 +728,16 @@ class CRCM_Vehicle_Manager {
             let ruleIndex = <?php echo !empty($availability_data) ? count($availability_data) : 0; ?>;
             const maxQuantity = <?php echo $max_quantity; ?>;
             
-            $('#add-availability-rule').on('click', function() {
+            // FIXED: Properly bind click event
+            $('#add-availability-rule').off('click').on('click', function(e) {
+                e.preventDefault();
+                
+                let quantityOptions = '';
+                for (let i = 1; i <= maxQuantity; i++) {
+                    quantityOptions += `<option value="${i}">${i}</option>`;
+                }
+                quantityOptions += `<option value="all"><?php _e('Tutte', 'custom-rental-manager'); ?></option>`;
+                
                 const ruleHtml = `
                     <div class="crcm-availability-rule" data-index="${ruleIndex}">
                         <table class="form-table">
@@ -691,14 +756,8 @@ class CRCM_Vehicle_Manager {
                                 </td>
                                 <td style="width: 150px;">
                                     <label><?php _e('Quantità da Rimuovere', 'custom-rental-manager'); ?></label>
-                                    <select name="availability_data[${ruleIndex}][quantity_to_remove]">`;
-                
-                for (let i = 1; i <= maxQuantity; i++) {
-                    ruleHtml += `<option value="${i}">${i}</option>`;
-                }
-                
-                ruleHtml += `
-                                        <option value="all"><?php _e('Tutte', 'custom-rental-manager'); ?></option>
+                                    <select name="availability_data[${ruleIndex}][quantity_to_remove]">
+                                        ${quantityOptions}
                                     </select>
                                 </td>
                                 <td style="width: 50px;">
@@ -714,13 +773,19 @@ class CRCM_Vehicle_Manager {
                 ruleIndex++;
             });
             
-            $(document).on('click', '.remove-rule', function() {
+            // FIXED: Use event delegation for dynamically added elements
+            $(document).on('click', '.remove-rule', function(e) {
+                e.preventDefault();
                 $(this).closest('.crcm-availability-rule').remove();
             });
         });
         </script>
         
         <style>
+        .crcm-availability-container {
+            padding: 10px 0;
+        }
+        
         .crcm-availability-rule {
             margin-bottom: 15px;
             padding: 15px;
@@ -747,6 +812,10 @@ class CRCM_Vehicle_Manager {
         .crcm-availability-rule input,
         .crcm-availability-rule select {
             width: 100%;
+        }
+        
+        #add-availability-rule {
+            margin-top: 10px;
         }
         </style>
         <?php
@@ -814,133 +883,6 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
-     * Gallery meta box (simplified)
-     */
-    public function gallery_meta_box($post) {
-        $gallery_ids = get_post_meta($post->ID, '_crcm_gallery_ids', true);
-        $gallery_ids = !empty($gallery_ids) ? explode(',', $gallery_ids) : array();
-        ?>
-        
-        <div id="crcm-gallery-container">
-            <div class="crcm-gallery-images">
-                <?php foreach ($gallery_ids as $attachment_id): 
-                    if (empty($attachment_id)) continue;
-                    $image_url = wp_get_attachment_image_url($attachment_id, 'thumbnail');
-                    if ($image_url): ?>
-                        <div class="crcm-gallery-image" data-attachment-id="<?php echo $attachment_id; ?>">
-                            <img src="<?php echo esc_url($image_url); ?>" alt="" />
-                            <button type="button" class="remove-image">×</button>
-                        </div>
-                    <?php endif;
-                endforeach; ?>
-            </div>
-            
-            <input type="hidden" id="crcm-gallery-ids" name="gallery_ids" value="<?php echo esc_attr(implode(',', $gallery_ids)); ?>" />
-            
-            <button type="button" id="add-gallery-images" class="button">
-                <?php _e('Aggiungi Immagini', 'custom-rental-manager'); ?>
-            </button>
-        </div>
-        
-        <script>
-        jQuery(document).ready(function($) {
-            let frame;
-            
-            $('#add-gallery-images').on('click', function(e) {
-                e.preventDefault();
-                
-                if (frame) {
-                    frame.open();
-                    return;
-                }
-                
-                frame = wp.media({
-                    title: '<?php _e('Seleziona Immagini', 'custom-rental-manager'); ?>',
-                    button: {
-                        text: '<?php _e('Aggiungi alla Galleria', 'custom-rental-manager'); ?>'
-                    },
-                    multiple: true
-                });
-                
-                frame.on('select', function() {
-                    const selection = frame.state().get('selection');
-                    const ids = $('#crcm-gallery-ids').val().split(',').filter(id => id !== '');
-                    
-                    selection.each(function(attachment) {
-                        const id = attachment.get('id');
-                        if (ids.indexOf(id.toString()) === -1) {
-                            ids.push(id);
-                            
-                            const imageHtml = `
-                                <div class="crcm-gallery-image" data-attachment-id="${id}">
-                                    <img src="${attachment.get('sizes').thumbnail.url}" alt="" />
-                                    <button type="button" class="remove-image">×</button>
-                                </div>
-                            `;
-                            
-                            $('.crcm-gallery-images').append(imageHtml);
-                        }
-                    });
-                    
-                    $('#crcm-gallery-ids').val(ids.join(','));
-                });
-                
-                frame.open();
-            });
-            
-            $(document).on('click', '.remove-image', function() {
-                const attachmentId = $(this).parent().data('attachment-id');
-                const ids = $('#crcm-gallery-ids').val().split(',');
-                const newIds = ids.filter(id => id !== attachmentId.toString());
-                
-                $('#crcm-gallery-ids').val(newIds.join(','));
-                $(this).parent().remove();
-            });
-        });
-        </script>
-        
-        <style>
-        .crcm-gallery-images {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-        
-        .crcm-gallery-image {
-            position: relative;
-            width: 80px;
-            height: 80px;
-        }
-        
-        .crcm-gallery-image img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            border-radius: 5px;
-        }
-        
-        .remove-image {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            width: 20px;
-            height: 20px;
-            background: #dc3232;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-        }
-        </style>
-        <?php
-    }
-    
-    /**
      * AJAX get vehicle fields
      */
     public function ajax_get_vehicle_fields() {
@@ -951,6 +893,31 @@ class CRCM_Vehicle_Manager {
         
         ob_start();
         $this->render_vehicle_fields($vehicle_type, $vehicle_data);
+        $html = ob_get_clean();
+        
+        wp_send_json_success($html);
+    }
+    
+    /**
+     * AJAX get vehicle features based on type
+     */
+    public function ajax_get_vehicle_features() {
+        check_ajax_referer('crcm_admin_nonce', 'nonce');
+        
+        $vehicle_type = sanitize_text_field($_POST['vehicle_type']);
+        $available_features = $this->vehicle_types[$vehicle_type]['features'];
+        
+        ob_start();
+        foreach ($available_features as $key => $label):
+        ?>
+            <div class="crcm-feature-item">
+                <label>
+                    <input type="checkbox" name="vehicle_features[]" value="<?php echo esc_attr($key); ?>" />
+                    <span class="crcm-feature-label"><?php echo esc_html($label); ?></span>
+                </label>
+            </div>
+        <?php
+        endforeach;
         $html = ob_get_clean();
         
         wp_send_json_success($html);
@@ -1028,11 +995,6 @@ class CRCM_Vehicle_Manager {
                 }
             }
             update_post_meta($post_id, '_crcm_availability_data', $availability_data);
-        }
-        
-        // Save gallery
-        if (isset($_POST['gallery_ids'])) {
-            update_post_meta($post_id, '_crcm_gallery_ids', sanitize_text_field($_POST['gallery_ids']));
         }
         
         // Save features
@@ -1120,6 +1082,13 @@ class CRCM_Vehicle_Manager {
     public function get_vehicle_type($vehicle_id) {
         $vehicle_data = get_post_meta($vehicle_id, '_crcm_vehicle_data', true);
         return isset($vehicle_data['vehicle_type']) ? $vehicle_data['vehicle_type'] : 'auto';
+    }
+    
+    /**
+     * Get locations array
+     */
+    public function get_locations() {
+        return $this->locations;
     }
     
     /**
@@ -1285,3 +1254,6 @@ add_action('admin_head', function() {
     </style>
     <?php
 });
+
+// Add AJAX handler for features
+add_action('wp_ajax_crcm_get_vehicle_features', array(crcm()->vehicle_manager, 'ajax_get_vehicle_features'));
