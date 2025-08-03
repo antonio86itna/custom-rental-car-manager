@@ -1,8 +1,9 @@
 <?php
 /**
- * Vehicle Manager Class - COMPLETE WITH MISC SECTION & FULL TABS
+ * Vehicle Manager Class - OPTIMIZED LAYOUT WITH LEFT-SIDE SECTIONS
  * 
- * Added complete Misc section and moved all metaboxes to full-width tabs.
+ * All metaboxes moved to left column (normal) for better layout and visibility.
+ * Clean, modern, and intuitive design.
  * 
  * @package CustomRentalCarManager
  * @author Totaliweb
@@ -77,6 +78,9 @@ class CRCM_Vehicle_Manager {
         
         // AJAX handlers
         add_action('wp_ajax_crcm_get_vehicle_fields', array($this, 'ajax_get_vehicle_fields'));
+        
+        // Add custom admin styles
+        add_action('admin_head', array($this, 'admin_custom_styles'));
     }
     
     /**
@@ -126,12 +130,13 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
-     * Add meta boxes for vehicle post type - REORGANIZED AS FULL WIDTH TABS
+     * Add meta boxes for vehicle post type - OPTIMIZED LAYOUT
      */
     public function add_meta_boxes() {
+        // PRIMARY SECTIONS - HIGH PRIORITY
         add_meta_box(
             'crcm_vehicle_details',
-            __('Vehicle Details', 'custom-rental-manager'),
+            '🚗 ' . __('Vehicle Details', 'custom-rental-manager'),
             array($this, 'vehicle_details_meta_box'),
             'crcm_vehicle',
             'normal',
@@ -140,16 +145,17 @@ class CRCM_Vehicle_Manager {
         
         add_meta_box(
             'crcm_vehicle_pricing',
-            __('Tariffe', 'custom-rental-manager'),
+            '💰 ' . __('Tariffe', 'custom-rental-manager'),
             array($this, 'pricing_meta_box'),
             'crcm_vehicle',
             'normal',
             'high'
         );
         
+        // SECONDARY SECTIONS - DEFAULT PRIORITY (BETTER ORGANIZED)
         add_meta_box(
             'crcm_vehicle_features',
-            __('Features & Specifications', 'custom-rental-manager'),
+            '⚙️ ' . __('Features & Specifications', 'custom-rental-manager'),
             array($this, 'features_meta_box'),
             'crcm_vehicle',
             'normal',
@@ -158,42 +164,384 @@ class CRCM_Vehicle_Manager {
         
         add_meta_box(
             'crcm_vehicle_availability',
-            __('Disponibilità', 'custom-rental-manager'),
+            '📅 ' . __('Disponibilità', 'custom-rental-manager'),
             array($this, 'availability_meta_box'),
             'crcm_vehicle',
             'normal',
             'default'
         );
         
-        // MOVED TO FULL WIDTH: Extra Services
         add_meta_box(
             'crcm_vehicle_extras',
-            __('Servizi Extra', 'custom-rental-manager'),
+            '🛠️ ' . __('Servizi Extra', 'custom-rental-manager'),
             array($this, 'extras_meta_box'),
             'crcm_vehicle',
             'normal',
             'default'
         );
         
-        // MOVED TO FULL WIDTH: Insurance
         add_meta_box(
             'crcm_vehicle_insurance',
-            __('Assicurazioni', 'custom-rental-manager'),
+            '🛡️ ' . __('Assicurazioni', 'custom-rental-manager'),
             array($this, 'insurance_meta_box'),
             'crcm_vehicle',
             'normal',
             'default'
         );
         
-        // MOVED TO FULL WIDTH: Misc Settings
         add_meta_box(
             'crcm_vehicle_misc',
-            __('Varie', 'custom-rental-manager'),
+            '⚡ ' . __('Varie', 'custom-rental-manager'),
             array($this, 'misc_meta_box'),
             'crcm_vehicle',
             'normal',
             'default'
         );
+    }
+    
+    /**
+     * Add custom admin styles for better layout
+     */
+    public function admin_custom_styles() {
+        $screen = get_current_screen();
+        if ($screen && ($screen->post_type === 'crcm_vehicle')) {
+            ?>
+            <style>
+            /* OPTIMIZE VEHICLE ADMIN LAYOUT */
+            .post-type-crcm_vehicle #poststuff {
+                padding-top: 10px;
+            }
+            
+            .post-type-crcm_vehicle #post-body.columns-2 {
+                margin-right: 320px;
+            }
+            
+            .post-type-crcm_vehicle #post-body.columns-2 #postbox-container-1 {
+                width: 300px;
+                margin-right: -300px;
+            }
+            
+            .post-type-crcm_vehicle #post-body.columns-2 #postbox-container-2 {
+                margin-right: 0;
+            }
+            
+            /* METABOX STYLING */
+            .post-type-crcm_vehicle .postbox {
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                margin-bottom: 20px;
+            }
+            
+            .post-type-crcm_vehicle .postbox .postbox-header {
+                background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                border-bottom: 1px solid #ddd;
+                border-radius: 8px 8px 0 0;
+                padding: 12px 16px;
+            }
+            
+            .post-type-crcm_vehicle .postbox .postbox-header h2 {
+                font-size: 15px;
+                font-weight: 600;
+                color: #333;
+                margin: 0;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            
+            .post-type-crcm_vehicle .postbox .inside {
+                padding: 20px;
+                background: white;
+                border-radius: 0 0 8px 8px;
+            }
+            
+            /* HIGH PRIORITY SECTIONS - SPECIAL STYLING */
+            .post-type-crcm_vehicle #crcm_vehicle_details .postbox-header {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+            }
+            
+            .post-type-crcm_vehicle #crcm_vehicle_pricing .postbox-header {
+                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                color: white;
+            }
+            
+            /* SECTION SPECIFIC COLORS */
+            .post-type-crcm_vehicle #crcm_vehicle_features .postbox-header {
+                background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+                color: white;
+            }
+            
+            .post-type-crcm_vehicle #crcm_vehicle_availability .postbox-header {
+                background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+                color: white;
+            }
+            
+            .post-type-crcm_vehicle #crcm_vehicle_extras .postbox-header {
+                background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+                color: white;
+            }
+            
+            .post-type-crcm_vehicle #crcm_vehicle_insurance .postbox-header {
+                background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+                color: #333;
+            }
+            
+            .post-type-crcm_vehicle #crcm_vehicle_misc .postbox-header {
+                background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+                color: #333;
+            }
+            
+            /* FORM STYLING */
+            .post-type-crcm_vehicle .form-table th {
+                width: 200px;
+                font-weight: 600;
+                color: #333;
+                padding: 12px 0;
+            }
+            
+            .post-type-crcm_vehicle .form-table td {
+                padding: 12px 0;
+            }
+            
+            .post-type-crcm_vehicle .form-table input[type="text"],
+            .post-type-crcm_vehicle .form-table input[type="number"],
+            .post-type-crcm_vehicle .form-table input[type="date"],
+            .post-type-crcm_vehicle .form-table input[type="email"],
+            .post-type-crcm_vehicle .form-table select,
+            .post-type-crcm_vehicle .form-table textarea {
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 8px 12px;
+                font-size: 14px;
+                transition: border-color 0.2s ease;
+            }
+            
+            .post-type-crcm_vehicle .form-table input:focus,
+            .post-type-crcm_vehicle .form-table select:focus,
+            .post-type-crcm_vehicle .form-table textarea:focus {
+                border-color: #007cba;
+                box-shadow: 0 0 0 1px #007cba;
+                outline: none;
+            }
+            
+            /* BUTTON STYLING */
+            .post-type-crcm_vehicle .button {
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-weight: 500;
+                transition: all 0.2s ease;
+            }
+            
+            .post-type-crcm_vehicle .button-secondary {
+                background: #f7f7f7;
+                border-color: #ccc;
+            }
+            
+            .post-type-crcm_vehicle .button-secondary:hover {
+                background: #fafafa;
+                border-color: #999;
+                transform: translateY(-1px);
+            }
+            
+            .post-type-crcm_vehicle .button-link-delete {
+                color: #d63638;
+                text-decoration: none;
+            }
+            
+            .post-type-crcm_vehicle .button-link-delete:hover {
+                color: #d63638;
+                text-decoration: underline;
+            }
+            
+            /* RESPONSIVE IMPROVEMENTS */
+            @media screen and (max-width: 1200px) {
+                .post-type-crcm_vehicle #post-body.columns-2 {
+                    margin-right: 280px;
+                }
+                
+                .post-type-crcm_vehicle #post-body.columns-2 #postbox-container-1 {
+                    width: 260px;
+                    margin-right: -260px;
+                }
+            }
+            
+            @media screen and (max-width: 980px) {
+                .post-type-crcm_vehicle #post-body.columns-2 {
+                    margin-right: 0;
+                }
+                
+                .post-type-crcm_vehicle #post-body.columns-2 #postbox-container-1 {
+                    width: 100%;
+                    margin-right: 0;
+                    margin-top: 20px;
+                }
+            }
+             
+            /* SECTION SPECIFIC IMPROVEMENTS */
+            .crcm-insurance-cards,
+            .crcm-misc-sections {
+                display: grid;
+                gap: 15px;
+            }
+            
+            @media screen and (min-width: 1200px) {
+                .crcm-insurance-cards {
+                    grid-template-columns: 1fr 1fr;
+                }
+            }
+            
+            .crcm-insurance-card,
+            .crcm-misc-section {
+                border-radius: 6px;
+                border: 1px solid #ddd;
+                background: #fafafa;
+                overflow: hidden;
+            }
+            
+            .crcm-insurance-card .card-header,
+            .crcm-misc-section h3 {
+                padding: 12px 16px;
+                margin: 0;
+                font-size: 14px;
+                font-weight: 600;
+                border-bottom: 1px solid #ddd;
+                background: white;
+            }
+            
+            .crcm-insurance-card .card-content,
+            .crcm-misc-section .form-table {
+                padding: 16px;
+            }
+            
+            /* FEATURES GRID */
+            .crcm-features-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 10px;
+            }
+            
+            .crcm-feature-item {
+                background: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                padding: 10px 12px;
+            }
+            
+            .crcm-feature-item:hover {
+                background: #e9ecef;
+            }
+            
+            .crcm-feature-item label {
+                display: flex;
+                align-items: center;
+                cursor: pointer;
+                margin: 0;
+                font-weight: 500;
+            }
+            
+            .crcm-feature-item input[type="checkbox"] {
+                margin-right: 8px;
+            }
+            
+            /* DYNAMIC SECTIONS STYLING */
+            .crcm-custom-rate-row,
+            .crcm-availability-rule,
+            .crcm-extra-service-row {
+                background: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 6px;
+                padding: 16px;
+                margin-bottom: 12px;
+            }
+            
+            .crcm-custom-rate-row:hover,
+            .crcm-availability-rule:hover,
+            .crcm-extra-service-row:hover {
+                background: #f1f3f4;
+                border-color: #adb5bd;
+            }
+            
+            /* LOADING STATES */
+            .crcm-loading {
+                opacity: 0.6;
+                pointer-events: none;
+            }
+            
+            .crcm-loading::after {
+                content: '';
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                width: 20px;
+                height: 20px;
+                margin: -10px 0 0 -10px;
+                border: 2px solid #f3f3f3;
+                border-radius: 50%;
+                border-top: 2px solid #007cba;
+                animation: crcm-spin 1s linear infinite;
+            }
+            
+            @keyframes crcm-spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            
+            /* SUCCESS/ERROR MESSAGES */
+            .crcm-message {
+                padding: 10px 15px;
+                border-radius: 4px;
+                margin: 10px 0;
+                font-weight: 500;
+            }
+            
+            .crcm-message.success {
+                background: #d4edda;
+                border: 1px solid #c3e6cb;
+                color: #155724;
+            }
+            
+            .crcm-message.error {
+                background: #f8d7da;
+                border: 1px solid #f5c6cb;
+                color: #721c24;
+            }
+            
+            .crcm-message.warning {
+                background: #fff3cd;
+                border: 1px solid #ffeaa7;
+                color: #856404;
+            }
+            
+            /* BADGES AND STATUS INDICATORS */
+            .crcm-status-badge {
+                display: inline-block;
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 11px;
+                font-weight: 600;
+                text-transform: uppercase;
+                line-height: 1.4;
+            }
+            
+            .crcm-status-badge.active {
+                background: #d4edda;  
+                color: #155724;
+            }
+            
+            .crcm-status-badge.inactive {
+                background: #f8d7da;
+                color: #721c24;
+            }
+            
+            .crcm-status-badge.featured {
+                background: #ffeaa7;
+                color: #856404;
+            }
+            </style>
+            <?php
+        }
     }
     
     /**
@@ -219,11 +567,16 @@ class CRCM_Vehicle_Manager {
         }
         ?>
         
-        <div class="crcm-vehicle-details-tabs">
+        <div class="crcm-vehicle-details-container">
             <!-- Vehicle Type Selection -->
-            <table class="form-table crcm-main-table">
+            <div class="crcm-section-header">
+                <h4><?php _e('Tipo di Veicolo', 'custom-rental-manager'); ?></h4>
+                <p class="description"><?php _e('Seleziona il tipo di veicolo per visualizzare i campi specifici', 'custom-rental-manager'); ?></p>
+            </div>
+            
+            <table class="form-table">
                 <tr>
-                    <th><label for="vehicle_type"><?php _e('Tipo di Veicolo', 'custom-rental-manager'); ?> *</label></th>
+                    <th><label for="vehicle_type"><?php _e('Tipo Veicolo', 'custom-rental-manager'); ?> *</label></th>
                     <td>
                         <select id="vehicle_type" name="vehicle_data[vehicle_type]" class="crcm-vehicle-type-selector" required>
                             <?php foreach ($this->vehicle_types as $type_key => $type_data): ?>
@@ -232,12 +585,13 @@ class CRCM_Vehicle_Manager {
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                        <p class="description"><?php _e('La selezione cambierà i campi disponibili', 'custom-rental-manager'); ?></p>
                     </td>
                 </tr>
             </table>
             
             <!-- Dynamic Fields Container -->
-            <div id="crcm-dynamic-fields">
+            <div id="crcm-dynamic-fields" class="crcm-dynamic-section">
                 <?php $this->render_vehicle_fields($selected_type, $vehicle_data); ?>
             </div>
         </div>
@@ -246,6 +600,9 @@ class CRCM_Vehicle_Manager {
         jQuery(document).ready(function($) {
             $('#vehicle_type').on('change', function() {
                 const vehicleType = $(this).val();
+                const $container = $('#crcm-dynamic-fields');
+                
+                $container.addClass('crcm-loading');
                 
                 $.ajax({
                     url: '<?php echo admin_url('admin-ajax.php'); ?>',
@@ -257,35 +614,22 @@ class CRCM_Vehicle_Manager {
                     },
                     success: function(response) {
                         if (response.success) {
-                            $('#crcm-dynamic-fields').html(response.data);
-                            // Trigger features update
-                            $('#crcm-dynamic-fields').trigger('vehicle_type_changed', [vehicleType]);
+                            $container.html(response.data);
+                            $container.trigger('vehicle_type_changed', [vehicleType]);
+                        } else {
+                            $container.html('<div class="crcm-message error">Errore nel caricamento dei campi</div>');
                         }
+                    },
+                    error: function() {
+                        $container.html('<div class="crcm-message error">Errore di connessione</div>');
+                    },
+                    complete: function() {
+                        $container.removeClass('crcm-loading');
                     }
                 });
             });
         });
         </script>
-        
-        <style>
-        .crcm-main-table {
-            border-bottom: 1px solid #ddd;
-            margin-bottom: 20px;
-            padding-bottom: 20px;
-        }
-        
-        .crcm-vehicle-type-selector {
-            width: 200px;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        
-        #crcm-dynamic-fields .form-table {
-            margin-top: 0;
-        }
-        </style>
         <?php
     }
     
@@ -296,9 +640,13 @@ class CRCM_Vehicle_Manager {
         $type_config = $this->vehicle_types[$vehicle_type];
         ?>
         
+        <div class="crcm-section-header">
+            <h4><?php printf(__('Dettagli %s', 'custom-rental-manager'), $type_config['name']); ?></h4>
+        </div>
+        
         <table class="form-table">
             <?php if (in_array('seats', $type_config['fields'])): ?>
-                <tr class="crcm-field-auto">
+                <tr>
                     <th><label for="seats"><?php _e('Numero Posti', 'custom-rental-manager'); ?> *</label></th>
                     <td>
                         <select id="seats" name="vehicle_data[seats]" required>
@@ -313,7 +661,7 @@ class CRCM_Vehicle_Manager {
             <?php endif; ?>
             
             <?php if (in_array('luggage', $type_config['fields'])): ?>
-                <tr class="crcm-field-auto">
+                <tr>
                     <th><label for="luggage"><?php _e('Numero Bagagli', 'custom-rental-manager'); ?> *</label></th>
                     <td>
                         <select id="luggage" name="vehicle_data[luggage]" required>
@@ -327,7 +675,7 @@ class CRCM_Vehicle_Manager {
             <?php endif; ?>
             
             <?php if (in_array('transmission', $type_config['fields'])): ?>
-                <tr class="crcm-field-auto">
+                <tr>
                     <th><label for="transmission"><?php _e('Cambio', 'custom-rental-manager'); ?> *</label></th>
                     <td>
                         <select id="transmission" name="vehicle_data[transmission]" required>
@@ -374,7 +722,7 @@ class CRCM_Vehicle_Manager {
             <?php endif; ?>
             
             <?php if (in_array('engine_size', $type_config['fields'])): ?>
-                <tr class="crcm-field-scooter">
+                <tr>
                     <th><label for="engine_size"><?php _e('Cilindrata', 'custom-rental-manager'); ?> *</label></th>
                     <td>
                         <select id="engine_size" name="vehicle_data[engine_size]" required>
@@ -424,6 +772,11 @@ class CRCM_Vehicle_Manager {
         
         <div class="crcm-pricing-container">
             <!-- Base Rate -->
+            <div class="crcm-section-header">
+                <h4><?php _e('Prezzo Base', 'custom-rental-manager'); ?></h4>
+                <p class="description"><?php _e('Imposta il prezzo base giornaliero per questo veicolo', 'custom-rental-manager'); ?></p>
+            </div>
+            
             <table class="form-table">
                 <tr>
                     <th><label for="daily_rate"><?php _e('Prezzo Base Giornaliero (€)', 'custom-rental-manager'); ?> *</label></th>
@@ -438,8 +791,10 @@ class CRCM_Vehicle_Manager {
             
             <!-- Custom Rates -->
             <div class="crcm-custom-rates">
-                <h3><?php _e('Tariffe Personalizzate', 'custom-rental-manager'); ?></h3>
-                <p class="description"><?php _e('Aggiungi tariffe extra per periodi specifici. Le tariffe si sommano al prezzo base.', 'custom-rental-manager'); ?></p>
+                <div class="crcm-section-header">
+                    <h4><?php _e('Tariffe Personalizzate', 'custom-rental-manager'); ?></h4>
+                    <p class="description"><?php _e('Aggiungi tariffe extra per periodi specifici. Le tariffe si sommano al prezzo base.', 'custom-rental-manager'); ?></p>
+                </div>
                 
                 <div id="custom-rates-container">
                     <?php
@@ -452,6 +807,7 @@ class CRCM_Vehicle_Manager {
                 </div>
                 
                 <button type="button" id="add-custom-rate" class="button button-secondary">
+                    <span class="dashicons dashicons-plus"></span>
                     <?php _e('Aggiungi Tariffa Personalizzata', 'custom-rental-manager'); ?>
                 </button>
             </div>
@@ -492,7 +848,10 @@ class CRCM_Vehicle_Manager {
                                 </td>
                                 <td style="width: 50px;">
                                     <label>&nbsp;</label>
-                                    <button type="button" class="button button-link-delete remove-rate"><?php _e('Rimuovi', 'custom-rental-manager'); ?></button>
+                                    <button type="button" class="button button-link-delete remove-rate">
+                                        <span class="dashicons dashicons-trash"></span>
+                                        <?php _e('Rimuovi', 'custom-rental-manager'); ?>
+                                    </button>
                                 </td>
                             </tr>
                         </table>
@@ -504,7 +863,9 @@ class CRCM_Vehicle_Manager {
             });
             
             $(document).on('click', '.remove-rate', function() {
-                $(this).closest('.crcm-custom-rate-row').remove();
+                $(this).closest('.crcm-custom-rate-row').fadeOut(300, function() {
+                    $(this).remove();
+                });
             });
             
             $(document).on('change', '.rate-type-selector', function() {
@@ -519,43 +880,6 @@ class CRCM_Vehicle_Manager {
             });
         });
         </script>
-        
-        <style>
-        .crcm-custom-rates {
-            margin-top: 20px;
-            padding: 20px;
-            background: #f9f9f9;
-            border-radius: 5px;
-        }
-        
-        .crcm-custom-rate-row {
-            margin-bottom: 15px;
-            padding: 15px;
-            background: white;
-            border-radius: 5px;
-            border: 1px solid #ddd;
-        }
-        
-        .crcm-custom-rate-row table {
-            margin: 0;
-        }
-        
-        .crcm-custom-rate-row td {
-            padding: 5px;
-            vertical-align: top;
-        }
-        
-        .crcm-custom-rate-row label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-        
-        .crcm-custom-rate-row input,
-        .crcm-custom-rate-row select {
-            width: 100%;
-        }
-        </style>
         <?php
     }
     
@@ -597,7 +921,10 @@ class CRCM_Vehicle_Manager {
                     </td>
                     <td style="width: 50px;">
                         <label>&nbsp;</label>
-                        <button type="button" class="button button-link-delete remove-rate"><?php _e('Rimuovi', 'custom-rental-manager'); ?></button>
+                        <button type="button" class="button button-link-delete remove-rate">
+                            <span class="dashicons dashicons-trash"></span>
+                            <?php _e('Rimuovi', 'custom-rental-manager'); ?>
+                        </button>
                     </td>
                 </tr>
             </table>
@@ -621,6 +948,11 @@ class CRCM_Vehicle_Manager {
         ?>
         
         <div class="crcm-features-container" id="crcm-features-container" data-vehicle-type="<?php echo esc_attr($vehicle_type); ?>">
+            <div class="crcm-section-header">
+                <h4><?php printf(__('Caratteristiche disponibili per %s', 'custom-rental-manager'), $vehicle_type === 'auto' ? 'Auto' : 'Scooter'); ?></h4>
+                <p class="description"><?php _e('Seleziona le caratteristiche incluse con questo veicolo', 'custom-rental-manager'); ?></p>
+            </div>
+            
             <div class="crcm-features-grid">
                 <?php foreach ($available_features as $key => $label): ?>
                     <div class="crcm-feature-item">
@@ -642,6 +974,9 @@ class CRCM_Vehicle_Manager {
             });
             
             function updateFeatures(vehicleType) {
+                const $container = $('#crcm-features-container');
+                $container.addClass('crcm-loading');
+                
                 $.ajax({
                     url: '<?php echo admin_url('admin-ajax.php'); ?>',
                     type: 'POST',
@@ -652,42 +987,21 @@ class CRCM_Vehicle_Manager {
                     },
                     success: function(response) {
                         if (response.success) {
-                            $('#crcm-features-container .crcm-features-grid').html(response.data);
-                            $('#crcm-features-container').attr('data-vehicle-type', vehicleType);
+                            $container.find('.crcm-features-grid').html(response.data);
+                            $container.attr('data-vehicle-type', vehicleType);
+                            
+                            // Update header
+                            const typeName = vehicleType === 'auto' ? 'Auto' : 'Scooter';
+                            $container.find('h4').text('Caratteristiche disponibili per ' + typeName);
                         }
+                    },
+                    complete: function() {
+                        $container.removeClass('crcm-loading');
                     }
                 });
             }
         });
         </script>
-        
-        <style>
-        .crcm-features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 10px;
-        }
-        
-        .crcm-feature-item {
-            padding: 10px;
-            background: #f9f9f9;
-            border-radius: 5px;
-        }
-        
-        .crcm-feature-item label {
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-        }
-        
-        .crcm-feature-item input[type="checkbox"] {
-            margin-right: 8px;
-        }
-        
-        .crcm-feature-label {
-            font-weight: 500;
-        }
-        </style>
         <?php
     }
     
@@ -705,9 +1019,12 @@ class CRCM_Vehicle_Manager {
         ?>
         
         <div class="crcm-availability-container">
-            <p class="description">
-                <?php printf(__('Gestisci la disponibilità del veicolo. Quantità massima: %d unità', 'custom-rental-manager'), $max_quantity); ?>
-            </p>
+            <div class="crcm-section-header">
+                <h4><?php _e('Regole di Disponibilità', 'custom-rental-manager'); ?></h4>
+                <p class="description">
+                    <?php printf(__('Gestisci la disponibilità del veicolo. Quantità massima: %d unità', 'custom-rental-manager'), $max_quantity); ?>
+                </p>
+            </div>
             
             <div id="availability-rules-container">
                 <?php
@@ -720,6 +1037,7 @@ class CRCM_Vehicle_Manager {
             </div>
             
             <button type="button" id="add-availability-rule" class="button button-secondary">
+                <span class="dashicons dashicons-calendar-alt"></span>
                 <?php _e('Aggiungi Regola Disponibilità', 'custom-rental-manager'); ?>
             </button>
         </div>
@@ -762,7 +1080,10 @@ class CRCM_Vehicle_Manager {
                                 </td>
                                 <td style="width: 50px;">
                                     <label>&nbsp;</label>
-                                    <button type="button" class="button button-link-delete remove-rule"><?php _e('Rimuovi', 'custom-rental-manager'); ?></button>
+                                    <button type="button" class="button button-link-delete remove-rule">
+                                        <span class="dashicons dashicons-trash"></span>
+                                        <?php _e('Rimuovi', 'custom-rental-manager'); ?>
+                                    </button>
                                 </td>
                             </tr>
                         </table>
@@ -775,48 +1096,12 @@ class CRCM_Vehicle_Manager {
             
             $(document).on('click', '.remove-rule', function(e) {
                 e.preventDefault();
-                $(this).closest('.crcm-availability-rule').remove();
+                $(this).closest('.crcm-availability-rule').fadeOut(300, function() {
+                    $(this).remove();
+                });
             });
         });
         </script>
-        
-        <style>
-        .crcm-availability-container {
-            padding: 10px 0;
-        }
-        
-        .crcm-availability-rule {
-            margin-bottom: 15px;
-            padding: 15px;
-            background: white;
-            border-radius: 5px;
-            border: 1px solid #ddd;
-        }
-        
-        .crcm-availability-rule table {
-            margin: 0;
-        }
-        
-        .crcm-availability-rule td {
-            padding: 5px;
-            vertical-align: top;
-        }
-        
-        .crcm-availability-rule label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-        
-        .crcm-availability-rule input,
-        .crcm-availability-rule select {
-            width: 100%;
-        }
-        
-        #add-availability-rule {
-            margin-top: 10px;
-        }
-        </style>
         <?php
     }
     
@@ -858,7 +1143,10 @@ class CRCM_Vehicle_Manager {
                     </td>
                     <td style="width: 50px;">
                         <label>&nbsp;</label>
-                        <button type="button" class="button button-link-delete remove-rule"><?php _e('Rimuovi', 'custom-rental-manager'); ?></button>
+                        <button type="button" class="button button-link-delete remove-rule">
+                            <span class="dashicons dashicons-trash"></span>
+                            <?php _e('Rimuovi', 'custom-rental-manager'); ?>
+                        </button>
                     </td>
                 </tr>
             </table>
@@ -867,7 +1155,7 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
-     * Extra Services meta box - NOW FULL WIDTH
+     * Extra Services meta box - OPTIMIZED LAYOUT
      */
     public function extras_meta_box($post) {
         $extras_data = get_post_meta($post->ID, '_crcm_extras_data', true);
@@ -878,7 +1166,10 @@ class CRCM_Vehicle_Manager {
         ?>
         
         <div class="crcm-extras-container">
-            <p class="description"><?php _e('Aggiungi servizi extra disponibili per questo veicolo. Ogni servizio avrà una tariffa giornaliera aggiuntiva.', 'custom-rental-manager'); ?></p>
+            <div class="crcm-section-header">
+                <h4><?php _e('Servizi Aggiuntivi', 'custom-rental-manager'); ?></h4>
+                <p class="description"><?php _e('Aggiungi servizi extra disponibili per questo veicolo. Ogni servizio avrà una tariffa giornaliera aggiuntiva.', 'custom-rental-manager'); ?></p>
+            </div>
             
             <div id="extras-services-container">
                 <?php
@@ -891,6 +1182,7 @@ class CRCM_Vehicle_Manager {
             </div>
             
             <button type="button" id="add-extra-service" class="button button-secondary">
+                <span class="dashicons dashicons-plus"></span>
                 <?php _e('Aggiungi Servizio Extra', 'custom-rental-manager'); ?>
             </button>
         </div>
@@ -918,7 +1210,10 @@ class CRCM_Vehicle_Manager {
                                 </td>
                                 <td style="width: 10%;">
                                     <label>&nbsp;</label>
-                                    <button type="button" class="button button-link-delete remove-service"><?php _e('Rimuovi', 'custom-rental-manager'); ?></button>
+                                    <button type="button" class="button button-link-delete remove-service">
+                                        <span class="dashicons dashicons-trash"></span>
+                                        <?php _e('Rimuovi', 'custom-rental-manager'); ?>
+                                    </button>
                                 </td>
                             </tr>
                         </table>
@@ -931,53 +1226,12 @@ class CRCM_Vehicle_Manager {
             
             $(document).on('click', '.remove-service', function(e) {
                 e.preventDefault();
-                $(this).closest('.crcm-extra-service-row').remove();
+                $(this).closest('.crcm-extra-service-row').fadeOut(300, function() {
+                    $(this).remove();
+                });
             });
         });
         </script>
-        
-        <style>
-        .crcm-extras-container {
-            padding: 15px;
-        }
-        
-        .crcm-extra-service-row {
-            margin-bottom: 15px;
-            padding: 15px;
-            background: #f9f9f9;
-            border-radius: 5px;
-            border: 1px solid #ddd;
-        }
-        
-        .crcm-extra-service-row table {
-            margin: 0;
-        }
-        
-        .crcm-extra-service-row td {
-            padding: 5px;
-            vertical-align: top;
-        }
-        
-        .crcm-extra-service-row label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-        
-        .crcm-extra-service-row input {
-            width: 100%;
-        }
-        
-        .crcm-extra-service-row .description {
-            margin-top: 5px;
-            font-size: 12px;
-            color: #666;
-        }
-        
-        #add-extra-service {
-            margin-top: 10px;
-        }
-        </style>
         <?php
     }
     
@@ -1003,7 +1257,10 @@ class CRCM_Vehicle_Manager {
                     </td>
                     <td style="width: 10%;">
                         <label>&nbsp;</label>
-                        <button type="button" class="button button-link-delete remove-service"><?php _e('Rimuovi', 'custom-rental-manager'); ?></button>
+                        <button type="button" class="button button-link-delete remove-service">
+                            <span class="dashicons dashicons-trash"></span>
+                            <?php _e('Rimuovi', 'custom-rental-manager'); ?>
+                        </button>
                     </td>
                 </tr>
             </table>
@@ -1012,7 +1269,7 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
-     * Insurance meta box - NOW FULL WIDTH
+     * Insurance meta box - OPTIMIZED LAYOUT
      */
     public function insurance_meta_box($post) {
         $insurance_data = get_post_meta($post->ID, '_crcm_insurance_data', true);
@@ -1035,6 +1292,11 @@ class CRCM_Vehicle_Manager {
         ?>
         
         <div class="crcm-insurance-container">
+            <div class="crcm-section-header">
+                <h4><?php _e('Opzioni Assicurative', 'custom-rental-manager'); ?></h4>
+                <p class="description"><?php _e('Configura le opzioni assicurative disponibili per questo veicolo', 'custom-rental-manager'); ?></p>
+            </div>
+            
             <div class="crcm-insurance-cards">
                 
                 <!-- Basic Insurance Card -->
@@ -1043,7 +1305,7 @@ class CRCM_Vehicle_Manager {
                         <h3><?php _e('Assicurazione Base', 'custom-rental-manager'); ?></h3>
                         <div class="card-status">
                             <input type="hidden" name="insurance_data[basic][enabled]" value="1" />
-                            <span class="status-badge status-included"><?php _e('Sempre Inclusa', 'custom-rental-manager'); ?></span>
+                            <span class="crcm-status-badge active"><?php _e('Sempre Inclusa', 'custom-rental-manager'); ?></span>
                         </div>
                     </div>
                     
@@ -1113,142 +1375,11 @@ class CRCM_Vehicle_Manager {
                 
             </div>
         </div>
-        
-        <style>
-        .crcm-insurance-container {
-            padding: 15px;
-        }
-        
-        .crcm-insurance-cards {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-        
-        .crcm-insurance-card {
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            background: white;
-            overflow: hidden;
-        }
-        
-        .crcm-basic-card {
-            border-color: #27ae60;
-        }
-        
-        .crcm-premium-card {
-            border-color: #3498db;
-        }
-        
-        .card-header {
-            background: #f8f9fa;
-            padding: 15px;
-            border-bottom: 1px solid #ddd;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .crcm-basic-card .card-header {
-            background: #27ae60;
-            color: white;
-        }
-        
-        .crcm-premium-card .card-header {
-            background: #3498db;
-            color: white;
-        }
-        
-        .card-header h3 {
-            margin: 0;
-            font-size: 16px;
-            font-weight: 600;
-        }
-        
-        .status-badge {
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        
-        .status-included {
-            background: rgba(255,255,255,0.2);
-            color: white;
-        }
-        
-        .card-content {
-            padding: 15px;
-        }
-        
-        .features-list h4,
-        .cost-info h4 {
-            margin: 0 0 10px 0;
-            font-size: 14px;
-            font-weight: 600;
-            color: #333;
-        }
-        
-        .features-list ul {
-            margin: 0;
-            padding-left: 20px;
-        }
-        
-        .features-list li {
-            margin-bottom: 5px;
-            font-size: 13px;
-        }
-        
-        .cost-display {
-            text-align: center;
-            padding: 10px;
-        }
-        
-        .cost-amount {
-            font-size: 18px;
-            font-weight: 700;
-        }
-        
-        .cost-amount.included {
-            color: #27ae60;
-        }
-        
-        .cost-input {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        
-        .cost-input input {
-            flex: 1;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        
-        .currency {
-            font-weight: 600;
-            color: #666;
-        }
-        
-        .card-content .description {
-            margin-top: 5px;
-            font-size: 12px;
-            color: #666;
-        }
-        
-        @media (max-width: 768px) {
-            .crcm-insurance-cards {
-                grid-template-columns: 1fr;
-            }
-        }
-        </style>
         <?php
     }
     
     /**
-     * COMPLETE: Misc meta box with all advanced settings - NOW FULL WIDTH
+     * Misc meta box with all advanced settings - OPTIMIZED LAYOUT
      */
     public function misc_meta_box($post) {
         $misc_data = get_post_meta($post->ID, '_crcm_misc_data', true);
@@ -1269,11 +1400,16 @@ class CRCM_Vehicle_Manager {
         ?>
         
         <div class="crcm-misc-container">
+            <div class="crcm-section-header">
+                <h4><?php _e('Impostazioni Avanzate', 'custom-rental-manager'); ?></h4>
+                <p class="description"><?php _e('Configura regole speciali e opzioni avanzate per questo veicolo', 'custom-rental-manager'); ?></p>
+            </div>
+            
             <div class="crcm-misc-sections">
                 
                 <!-- Rental Duration Limits -->
                 <div class="crcm-misc-section">
-                    <h3><?php _e('Limiti Durata Noleggio', 'custom-rental-manager'); ?></h3>
+                    <h3><?php _e('📅 Limiti Durata Noleggio', 'custom-rental-manager'); ?></h3>
                     <table class="form-table">
                         <tr>
                             <th><label for="min_rental_days"><?php _e('Giorni Minimi di Noleggio', 'custom-rental-manager'); ?></label></th>
@@ -1298,7 +1434,7 @@ class CRCM_Vehicle_Manager {
                 
                 <!-- Cancellation Policy -->
                 <div class="crcm-misc-section">
-                    <h3><?php _e('Politica di Cancellazione', 'custom-rental-manager'); ?></h3>
+                    <h3><?php _e('❌ Politica di Cancellazione', 'custom-rental-manager'); ?></h3>
                     <table class="form-table">
                         <tr>
                             <th><?php _e('Cancellazione con Rimborso', 'custom-rental-manager'); ?></th>
@@ -1326,7 +1462,7 @@ class CRCM_Vehicle_Manager {
                 
                 <!-- Late Return Policy -->
                 <div class="crcm-misc-section">
-                    <h3><?php _e('Regola Riconsegna Tardiva', 'custom-rental-manager'); ?></h3>
+                    <h3><?php _e('⏰ Regola Riconsegna Tardiva', 'custom-rental-manager'); ?></h3>
                     <table class="form-table">
                         <tr>
                             <th><?php _e('Giorno Extra dopo le 10:00', 'custom-rental-manager'); ?></th>
@@ -1360,7 +1496,7 @@ class CRCM_Vehicle_Manager {
                 
                 <!-- Featured Vehicle -->
                 <div class="crcm-misc-section">
-                    <h3><?php _e('Veicolo in Evidenza', 'custom-rental-manager'); ?></h3>
+                    <h3><?php _e('⭐ Veicolo in Evidenza', 'custom-rental-manager'); ?></h3>
                     <table class="form-table">
                         <tr>
                             <th><?php _e('Metti in Evidenza', 'custom-rental-manager'); ?></th>
@@ -1394,27 +1530,27 @@ class CRCM_Vehicle_Manager {
             // Toggle cancellation days visibility
             $('#cancellation_enabled').on('change', function() {
                 if ($(this).is(':checked')) {
-                    $('.cancellation-days-row').show();
+                    $('.cancellation-days-row').slideDown(300);
                 } else {
-                    $('.cancellation-days-row').hide();
+                    $('.cancellation-days-row').slideUp(300); 
                 }
             });
             
             // Toggle late return time visibility
             $('#late_return_rule').on('change', function() {
                 if ($(this).is(':checked')) {
-                    $('.late-return-time-row').show();
+                    $('.late-return-time-row').slideDown(300);
                 } else {
-                    $('.late-return-time-row').hide();
+                    $('.late-return-time-row').slideUp(300);
                 }
             });
             
             // Toggle featured priority visibility
             $('#featured_vehicle').on('change', function() {
                 if ($(this).is(':checked')) {
-                    $('.featured-priority-row').show();
+                    $('.featured-priority-row').slideDown(300);
                 } else {
-                    $('.featured-priority-row').hide();
+                    $('.featured-priority-row').slideUp(300);
                 }
             });
             
@@ -1430,84 +1566,6 @@ class CRCM_Vehicle_Manager {
             });
         });
         </script>
-        
-        <style>
-        .crcm-misc-container {
-            padding: 15px;
-        }
-        
-        .crcm-misc-sections {
-            display: grid;
-            gap: 25px;
-        }
-        
-        .crcm-misc-section {
-            background: #f9f9f9;
-            border-radius: 8px;
-            padding: 20px;
-            border: 1px solid #ddd;
-        }
-        
-        .crcm-misc-section h3 {
-            margin: 0 0 15px 0;
-            font-size: 16px;
-            font-weight: 600;
-            color: #333;
-            border-bottom: 2px solid #ddd;
-            padding-bottom: 8px;
-        }
-        
-        .crcm-misc-section .form-table {
-            margin: 0;
-        }
-        
-        .crcm-misc-section .form-table th {
-            width: 200px;
-            padding: 10px 0;
-            font-weight: 600;
-        }
-        
-        .crcm-misc-section .form-table td {
-            padding: 10px 0;
-        }
-        
-        .crcm-misc-section input[type="number"],
-        .crcm-misc-section select {
-            width: 100px;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        
-        .crcm-misc-section input[type="checkbox"] {
-            margin-right: 8px;
-        }
-        
-        .crcm-misc-section .description {
-            margin-top: 5px;
-            font-size: 12px;
-            color: #666;
-            font-style: italic;
-        }
-        
-        .crcm-misc-section label {
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-            font-weight: 500;
-        }
-        
-        /* Special styling for featured section */
-        .crcm-misc-section:last-child {
-            border-color: #f39c12;
-            background: linear-gradient(135deg, #fff9e6 0%, #fff 100%);
-        }
-        
-        .crcm-misc-section:last-child h3 {
-            color: #f39c12;
-            border-color: #f39c12;
-        }
-        </style>
         <?php
     }
     
@@ -1899,7 +1957,7 @@ class CRCM_Vehicle_Manager {
             case 'crcm_featured':
                 if (isset($misc_data['featured_vehicle']) && $misc_data['featured_vehicle']) {
                     $priority = intval($misc_data['featured_priority'] ?? 0);
-                    echo '<span class="crcm-featured-badge">★ In Evidenza</span>';
+                    echo '<span class="crcm-status-badge featured">★ In Evidenza</span>';
                     if ($priority > 0) {
                         echo '<br><small>Priorità: ' . $priority . '</small>';
                     }
@@ -2045,19 +2103,6 @@ add_action('admin_head', function() {
     .crcm-no-extras {
         color: #999;
         font-style: italic;
-    }
-    
-    .crcm-featured-badge {
-        background: #f39c12;
-        color: white;
-        padding: 2px 6px;
-        border-radius: 10px;
-        font-size: 11px;
-        font-weight: 600;
-    }
-    
-    .crcm-not-featured {
-        color: #999;
     }
     </style>
     <?php
