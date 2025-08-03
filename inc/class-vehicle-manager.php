@@ -1,10 +1,8 @@
 <?php
 /**
- * Vehicle Manager Class - OPTIMIZED & CLEANED
+ * Vehicle Manager Class - WITH EXTRA SERVICES & INSURANCE
  * 
- * Handles all vehicle-related operations with custom user roles,
- * dynamic vehicle types, and advanced availability management.
- * Removed taxonomies, editor, gallery and fixed all issues.
+ * Added Extra Services and Insurance sections with advanced functionality.
  * 
  * @package CustomRentalCarManager
  * @author Totaliweb
@@ -605,7 +603,7 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
-     * Dynamic features meta box - FIXED: Now properly detects vehicle type
+     * Dynamic features meta box
      */
     public function features_meta_box($post) {
         $features = get_post_meta($post->ID, '_crcm_vehicle_features', true);
@@ -691,7 +689,7 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
-     * Advanced availability meta box - FIXED: JavaScript now works properly
+     * Advanced availability meta box
      */
     public function availability_meta_box($post) {
         $availability_data = get_post_meta($post->ID, '_crcm_availability_data', true);
@@ -728,7 +726,6 @@ class CRCM_Vehicle_Manager {
             let ruleIndex = <?php echo !empty($availability_data) ? count($availability_data) : 0; ?>;
             const maxQuantity = <?php echo $max_quantity; ?>;
             
-            // FIXED: Properly bind click event
             $('#add-availability-rule').off('click').on('click', function(e) {
                 e.preventDefault();
                 
@@ -773,7 +770,6 @@ class CRCM_Vehicle_Manager {
                 ruleIndex++;
             });
             
-            // FIXED: Use event delegation for dynamically added elements
             $(document).on('click', '.remove-rule', function(e) {
                 e.preventDefault();
                 $(this).closest('.crcm-availability-rule').remove();
@@ -868,18 +864,392 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
-     * Empty meta boxes for future implementation
+     * ENHANCED: Extra Services meta box with unlimited services
      */
     public function extras_meta_box($post) {
-        echo '<p>' . __('Servizi extra verranno implementati qui.', 'custom-rental-manager') . '</p>';
+        $extras_data = get_post_meta($post->ID, '_crcm_extras_data', true);
+        
+        if (empty($extras_data)) {
+            $extras_data = array();
+        }
+        ?>
+        
+        <div class="crcm-extras-container">
+            <p class="description"><?php _e('Aggiungi servizi extra disponibili per questo veicolo. Ogni servizio avrà una tariffa giornaliera aggiuntiva.', 'custom-rental-manager'); ?></p>
+            
+            <div id="extras-services-container">
+                <?php
+                if (!empty($extras_data)) {
+                    foreach ($extras_data as $index => $service) {
+                        $this->render_extra_service_row($index, $service);
+                    }
+                }
+                ?>
+            </div>
+            
+            <button type="button" id="add-extra-service" class="button button-secondary">
+                <?php _e('Aggiungi Servizio Extra', 'custom-rental-manager'); ?>
+            </button>
+        </div>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            let serviceIndex = <?php echo !empty($extras_data) ? count($extras_data) : 0; ?>;
+            
+            $('#add-extra-service').off('click').on('click', function(e) {
+                e.preventDefault();
+                
+                const serviceHtml = `
+                    <div class="crcm-extra-service-row" data-index="${serviceIndex}">
+                        <table class="form-table">
+                            <tr>
+                                <td style="width: 60%;">
+                                    <label><?php _e('Nome Servizio', 'custom-rental-manager'); ?></label>
+                                    <input type="text" name="extras_data[${serviceIndex}][name]" placeholder="Es: GPS, Seggiolino bambini, Catene da neve..." required />
+                                    <p class="description"><?php _e('Nome del servizio extra disponibile', 'custom-rental-manager'); ?></p>
+                                </td>
+                                <td style="width: 30%;">
+                                    <label><?php _e('Tariffa Giornaliera (€)', 'custom-rental-manager'); ?></label>
+                                    <input type="number" name="extras_data[${serviceIndex}][daily_rate]" step="0.01" min="0" placeholder="0.00" required />
+                                    <p class="description"><?php _e('Costo extra giornaliero', 'custom-rental-manager'); ?></p>
+                                </td>
+                                <td style="width: 10%;">
+                                    <label>&nbsp;</label>
+                                    <button type="button" class="button button-link-delete remove-service"><?php _e('Rimuovi', 'custom-rental-manager'); ?></button>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                `;
+                
+                $('#extras-services-container').append(serviceHtml);
+                serviceIndex++;
+            });
+            
+            $(document).on('click', '.remove-service', function(e) {
+                e.preventDefault();
+                $(this).closest('.crcm-extra-service-row').remove();
+            });
+        });
+        </script>
+        
+        <style>
+        .crcm-extras-container {
+            padding: 15px;
+        }
+        
+        .crcm-extra-service-row {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        
+        .crcm-extra-service-row table {
+            margin: 0;
+        }
+        
+        .crcm-extra-service-row td {
+            padding: 5px;
+            vertical-align: top;
+        }
+        
+        .crcm-extra-service-row label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .crcm-extra-service-row input {
+            width: 100%;
+        }
+        
+        .crcm-extra-service-row .description {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        #add-extra-service {
+            margin-top: 10px;
+        }
+        </style>
+        <?php
     }
     
+    /**
+     * Render extra service row
+     */
+    private function render_extra_service_row($index, $service) {
+        ?>
+        <div class="crcm-extra-service-row" data-index="<?php echo $index; ?>">
+            <table class="form-table">
+                <tr>
+                    <td style="width: 60%;">
+                        <label><?php _e('Nome Servizio', 'custom-rental-manager'); ?></label>
+                        <input type="text" name="extras_data[<?php echo $index; ?>][name]" 
+                               value="<?php echo esc_attr($service['name'] ?? ''); ?>" placeholder="Es: GPS, Seggiolino bambini, Catene da neve..." required />
+                        <p class="description"><?php _e('Nome del servizio extra disponibile', 'custom-rental-manager'); ?></p>
+                    </td>
+                    <td style="width: 30%;">
+                        <label><?php _e('Tariffa Giornaliera (€)', 'custom-rental-manager'); ?></label>
+                        <input type="number" name="extras_data[<?php echo $index; ?>][daily_rate]" 
+                               value="<?php echo esc_attr($service['daily_rate'] ?? ''); ?>" step="0.01" min="0" placeholder="0.00" required />
+                        <p class="description"><?php _e('Costo extra giornaliero', 'custom-rental-manager'); ?></p>
+                    </td>
+                    <td style="width: 10%;">
+                        <label>&nbsp;</label>
+                        <button type="button" class="button button-link-delete remove-service"><?php _e('Rimuovi', 'custom-rental-manager'); ?></button>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <?php
+    }
+    
+    /**
+     * ENHANCED: Insurance meta box with Basic and Premium options
+     */
     public function insurance_meta_box($post) {
-        echo '<p>' . __('Opzioni assicurative verranno implementate qui.', 'custom-rental-manager') . '</p>';
+        $insurance_data = get_post_meta($post->ID, '_crcm_insurance_data', true);
+        
+        // Default values
+        if (empty($insurance_data)) {
+            $insurance_data = array(
+                'basic' => array(
+                    'enabled' => true, // Always enabled
+                    'features' => array('Solo RCA'),
+                    'cost' => 'Incluso'
+                ),
+                'premium' => array(
+                    'enabled' => false,
+                    'deductible' => '500',
+                    'daily_rate' => 0
+                )
+            );
+        }
+        ?>
+        
+        <div class="crcm-insurance-container">
+            <div class="crcm-insurance-cards">
+                
+                <!-- Basic Insurance Card -->
+                <div class="crcm-insurance-card crcm-basic-card">
+                    <div class="card-header">
+                        <h3><?php _e('Assicurazione Base', 'custom-rental-manager'); ?></h3>
+                        <div class="card-status">
+                            <input type="hidden" name="insurance_data[basic][enabled]" value="1" />
+                            <span class="status-badge status-included"><?php _e('Sempre Inclusa', 'custom-rental-manager'); ?></span>
+                        </div>
+                    </div>
+                    
+                    <div class="card-content">
+                        <div class="features-list">
+                            <h4><?php _e('Caratteristiche:', 'custom-rental-manager'); ?></h4>
+                            <ul>
+                                <li><?php _e('Solo RCA', 'custom-rental-manager'); ?></li>
+                                <li><?php _e('Responsabilità Civile Auto', 'custom-rental-manager'); ?></li>
+                            </ul>
+                        </div>
+                        
+                        <div class="cost-info">
+                            <h4><?php _e('Costo:', 'custom-rental-manager'); ?></h4>
+                            <div class="cost-display">
+                                <span class="cost-amount included"><?php _e('Incluso', 'custom-rental-manager'); ?></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Premium Insurance Card -->
+                <div class="crcm-insurance-card crcm-premium-card">
+                    <div class="card-header">
+                        <h3><?php _e('Assicurazione Premium', 'custom-rental-manager'); ?></h3>
+                        <div class="card-status">
+                            <label>
+                                <input type="checkbox" name="insurance_data[premium][enabled]" value="1" 
+                                       <?php checked($insurance_data['premium']['enabled'] ?? false, true); ?> />
+                                <?php _e('Disponibile', 'custom-rental-manager'); ?>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="card-content">
+                        <div class="features-list">
+                            <h4><?php _e('Caratteristiche:', 'custom-rental-manager'); ?></h4>
+                            <ul>
+                                <li><?php _e('RCA', 'custom-rental-manager'); ?></li>
+                                <li>
+                                    <?php _e('Franchigia', 'custom-rental-manager'); ?>: 
+                                    <select name="insurance_data[premium][deductible]" style="width: 100px;">
+                                        <option value="300" <?php selected($insurance_data['premium']['deductible'] ?? '', '300'); ?>>€300</option>
+                                        <option value="500" <?php selected($insurance_data['premium']['deductible'] ?? '', '500'); ?>>€500</option>
+                                        <option value="700" <?php selected($insurance_data['premium']['deductible'] ?? '', '700'); ?>>€700</option>
+                                        <option value="1000" <?php selected($insurance_data['premium']['deductible'] ?? '', '1000'); ?>>€1000</option>
+                                        <option value="1500" <?php selected($insurance_data['premium']['deductible'] ?? '', '1500'); ?>>€1500</option>
+                                    </select>
+                                </li>
+                                <li><?php _e('Furto e Incendio', 'custom-rental-manager'); ?></li>
+                                <li><?php _e('Danni Accidentali', 'custom-rental-manager'); ?></li>
+                            </ul>
+                        </div>
+                        
+                        <div class="cost-info">
+                            <h4><?php _e('Tariffa Giornaliera:', 'custom-rental-manager'); ?></h4>
+                            <div class="cost-input">
+                                <input type="number" name="insurance_data[premium][daily_rate]" 
+                                       value="<?php echo esc_attr($insurance_data['premium']['daily_rate'] ?? ''); ?>" 
+                                       step="0.01" min="0" placeholder="0.00" />
+                                <span class="currency">€</span>
+                            </div>
+                            <p class="description"><?php _e('Costo extra giornaliero per assicurazione premium', 'custom-rental-manager'); ?></p>
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+        
+        <style>
+        .crcm-insurance-container {
+            padding: 15px;
+        }
+        
+        .crcm-insurance-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .crcm-insurance-card {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            overflow: hidden;
+        }
+        
+        .crcm-basic-card {
+            border-color: #27ae60;
+        }
+        
+        .crcm-premium-card {
+            border-color: #3498db;
+        }
+        
+        .card-header {
+            background: #f8f9fa;
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .crcm-basic-card .card-header {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .crcm-premium-card .card-header {
+            background: #3498db;
+            color: white;
+        }
+        
+        .card-header h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-included {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        
+        .card-content {
+            padding: 15px;
+        }
+        
+        .features-list h4,
+        .cost-info h4 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .features-list ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        .features-list li {
+            margin-bottom: 5px;
+            font-size: 13px;
+        }
+        
+        .cost-display {
+            text-align: center;
+            padding: 10px;
+        }
+        
+        .cost-amount {
+            font-size: 18px;
+            font-weight: 700;
+        }
+        
+        .cost-amount.included {
+            color: #27ae60;
+        }
+        
+        .cost-input {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .cost-input input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .currency {
+            font-weight: 600;
+            color: #666;
+        }
+        
+        .card-content .description {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        @media (max-width: 768px) {
+            .crcm-insurance-cards {
+                grid-template-columns: 1fr;
+            }
+        }
+        </style>
+        <?php
     }
     
+    /**
+     * Misc meta box - placeholder for future features
+     */
     public function misc_meta_box($post) {
         echo '<p>' . __('Altre opzioni verranno implementate qui.', 'custom-rental-manager') . '</p>';
+        echo '<p class="description">' . __('Questa sezione è riservata per funzionalità future come condizioni speciali, note interne, ecc.', 'custom-rental-manager') . '</p>';
     }
     
     /**
@@ -924,7 +1294,7 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
-     * Save vehicle meta data
+     * ENHANCED: Save vehicle meta data with new sections
      */
     public function save_vehicle_meta($post_id) {
         // Verify nonce
@@ -1003,6 +1373,43 @@ class CRCM_Vehicle_Manager {
             update_post_meta($post_id, '_crcm_vehicle_features', $features);
         } else {
             update_post_meta($post_id, '_crcm_vehicle_features', array());
+        }
+        
+        // SAVE EXTRA SERVICES
+        if (isset($_POST['extras_data'])) {
+            $extras_data = array();
+            foreach ($_POST['extras_data'] as $service) {
+                if (!empty($service['name']) && isset($service['daily_rate'])) {
+                    $extras_data[] = array(
+                        'name' => sanitize_text_field($service['name']),
+                        'daily_rate' => floatval($service['daily_rate']),
+                    );
+                }
+            }
+            update_post_meta($post_id, '_crcm_extras_data', $extras_data);
+        } else {
+            update_post_meta($post_id, '_crcm_extras_data', array());
+        }
+        
+        // SAVE INSURANCE DATA
+        if (isset($_POST['insurance_data'])) {
+            $insurance_data = array();
+            
+            // Basic insurance (always enabled)
+            $insurance_data['basic'] = array(
+                'enabled' => true,
+                'features' => array('Solo RCA'),
+                'cost' => 'Incluso'
+            );
+            
+            // Premium insurance
+            $insurance_data['premium'] = array(
+                'enabled' => isset($_POST['insurance_data']['premium']['enabled']) ? true : false,
+                'deductible' => sanitize_text_field($_POST['insurance_data']['premium']['deductible'] ?? '500'),
+                'daily_rate' => floatval($_POST['insurance_data']['premium']['daily_rate'] ?? 0)
+            );
+            
+            update_post_meta($post_id, '_crcm_insurance_data', $insurance_data);
         }
     }
     
@@ -1092,6 +1499,20 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
+     * Get vehicle extra services
+     */
+    public function get_vehicle_extras($vehicle_id) {
+        return get_post_meta($vehicle_id, '_crcm_extras_data', true) ?: array();
+    }
+    
+    /**
+     * Get vehicle insurance options
+     */
+    public function get_vehicle_insurance($vehicle_id) {
+        return get_post_meta($vehicle_id, '_crcm_insurance_data', true) ?: array();
+    }
+    
+    /**
      * Custom columns for vehicle list
      */
     public function vehicle_columns($columns) {
@@ -1102,6 +1523,7 @@ class CRCM_Vehicle_Manager {
         $new_columns['crcm_type'] = __('Type', 'custom-rental-manager');
         $new_columns['crcm_specs'] = __('Specifications', 'custom-rental-manager');
         $new_columns['crcm_daily_rate'] = __('Daily Rate', 'custom-rental-manager');
+        $new_columns['crcm_extras'] = __('Extras', 'custom-rental-manager');
         $new_columns['crcm_availability'] = __('Available', 'custom-rental-manager');
         $new_columns['date'] = $columns['date'];
         
@@ -1114,6 +1536,7 @@ class CRCM_Vehicle_Manager {
     public function vehicle_column_content($column, $post_id) {
         $vehicle_data = get_post_meta($post_id, '_crcm_vehicle_data', true);
         $pricing_data = get_post_meta($post_id, '_crcm_pricing_data', true);
+        $extras_data = get_post_meta($post_id, '_crcm_extras_data', true);
         
         switch ($column) {
             case 'crcm_image':
@@ -1157,6 +1580,14 @@ class CRCM_Vehicle_Manager {
             case 'crcm_daily_rate':
                 if ($pricing_data && isset($pricing_data['daily_rate'])) {
                     echo '€' . number_format($pricing_data['daily_rate'], 2);
+                }
+                break;
+                
+            case 'crcm_extras':
+                if (!empty($extras_data)) {
+                    echo '<span class="crcm-extras-count">' . count($extras_data) . ' servizi</span>';
+                } else {
+                    echo '<span class="crcm-no-extras">Nessuno</span>';
                 }
                 break;
                 
@@ -1212,6 +1643,8 @@ class CRCM_Vehicle_Manager {
             
             $available_quantity = $this->check_availability($vehicle->ID, $pickup_date, $return_date);
             $pricing_data = get_post_meta($vehicle->ID, '_crcm_pricing_data', true);
+            $extras_data = get_post_meta($vehicle->ID, '_crcm_extras_data', true);
+            $insurance_data = get_post_meta($vehicle->ID, '_crcm_insurance_data', true);
             
             $available_vehicles[] = array(
                 'id' => $vehicle->ID,
@@ -1221,6 +1654,8 @@ class CRCM_Vehicle_Manager {
                 'daily_rate' => $pricing_data['daily_rate'] ?? 0,
                 'vehicle_type' => $vehicle_data['vehicle_type'] ?? 'auto',
                 'specs' => $vehicle_data,
+                'extras' => $extras_data ?: array(),
+                'insurance' => $insurance_data ?: array(),
                 'available_quantity' => $available_quantity,
                 'is_available' => $available_quantity > 0,
             );
@@ -1250,6 +1685,20 @@ add_action('admin_head', function() {
     
     .crcm-type-scooter {
         background: #764ba2;
+    }
+    
+    .crcm-extras-count {
+        background: #27ae60;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    
+    .crcm-no-extras {
+        color: #999;
+        font-style: italic;
     }
     </style>
     <?php
