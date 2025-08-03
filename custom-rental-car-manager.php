@@ -17,10 +17,10 @@
  */
 
 /**
- * Plugin Main File - CLEANED & OPTIMIZED
+ * Plugin Main File - FIXED ACTIVATION & ROLE CREATION
  * 
- * Removed taxonomies completely and cleaned up admin menu.
- * Fixed post type registration to remove editor and taxonomies.
+ * Added proper activation hook to ensure user roles are created.
+ * Fixed role creation timing and initialization.
  * 
  * @package CustomRentalCarManager
  * @author Totaliweb
@@ -81,6 +81,7 @@ class CRCM_Plugin {
      * Initialize hooks
      */
     private function init_hooks() {
+        // CRITICAL: Add activation hook to create roles
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
         
@@ -88,6 +89,9 @@ class CRCM_Plugin {
         add_action('init', array($this, 'load_textdomain'), 5);
         add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_assets'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
+        
+        // FORCE role creation check on every admin page load (for debugging)
+        add_action('admin_init', array($this, 'check_and_create_roles'));
     }
     
     /**
@@ -325,8 +329,15 @@ class CRCM_Plugin {
             
             echo '<p>' . sprintf(esc_html__('Vehicles: %d', 'custom-rental-manager'), $vehicle_count->publish ?? 0) . '</p>';
             echo '<p>' . sprintf(esc_html__('Bookings: %d', 'custom-rental-manager'), $booking_count->publish ?? 0) . '</p>';
-            echo '</div>';
             
+            // Show role status for debugging
+            echo '<h3>' . __('Role Status (Debug)', 'custom-rental-manager') . '</h3>';
+            $customer_role = get_role('crcm_customer');
+            $manager_role = get_role('crcm_manager');
+            echo '<p><strong>Customer Role:</strong> ' . ($customer_role ? '✅ Created' : '❌ Missing') . '</p>';
+            echo '<p><strong>Manager Role:</strong> ' . ($manager_role ? '✅ Created' : '❌ Missing') . '</p>';
+            
+            echo '</div>';
             echo '</div>';
         }
     }
@@ -448,13 +459,13 @@ class CRCM_Plugin {
      * Enqueue frontend assets
      */
     public function enqueue_frontend_assets() {
-        $css_path = CRCM_PLUGIN_PATH . 'asset/css/frontend.css';
-        $js_path = CRCM_PLUGIN_PATH . 'asset/js/frontend.js';
+        $css_path = CRCM_PLUGIN_PATH . 'assets/css/frontend.css';
+        $js_path = CRCM_PLUGIN_PATH . 'assets/js/frontend.js';
         
         if (file_exists($css_path)) {
             wp_enqueue_style(
                 'crcm-frontend',
-                CRCM_PLUGIN_URL . 'asset/css/frontend.css',
+                CRCM_PLUGIN_URL . 'assets/css/frontend.css',
                 array(),
                 CRCM_VERSION
             );
@@ -463,7 +474,7 @@ class CRCM_Plugin {
         if (file_exists($js_path)) {
             wp_enqueue_script(
                 'crcm-frontend',
-                CRCM_PLUGIN_URL . 'asset/js/frontend.js',
+                CRCM_PLUGIN_URL . 'assets/js/frontend.js',
                 array('jquery'),
                 CRCM_VERSION,
                 true
@@ -487,13 +498,13 @@ class CRCM_Plugin {
             return;
         }
         
-        $css_path = CRCM_PLUGIN_PATH . 'asset/css/admin.css';
-        $js_path = CRCM_PLUGIN_PATH . 'asset/js/admin.js';
+        $css_path = CRCM_PLUGIN_PATH . 'assets/css/admin.css';
+        $js_path = CRCM_PLUGIN_PATH . 'assets/js/admin.js';
         
         if (file_exists($css_path)) {
             wp_enqueue_style(
                 'crcm-admin',
-                CRCM_PLUGIN_URL . 'asset/css/admin.css',
+                CRCM_PLUGIN_URL . 'assets/css/admin.css',
                 array(),
                 CRCM_VERSION
             );
@@ -509,7 +520,7 @@ class CRCM_Plugin {
         if (file_exists($js_path)) {
             wp_enqueue_script(
                 'crcm-admin',
-                CRCM_PLUGIN_URL . 'asset/js/admin.js',
+                CRCM_PLUGIN_URL . 'assets/js/admin.js',
                 array('jquery', 'jquery-ui-datepicker'),
                 CRCM_VERSION,
                 true
@@ -531,13 +542,46 @@ class CRCM_Plugin {
     }
     
     /**
-     * Plugin activation
+     * CRITICAL: Check and create roles if they don't exist
+     */
+    public function check_and_create_roles() {
+        $customer_role = get_role('crcm_customer');
+        $manager_role = get_role('crcm_manager');
+        
+        if (!$customer_role || !$manager_role) {
+            // Force create roles
+            if (function_exists('crcm_create_custom_user_roles')) {
+                crcm_create_custom_user_roles();
+            }
+        }
+    }
+    
+    /**
+     * Plugin activation - FIXED: Now properly creates roles
      */
     public function activate() {
+        // Create default settings
         $this->create_default_settings();
         
-        // FLUSH REWRITE RULES: Delay to avoid early execution
-        add_action('init', 'flush_rewrite_rules', 999);
+        // Load functions.php to access role creation function
+        if (file_exists(CRCM_PLUGIN_PATH . 'inc/functions.php')) {
+            require_once CRCM_PLUGIN_PATH . 'inc/functions.php';
+        }
+        
+        // Create user roles immediately on activation
+        if (function_exists('crcm_create_custom_user_roles')) {
+            crcm_create_custom_user_roles();
+        }
+        
+        // Register post types before flushing
+        $this->register_post_types();
+        
+        // Flush rewrite rules
+        flush_rewrite_rules();
+        
+        // Set activation flag
+        update_option('crcm_plugin_activated', true);
+        update_option('crcm_activation_time', current_time('mysql'));
     }
     
     /**
@@ -546,6 +590,10 @@ class CRCM_Plugin {
     public function deactivate() {
         wp_clear_scheduled_hook('crcm_daily_reminder_check');
         flush_rewrite_rules();
+        
+        // Optionally remove roles on deactivation (uncomment if needed)
+        // remove_role('crcm_customer');
+        // remove_role('crcm_manager');
     }
     
     /**
@@ -576,3 +624,29 @@ function crcm() {
 
 // Initialize only after WordPress is loaded
 add_action('plugins_loaded', 'crcm', 10);
+
+/**
+ * MANUAL ROLE CREATION FUNCTION - For immediate testing
+ * Add this to wp-admin/plugins.php?crcm_create_roles=1 for manual trigger
+ */
+if (isset($_GET['crcm_create_roles']) && current_user_can('manage_options')) {
+    add_action('admin_init', function() {
+        if (file_exists(CRCM_PLUGIN_PATH . 'inc/functions.php')) {
+            require_once CRCM_PLUGIN_PATH . 'inc/functions.php';
+            if (function_exists('crcm_create_custom_user_roles')) {
+                crcm_create_custom_user_roles();
+                wp_redirect(admin_url('plugins.php?crcm_roles_created=1'));
+                exit;
+            }
+        }
+    });
+}
+
+// Show success message
+if (isset($_GET['crcm_roles_created'])) {
+    add_action('admin_notices', function() {
+        echo '<div class="notice notice-success is-dismissible">';
+        echo '<p><strong>Custom Rental Manager:</strong> User roles created successfully!</p>';
+        echo '</div>';
+    });
+}
