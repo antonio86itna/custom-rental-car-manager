@@ -16,6 +16,17 @@
  * Network: false
  */
 
+/**
+ * Plugin Main File - CLEANED & OPTIMIZED
+ * 
+ * Removed taxonomies completely and cleaned up admin menu.
+ * Fixed post type registration to remove editor and taxonomies.
+ * 
+ * @package CustomRentalCarManager
+ * @author Totaliweb
+ * @since 1.0.0
+ */
+
 // Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
@@ -67,29 +78,27 @@ class CRCM_Plugin {
     }
     
     /**
-     * Initialize hooks - FIX: Proper hook timing
+     * Initialize hooks
      */
     private function init_hooks() {
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
         
-        // FIX: Use proper WordPress initialization hooks with correct timing
         add_action('init', array($this, 'init'), 10);
-        add_action('init', array($this, 'load_textdomain'), 5); // Load textdomain early in init
+        add_action('init', array($this, 'load_textdomain'), 5);
         add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_assets'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
     }
     
     /**
-     * Initialize plugin - FIX: Moved post type registration to proper timing
+     * Initialize plugin
      */
     public function init() {
         // Load dependencies first
         $this->load_dependencies();
         
-        // Register post types and taxonomies AFTER WordPress is fully loaded
+        // Register post types (NO taxonomies)
         $this->register_post_types();
-        $this->register_taxonomies();
         
         // Initialize managers after WordPress objects are ready
         $this->init_managers();
@@ -102,7 +111,7 @@ class CRCM_Plugin {
     }
     
     /**
-     * Load plugin textdomain - FIX: Separate method called at proper time
+     * Load plugin textdomain
      */
     public function load_textdomain() {
         $languages_path = dirname(plugin_basename(__FILE__)) . '/languages/';
@@ -138,7 +147,7 @@ class CRCM_Plugin {
     }
     
     /**
-     * Initialize manager instances - FIX: Only instantiate if classes exist
+     * Initialize manager instances
      */
     private function init_managers() {
         if (class_exists('CRCM_Vehicle_Manager')) {
@@ -171,10 +180,10 @@ class CRCM_Plugin {
     }
     
     /**
-     * Register custom post types - FIX: Clean menu structure
+     * Register custom post types - CLEANED: No taxonomies, no editor
      */
     private function register_post_types() {
-        // Vehicle post type - NO MENU (will be under main menu)
+        // Vehicle post type - CLEANED: No editor, no taxonomies
         register_post_type('crcm_vehicle', array(
             'labels' => array(
                 'name' => __('Vehicles', 'custom-rental-manager'),
@@ -186,13 +195,13 @@ class CRCM_Plugin {
             'public' => true,
             'has_archive' => false,
             'menu_icon' => 'dashicons-car',
-            'supports' => array('title', 'editor', 'thumbnail', 'excerpt'),
+            'supports' => array('title', 'thumbnail'), // REMOVED: editor, excerpt
             'show_in_rest' => false,
             'rewrite' => false,
-            'show_in_menu' => false, // FIX: Don't show separate menu
+            'show_in_menu' => false, // Will be under main menu
         ));
         
-        // Booking post type - NO MENU (will be under main menu)
+        // Booking post type - NO CHANGES
         register_post_type('crcm_booking', array(
             'labels' => array(
                 'name' => __('Bookings', 'custom-rental-manager'),
@@ -212,50 +221,19 @@ class CRCM_Plugin {
                 'read_private_posts' => 'manage_options',
             ),
             'rewrite' => false,
-            'show_in_menu' => false, // FIX: Don't show separate menu
+            'show_in_menu' => false, // Will be under main menu
         ));
     }
     
     /**
-     * Register taxonomies - FIX: Clean taxonomy registration
-     */
-    private function register_taxonomies() {
-        // Vehicle type taxonomy
-        register_taxonomy('crcm_vehicle_type', 'crcm_vehicle', array(
-            'labels' => array(
-                'name' => __('Vehicle Types', 'custom-rental-manager'),
-                'singular_name' => __('Vehicle Type', 'custom-rental-manager'),
-            ),
-            'hierarchical' => true,
-            'public' => true,
-            'show_admin_column' => true,
-            'rewrite' => false,
-            'show_in_menu' => true,
-        ));
-        
-        // Location taxonomy - ONLY for vehicles, NOT bookings
-        register_taxonomy('crcm_location', 'crcm_vehicle', array(
-            'labels' => array(
-                'name' => __('Locations', 'custom-rental-manager'),
-                'singular_name' => __('Location', 'custom-rental-manager'),
-            ),
-            'hierarchical' => true,
-            'public' => true,
-            'show_admin_column' => true,
-            'rewrite' => false,
-            'show_in_menu' => true,
-        ));
-    }
-    
-    /**
-     * Add admin menu - FIX: Clean organized menu structure
+     * Add admin menu - CLEANED: Removed taxonomy menus
      */
     private function add_admin_menu() {
         add_action('admin_menu', array($this, 'admin_menu'));
     }
     
     /**
-     * Admin menu callback - FIX: Single organized menu
+     * Admin menu callback - CLEANED: No more taxonomy submenus
      */
     public function admin_menu() {
         // Main menu page
@@ -285,24 +263,6 @@ class CRCM_Plugin {
             __('Add Vehicle', 'custom-rental-manager'),
             'manage_options',
             'post-new.php?post_type=crcm_vehicle'
-        );
-        
-        // Vehicle Types submenu
-        add_submenu_page(
-            'crcm-dashboard',
-            __('Vehicle Types', 'custom-rental-manager'),
-            __('Vehicle Types', 'custom-rental-manager'),
-            'manage_options',
-            'edit-tags.php?taxonomy=crcm_vehicle_type&post_type=crcm_vehicle'
-        );
-        
-        // Locations submenu
-        add_submenu_page(
-            'crcm-dashboard',
-            __('Locations', 'custom-rental-manager'),
-            __('Locations', 'custom-rental-manager'),
-            'manage_options',
-            'edit-tags.php?taxonomy=crcm_location&post_type=crcm_vehicle'
         );
         
         // Bookings submenu
@@ -345,7 +305,7 @@ class CRCM_Plugin {
     }
     
     /**
-     * Dashboard page - FIX: Better error handling
+     * Dashboard page
      */
     public function dashboard_page() {
         $template_path = CRCM_PLUGIN_PATH . 'templates/admin/dashboard.php';
@@ -354,7 +314,7 @@ class CRCM_Plugin {
         } else {
             echo '<div class="wrap">';
             echo '<h1>' . esc_html__('Rental Manager Dashboard', 'custom-rental-manager') . '</h1>';
-            echo '<div class="notice notice-warning"><p>' . esc_html__('Dashboard template not found. Please ensure all plugin files are properly uploaded.', 'custom-rental-manager') . '</p></div>';
+            echo '<p>' . esc_html__('Dashboard template not found. Please ensure all plugin files are properly uploaded.', 'custom-rental-manager') . '</p>';
             
             // Show basic stats even without template
             echo '<div class="crcm-basic-stats">';
@@ -402,7 +362,7 @@ class CRCM_Plugin {
     }
     
     /**
-     * Initialize shortcodes - FIX: Better error handling for templates
+     * Initialize shortcodes
      */
     private function init_shortcodes() {
         add_shortcode('crcm_search_form', array($this, 'search_form_shortcode'));
@@ -424,7 +384,7 @@ class CRCM_Plugin {
         if (file_exists($template_path)) {
             include $template_path;
         } else {
-            echo '<div class="crcm-error">' . esc_html__('Search form template not found.', 'custom-rental-manager') . '</div>';
+            echo '<p>' . esc_html__('Search form template not found.', 'custom-rental-manager') . '</p>';
         }
         return ob_get_clean();
     }
@@ -443,7 +403,7 @@ class CRCM_Plugin {
         if (file_exists($template_path)) {
             include $template_path;
         } else {
-            echo '<div class="crcm-error">' . esc_html__('Vehicle list template not found.', 'custom-rental-manager') . '</div>';
+            echo '<p>' . esc_html__('Vehicle list template not found.', 'custom-rental-manager') . '</p>';
         }
         return ob_get_clean();
     }
@@ -461,7 +421,7 @@ class CRCM_Plugin {
         if (file_exists($template_path)) {
             include $template_path;
         } else {
-            echo '<div class="crcm-error">' . esc_html__('Booking form template not found.', 'custom-rental-manager') . '</div>';
+            echo '<p>' . esc_html__('Booking form template not found.', 'custom-rental-manager') . '</p>';
         }
         return ob_get_clean();
     }
@@ -471,7 +431,7 @@ class CRCM_Plugin {
      */
     public function customer_dashboard_shortcode($atts) {
         if (!is_user_logged_in()) {
-            return '<div class="crcm-login-required">' . esc_html__('Please log in to access your dashboard.', 'custom-rental-manager') . '</div>';
+            return '<p>' . esc_html__('Please log in to access your dashboard.', 'custom-rental-manager') . '</p>';
         }
         
         ob_start();
@@ -479,16 +439,15 @@ class CRCM_Plugin {
         if (file_exists($template_path)) {
             include $template_path;
         } else {
-            echo '<div class="crcm-error">' . esc_html__('Customer dashboard template not found.', 'custom-rental-manager') . '</div>';
+            echo '<p>' . esc_html__('Customer dashboard template not found.', 'custom-rental-manager') . '</p>';
         }
         return ob_get_clean();
     }
     
     /**
-     * Enqueue frontend assets - FIX: Correct asset path
+     * Enqueue frontend assets
      */
     public function enqueue_frontend_assets() {
-        // FIX: Use 'asset' directory (not 'assets')
         $css_path = CRCM_PLUGIN_PATH . 'asset/css/frontend.css';
         $js_path = CRCM_PLUGIN_PATH . 'asset/js/frontend.js';
         
@@ -514,13 +473,13 @@ class CRCM_Plugin {
                 'ajax_url' => admin_url('admin-ajax.php'),
                 'nonce' => wp_create_nonce('crcm_nonce'),
                 'currency_symbol' => $this->get_setting('currency_symbol', '€'),
-                'booking_page_url' => home_url('/booking/'), // FIX: Add booking page URL
+                'booking_page_url' => home_url('/booking/'),
             ));
         }
     }
     
     /**
-     * Enqueue admin assets - FIX: Better file existence checks
+     * Enqueue admin assets
      */
     public function enqueue_admin_assets($hook) {
         // Only load on plugin pages
@@ -528,7 +487,6 @@ class CRCM_Plugin {
             return;
         }
         
-        // FIX: Use 'asset' directory (not 'assets')
         $css_path = CRCM_PLUGIN_PATH . 'asset/css/admin.css';
         $js_path = CRCM_PLUGIN_PATH . 'asset/js/admin.js';
         
@@ -541,7 +499,6 @@ class CRCM_Plugin {
             );
         }
         
-        // FIX: Safer jQuery UI CSS loading
         wp_enqueue_style(
             'jquery-ui-datepicker-style',
             'https://code.jquery.com/ui/1.13.2/themes/ui-lightness/jquery-ui.css',
@@ -579,7 +536,7 @@ class CRCM_Plugin {
     public function activate() {
         $this->create_default_settings();
         
-        // FIX: Delay flush_rewrite_rules to avoid early execution
+        // FLUSH REWRITE RULES: Delay to avoid early execution
         add_action('init', 'flush_rewrite_rules', 999);
     }
     
@@ -611,11 +568,11 @@ class CRCM_Plugin {
 }
 
 /**
- * Initialize the plugin - FIX: Safer initialization
+ * Initialize the plugin
  */
 function crcm() {
     return CRCM_Plugin::get_instance();
 }
 
-// FIX: Initialize only after WordPress is loaded
+// Initialize only after WordPress is loaded
 add_action('plugins_loaded', 'crcm', 10);
