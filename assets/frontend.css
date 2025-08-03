@@ -1,0 +1,655 @@
+/**
+ * Custom Rental Car Manager - Frontend Styles
+ * 
+ * @package CustomRentalCarManager
+ * @author Totaliweb
+ * @since 1.0.0
+ */
+
+/* CSS Variables */
+:root {
+    --crcm-primary: #2563eb;
+    --crcm-primary-dark: #1d4ed8;
+    --crcm-secondary: #64748b;
+    --crcm-success: #059669;
+    --crcm-warning: #d97706;
+    --crcm-danger: #dc2626;
+    --crcm-light: #f8fafc;
+    --crcm-dark: #1e293b;
+    --crcm-border: #e2e8f0;
+    --crcm-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    --crcm-radius: 8px;
+    --crcm-transition: all 0.3s ease;
+}
+
+/* Reset and Base Styles */
+.crcm-search-form-wrapper *,
+.crcm-vehicle-list *,
+.crcm-booking-form-wrapper *,
+.crcm-customer-dashboard * {
+    box-sizing: border-box;
+}
+
+/* Common Components */
+.crcm-btn {
+    display: inline-block;
+    padding: 12px 24px;
+    border: none;
+    border-radius: var(--crcm-radius);
+    font-size: 16px;
+    font-weight: 500;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition: var(--crcm-transition);
+    line-height: 1.5;
+}
+
+.crcm-btn-primary {
+    background: var(--crcm-primary);
+    color: white;
+}
+
+.crcm-btn-primary:hover {
+    background: var(--crcm-primary-dark);
+    color: white;
+    text-decoration: none;
+}
+
+.crcm-btn-secondary {
+    background: white;
+    color: var(--crcm-secondary);
+    border: 1px solid var(--crcm-border);
+}
+
+.crcm-btn-secondary:hover {
+    background: var(--crcm-light);
+    color: var(--crcm-dark);
+    text-decoration: none;
+}
+
+.crcm-btn-danger {
+    background: var(--crcm-danger);
+    color: white;
+}
+
+.crcm-btn-danger:hover {
+    background: #b91c1c;
+    color: white;
+}
+
+/* Error Messages */
+.crcm-error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: var(--crcm-danger);
+    padding: 12px 16px;
+    border-radius: var(--crcm-radius);
+    margin: 10px 0;
+}
+
+/* Loading States */
+.crcm-loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid var(--crcm-primary);
+    border-radius: 50%;
+    animation: crcm-spin 1s linear infinite;
+}
+
+@keyframes crcm-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Search Form Specific Styles */
+.crcm-search-form-wrapper {
+    margin: 20px 0;
+}
+
+.crcm-search-form {
+    background: linear-gradient(135deg, var(--crcm-primary) 0%, #8b5cf6 100%);
+    color: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: var(--crcm-shadow);
+    margin-bottom: 20px;
+}
+
+.crcm-search-form h2 {
+    margin: 0 0 10px 0;
+    font-size: 28px;
+    text-align: center;
+}
+
+.crcm-search-form p {
+    margin: 0 0 30px 0;
+    text-align: center;
+    opacity: 0.9;
+}
+
+.crcm-search-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    align-items: end;
+}
+
+.crcm-field-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.crcm-field-group input,
+.crcm-field-group select {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: var(--crcm-radius);
+    font-size: 16px;
+    background: rgba(255, 255, 255, 0.95);
+    color: var(--crcm-dark);
+}
+
+.crcm-field-group input:focus,
+.crcm-field-group select:focus {
+    outline: none;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.crcm-search-btn {
+    width: 100%;
+    padding: 12px 24px;
+    background: #ff6b6b;
+    color: white;
+    border: none;
+    border-radius: var(--crcm-radius);
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: var(--crcm-transition);
+}
+
+.crcm-search-btn:hover {
+    background: #ff5252;
+    transform: translateY(-1px);
+}
+
+/* Vehicle List Styles */
+.crcm-vehicles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 30px;
+    margin: 30px 0;
+}
+
+.crcm-vehicle-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--crcm-shadow);
+    transition: var(--crcm-transition);
+    border: 1px solid var(--crcm-border);
+}
+
+.crcm-vehicle-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.crcm-vehicle-image {
+    position: relative;
+    height: 220px;
+    overflow: hidden;
+}
+
+.crcm-vehicle-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: var(--crcm-transition);
+}
+
+.crcm-vehicle-card:hover .crcm-vehicle-image img {
+    transform: scale(1.05);
+}
+
+.crcm-no-image {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, var(--crcm-primary) 0%, #8b5cf6 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.crcm-no-image .dashicons {
+    font-size: 60px;
+    color: white;
+    opacity: 0.8;
+}
+
+.crcm-vehicle-content {
+    padding: 24px;
+}
+
+.crcm-vehicle-content h3 {
+    margin: 0 0 12px 0;
+    font-size: 20px;
+    color: var(--crcm-dark);
+    font-weight: 600;
+}
+
+.crcm-vehicle-type {
+    display: inline-block;
+    background: #e0f2fe;
+    color: #0277bd;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.crcm-vehicle-specs {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.crcm-spec {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    color: var(--crcm-secondary);
+}
+
+.crcm-spec .dashicons {
+    font-size: 16px;
+    color: var(--crcm-primary);
+}
+
+.crcm-vehicle-price {
+    margin-bottom: 24px;
+    padding: 16px 0;
+    border-top: 1px solid var(--crcm-border);
+    border-bottom: 1px solid var(--crcm-border);
+}
+
+.crcm-price {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--crcm-primary);
+}
+
+.crcm-price small {
+    font-size: 14px;
+    color: var(--crcm-secondary);
+    font-weight: 400;
+}
+
+.crcm-vehicle-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.crcm-vehicle-actions .crcm-btn {
+    flex: 1;
+    font-size: 14px;
+    padding: 10px 16px;
+}
+
+/* Booking Form Styles */
+.crcm-booking-form-wrapper {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.crcm-vehicle-info {
+    background: white;
+    padding: 20px;
+    border-radius: var(--crcm-radius);
+    box-shadow: var(--crcm-shadow);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.crcm-vehicle-info img {
+    width: 120px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: var(--crcm-radius);
+}
+
+.crcm-booking-form {
+    background: white;
+    padding: 32px;
+    border-radius: var(--crcm-radius);
+    box-shadow: var(--crcm-shadow);
+}
+
+.crcm-booking-form h2 {
+    margin: 0 0 32px 0;
+    color: var(--crcm-dark);
+    text-align: center;
+    font-size: 28px;
+}
+
+.crcm-form-section {
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--crcm-border);
+}
+
+.crcm-form-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.crcm-form-section h3 {
+    margin: 0 0 20px 0;
+    color: var(--crcm-dark);
+    font-size: 20px;
+}
+
+.crcm-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.crcm-form-group {
+    margin-bottom: 16px;
+}
+
+.crcm-form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: var(--crcm-dark);
+}
+
+.crcm-form-group input,
+.crcm-form-group select,
+.crcm-form-group textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--crcm-border);
+    border-radius: var(--crcm-radius);
+    font-size: 16px;
+    transition: var(--crcm-transition);
+}
+
+.crcm-form-group input:focus,
+.crcm-form-group select:focus,
+.crcm-form-group textarea:focus {
+    outline: none;
+    border-color: var(--crcm-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.crcm-extras {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.crcm-extras label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 12px;
+    border: 1px solid var(--crcm-border);
+    border-radius: var(--crcm-radius);
+    transition: var(--crcm-transition);
+}
+
+.crcm-extras label:hover {
+    background: var(--crcm-light);
+    border-color: var(--crcm-primary);
+}
+
+.crcm-extras input[type="checkbox"]:checked + label {
+    background: rgba(37, 99, 235, 0.1);
+    border-color: var(--crcm-primary);
+}
+
+.crcm-submit-btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--crcm-primary);
+    color: white;
+    border: none;
+    border-radius: var(--crcm-radius);
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--crcm-transition);
+}
+
+.crcm-submit-btn:hover {
+    background: var(--crcm-primary-dark);
+    transform: translateY(-1px);
+}
+
+/* Customer Dashboard Styles */
+.crcm-customer-dashboard {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.crcm-dashboard-header {
+    text-align: center;
+    margin-bottom: 32px;
+    padding: 32px 20px;
+    background: linear-gradient(135deg, var(--crcm-primary) 0%, #8b5cf6 100%);
+    color: white;
+    border-radius: var(--crcm-radius);
+}
+
+.crcm-dashboard-header h2 {
+    margin: 0 0 8px 0;
+    font-size: 32px;
+}
+
+.crcm-dashboard-header p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 16px;
+}
+
+.crcm-dashboard-tabs {
+    display: flex;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--crcm-border);
+    background: white;
+    border-radius: var(--crcm-radius) var(--crcm-radius) 0 0;
+}
+
+.crcm-tab-btn {
+    padding: 16px 24px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 500;
+    border-bottom: 3px solid transparent;
+    transition: var(--crcm-transition);
+    color: var(--crcm-secondary);
+}
+
+.crcm-tab-btn:hover {
+    color: var(--crcm-primary);
+    background: var(--crcm-light);
+}
+
+.crcm-tab-btn.active {
+    border-bottom-color: var(--crcm-primary);
+    color: var(--crcm-primary);
+    background: white;
+}
+
+.crcm-tab-content {
+    background: white;
+    padding: 24px;
+    border-radius: 0 0 var(--crcm-radius) var(--crcm-radius);
+    box-shadow: var(--crcm-shadow);
+}
+
+.crcm-booking-item {
+    background: white;
+    padding: 24px;
+    border-radius: var(--crcm-radius);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 16px;
+    border: 1px solid var(--crcm-border);
+    transition: var(--crcm-transition);
+}
+
+.crcm-booking-item:hover {
+    box-shadow: var(--crcm-shadow);
+    transform: translateY(-1px);
+}
+
+.crcm-booking-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--crcm-border);
+}
+
+.crcm-booking-header h4 {
+    margin: 0;
+    font-size: 18px;
+    color: var(--crcm-dark);
+}
+
+.crcm-booking-details p {
+    margin: 8px 0;
+    color: var(--crcm-secondary);
+    font-size: 14px;
+}
+
+.crcm-booking-actions {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--crcm-border);
+}
+
+.crcm-no-bookings {
+    text-align: center;
+    padding: 48px 24px;
+    background: var(--crcm-light);
+    border-radius: var(--crcm-radius);
+    color: var(--crcm-secondary);
+}
+
+.crcm-no-bookings p {
+    margin: 0 0 24px 0;
+    font-size: 16px;
+}
+
+/* Status Badges */
+.crcm-status-badge {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .crcm-search-fields {
+        grid-template-columns: 1fr;
+    }
+
+    .crcm-vehicles-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .crcm-form-row {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .crcm-vehicle-actions {
+        flex-direction: column;
+    }
+
+    .crcm-booking-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .crcm-dashboard-tabs {
+        flex-direction: column;
+    }
+
+    .crcm-tab-btn {
+        border-bottom: none;
+        border-left: 3px solid transparent;
+    }
+
+    .crcm-tab-btn.active {
+        border-left-color: var(--crcm-primary);
+        border-bottom-color: transparent;
+    }
+}
+
+@media (max-width: 480px) {
+    .crcm-search-form,
+    .crcm-booking-form,
+    .crcm-tab-content {
+        padding: 20px;
+    }
+
+    .crcm-vehicles-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .crcm-vehicle-content {
+        padding: 16px;
+    }
+
+    .crcm-extras {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .crcm-search-form,
+    .crcm-booking-actions,
+    .crcm-vehicle-actions,
+    .crcm-dashboard-tabs {
+        display: none !important;
+    }
+
+    .crcm-vehicle-card,
+    .crcm-booking-item {
+        break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #ccc;
+    }
+}
