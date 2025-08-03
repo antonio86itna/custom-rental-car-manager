@@ -3,7 +3,7 @@
  * Email Manager Class
  * 
  * Handles all email communications including booking confirmations,
- * status updates, reminders, and automated notifications.
+ * reminders, status updates, and automated notifications.
  * 
  * @package CustomRentalCarManager
  * @author Totaliweb
@@ -20,244 +20,239 @@ class CRCM_Email_Manager {
      * Constructor
      */
     public function __construct() {
-        add_action('crcm_booking_status_changed', array($this, 'send_status_change_email'), 10, 3);
-        add_action('crcm_booking_created', array($this, 'send_booking_confirmation_email'));
-        add_action('crcm_send_booking_reminder', array($this, 'send_booking_reminder_email'));
+        add_action('crcm_booking_created', array($this, 'send_booking_confirmation'));
+        add_action('crcm_booking_status_changed', array($this, 'send_status_change_notification'), 10, 3);
+        add_action('crcm_daily_reminder_check', array($this, 'send_pickup_reminders'));
+        add_filter('wp_mail_from', array($this, 'set_from_email'));
+        add_filter('wp_mail_from_name', array($this, 'set_from_name'));
+
+        // Schedule daily reminder check
+        if (!wp_next_scheduled('crcm_daily_reminder_check')) {
+            wp_schedule_event(time(), 'daily', 'crcm_daily_reminder_check');
+        }
     }
 
     /**
      * Send booking confirmation email
      */
-    public function send_booking_confirmation_email($booking_id) {
-        $booking_manager = new CRCM_Booking_Manager();
-        $booking = $booking_manager->get_booking($booking_id);
+    public function send_booking_confirmation($booking_id) {
+        $booking = $this->get_booking_data($booking_id);
 
-        if (!$booking) {
+        if (!$booking || empty($booking['customer_data']['email'])) {
             return false;
         }
-
-        $customer_email = $booking['customer_data']['email'];
-        $customer_name = $booking['customer_data']['first_name'] . ' ' . $booking['customer_data']['last_name'];
 
         $subject = sprintf(__('Booking Confirmation - %s', 'custom-rental-manager'), $booking['booking_number']);
+        $message = $this->get_booking_confirmation_template($booking);
 
-        $message = $this->get_email_template('booking-confirmation', array(
-            'booking' => $booking,
-            'customer_name' => $customer_name,
-        ));
+        $headers = array(
+            'Content-Type: text/html; charset=UTF-8',
+        );
 
-        // Send to customer
-        $sent_customer = $this->send_email($customer_email, $subject, $message);
+        $sent = wp_mail(
+            $booking['customer_data']['email'],
+            $subject,
+            $message,
+            $headers
+        );
 
-        // Send copy to admin
-        $admin_email = crcm()->get_setting('email_from_email', get_option('admin_email'));
-        $admin_subject = sprintf(__('[New Booking] %s - %s', 'custom-rental-manager'), $booking['booking_number'], $customer_name);
-        $sent_admin = $this->send_email($admin_email, $admin_subject, $message);
+        if ($sent) {
+            update_post_meta($booking_id, '_crcm_confirmation_email_sent', current_time('mysql'));
+        }
 
-        return $sent_customer && $sent_admin;
+        return $sent;
     }
 
     /**
-     * Send booking status change email
+     * Send status change notification
      */
-    public function send_status_change_email($booking_id, $new_status, $old_status) {
-        $booking_manager = new CRCM_Booking_Manager();
-        $booking = $booking_manager->get_booking($booking_id);
+    public function send_status_change_notification($booking_id, $new_status, $old_status) {
+        $booking = $this->get_booking_data($booking_id);
 
-        if (!$booking) {
+        if (!$booking || empty($booking['customer_data']['email'])) {
             return false;
         }
 
-        $customer_email = $booking['customer_data']['email'];
-        $customer_name = $booking['customer_data']['first_name'] . ' ' . $booking['customer_data']['last_name'];
-
-        $status_labels = array(
-            'pending' => __('Pending', 'custom-rental-manager'),
-            'confirmed' => __('Confirmed', 'custom-rental-manager'),
-            'active' => __('Active', 'custom-rental-manager'),
-            'completed' => __('Completed', 'custom-rental-manager'),
-            'cancelled' => __('Cancelled', 'custom-rental-manager'),
-            'refunded' => __('Refunded', 'custom-rental-manager'),
-        );
+        // Don't send notification for initial status set
+        if (empty($old_status)) {
+            return false;
+        }
 
         $subject = sprintf(__('Booking Status Update - %s', 'custom-rental-manager'), $booking['booking_number']);
+        $message = $this->get_status_change_template($booking, $new_status, $old_status);
 
-        $message = $this->get_email_template('status-change', array(
-            'booking' => $booking,
-            'customer_name' => $customer_name,
-            'old_status' => $status_labels[$old_status] ?? $old_status,
-            'new_status' => $status_labels[$new_status] ?? $new_status,
-        ));
+        $headers = array(
+            'Content-Type: text/html; charset=UTF-8',
+        );
 
-        return $this->send_email($customer_email, $subject, $message);
+        return wp_mail(
+            $booking['customer_data']['email'],
+            $subject,
+            $message,
+            $headers
+        );
     }
 
     /**
-     * Send booking reminder email
+     * Send pickup reminders (24 hours before)
      */
-    public function send_booking_reminder_email($booking_id) {
-        $booking_manager = new CRCM_Booking_Manager();
-        $booking = $booking_manager->get_booking($booking_id);
+    public function send_pickup_reminders() {
+        $tomorrow = date('Y-m-d', strtotime('+1 day'));
 
-        if (!$booking) {
+        $bookings = get_posts(array(
+            'post_type' => 'crcm_booking',
+            'post_status' => array('publish', 'private'),
+            'posts_per_page' => -1,
+            'meta_query' => array(
+                array(
+                    'key' => '_crcm_booking_data',
+                    'value' => $tomorrow,
+                    'compare' => 'LIKE',
+                ),
+                array(
+                    'key' => '_crcm_booking_status',
+                    'value' => 'confirmed',
+                    'compare' => '=',
+                ),
+            ),
+        ));
+
+        foreach ($bookings as $booking_post) {
+            $booking_data = get_post_meta($booking_post->ID, '_crcm_booking_data', true);
+
+            // Check if pickup date is tomorrow
+            if ($booking_data && $booking_data['pickup_date'] === $tomorrow) {
+                // Check if reminder already sent
+                $reminder_sent = get_post_meta($booking_post->ID, '_crcm_pickup_reminder_sent', true);
+
+                if (!$reminder_sent) {
+                    $this->send_pickup_reminder($booking_post->ID);
+                }
+            }
+        }
+    }
+
+    /**
+     * Send pickup reminder email
+     */
+    public function send_pickup_reminder($booking_id) {
+        $booking = $this->get_booking_data($booking_id);
+
+        if (!$booking || empty($booking['customer_data']['email'])) {
             return false;
         }
 
-        $customer_email = $booking['customer_data']['email'];
-        $customer_name = $booking['customer_data']['first_name'] . ' ' . $booking['customer_data']['last_name'];
-
         $subject = sprintf(__('Pickup Reminder - %s', 'custom-rental-manager'), $booking['booking_number']);
+        $message = $this->get_pickup_reminder_template($booking);
 
-        $message = $this->get_email_template('pickup-reminder', array(
-            'booking' => $booking,
-            'customer_name' => $customer_name,
-        ));
-
-        return $this->send_email($customer_email, $subject, $message);
-    }
-
-    /**
-     * Send email using WordPress mail function
-     */
-    public function send_email($to, $subject, $message, $headers = array()) {
-        $from_name = crcm()->get_setting('email_from_name', get_bloginfo('name'));
-        $from_email = crcm()->get_setting('email_from_email', get_option('admin_email'));
-
-        $default_headers = array(
+        $headers = array(
             'Content-Type: text/html; charset=UTF-8',
-            'From: ' . $from_name . ' <' . $from_email . '>',
         );
 
-        $headers = array_merge($default_headers, $headers);
+        $sent = wp_mail(
+            $booking['customer_data']['email'],
+            $subject,
+            $message,
+            $headers
+        );
 
-        return wp_mail($to, $subject, $message, $headers);
+        if ($sent) {
+            update_post_meta($booking_id, '_crcm_pickup_reminder_sent', current_time('mysql'));
+        }
+
+        return $sent;
     }
 
     /**
-     * Get email template
+     * Get booking confirmation email template
      */
-    public function get_email_template($template, $vars = array()) {
-        $templates = array(
-            'booking-confirmation' => $this->get_booking_confirmation_template($vars),
-            'status-change' => $this->get_status_change_template($vars),
-            'pickup-reminder' => $this->get_pickup_reminder_template($vars),
-        );
-
-        return $templates[$template] ?? '';
-    }
-
-    /**
-     * Booking confirmation email template
-     */
-    private function get_booking_confirmation_template($vars) {
-        $booking = $vars['booking'];
-        $customer_name = $vars['customer_name'];
-        $company_name = crcm()->get_setting('company_name', 'Costabilerent');
-        $currency_symbol = crcm()->get_setting('currency_symbol', '€');
-
+    public function get_booking_confirmation_template($booking) {
         $vehicle = get_post($booking['booking_data']['vehicle_id']);
-        $vehicle_name = $vehicle ? $vehicle->post_title : __('Vehicle', 'custom-rental-manager');
-
-        $pickup_date = date_i18n('F j, Y', strtotime($booking['booking_data']['pickup_date']));
-        $return_date = date_i18n('F j, Y', strtotime($booking['booking_data']['return_date']));
+        $vehicle_name = $vehicle ? $vehicle->post_title : __('Unknown Vehicle', 'custom-rental-manager');
 
         $pickup_location = '';
         $return_location = '';
 
-        if ($booking['booking_data']['home_delivery']) {
-            $pickup_location = __('Home Delivery', 'custom-rental-manager');
-            $return_location = __('Home Pickup', 'custom-rental-manager');
-        } else {
+        if ($booking['booking_data']['pickup_location']) {
             $pickup_term = get_term($booking['booking_data']['pickup_location']);
-            $return_term = get_term($booking['booking_data']['return_location']);
             $pickup_location = $pickup_term ? $pickup_term->name : '';
+        }
+
+        if ($booking['booking_data']['return_location']) {
+            $return_term = get_term($booking['booking_data']['return_location']);
             $return_location = $return_term ? $return_term->name : '';
         }
 
+        $currency_symbol = '€';
+        $company_name = 'Costabilerent';
+
         ob_start();
         ?>
         <!DOCTYPE html>
         <html>
         <head>
-            <meta charset="utf-8">
+            <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title><?php _e('Booking Confirmation', 'custom-rental-manager'); ?></title>
-            <style>
-                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
-                .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; }
-                .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; }
-                .content { padding: 30px 20px; }
-                .booking-details { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
-                .detail-row { display: flex; justify-content: space-between; margin-bottom: 10px; }
-                .detail-label { font-weight: bold; }
-                .footer { background: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; }
-                .btn { display: inline-block; background: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 10px 0; }
-                .totaliweb-credit { font-size: 11px; color: #999; margin-top: 10px; }
-                .totaliweb-credit a { color: #667eea; text-decoration: none; }
-            </style>
+            <title><?php echo esc_html__('Booking Confirmation', 'custom-rental-manager'); ?></title>
         </head>
-        <body>
-            <div class="container">
-                <div class="header">
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px;">
+            <div style="max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
                     <h1><?php echo esc_html($company_name); ?></h1>
-                    <p><?php _e('Booking Confirmation', 'custom-rental-manager'); ?></p>
+                    <h2><?php echo esc_html__('Booking Confirmation', 'custom-rental-manager'); ?></h2>
+                    <p><?php printf(__('Booking Number: %s', 'custom-rental-manager'), '<strong>' . esc_html($booking['booking_number']) . '</strong>'); ?></p>
                 </div>
 
-                <div class="content">
-                    <h2><?php printf(__('Dear %s,', 'custom-rental-manager'), esc_html($customer_name)); ?></h2>
+                <div style="background: #fff; padding: 30px; border: 1px solid #e2e8f0; border-top: none;">
+                    <p><?php printf(__('Dear %s,', 'custom-rental-manager'), esc_html($booking['customer_data']['first_name'])); ?></p>
 
-                    <p><?php printf(__('Thank you for your booking! Your reservation has been confirmed with booking number <strong>%s</strong>.', 'custom-rental-manager'), $booking['booking_number']); ?></p>
+                    <p><?php _e('Thank you for your booking! We have received your reservation and it is currently being processed.', 'custom-rental-manager'); ?></p>
 
-                    <div class="booking-details">
+                    <div style="background: #f8fafc; padding: 20px; border-radius: 6px; margin: 20px 0;">
                         <h3><?php _e('Booking Details', 'custom-rental-manager'); ?></h3>
 
-                        <div class="detail-row">
-                            <span class="detail-label"><?php _e('Vehicle:', 'custom-rental-manager'); ?></span>
-                            <span><?php echo esc_html($vehicle_name); ?></span>
-                        </div>
+                        <p><strong><?php _e('Vehicle:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($vehicle_name); ?></p>
+                        <p><strong><?php _e('Pickup:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($booking['booking_data']['pickup_date']); ?> <?php echo esc_html($booking['booking_data']['pickup_time']); ?></p>
+                        <p><strong><?php _e('Return:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($booking['booking_data']['return_date']); ?> <?php echo esc_html($booking['booking_data']['return_time']); ?></p>
 
-                        <div class="detail-row">
-                            <span class="detail-label"><?php _e('Pickup Date:', 'custom-rental-manager'); ?></span>
-                            <span><?php echo esc_html($pickup_date); ?> <?php echo esc_html($booking['booking_data']['pickup_time']); ?></span>
-                        </div>
+                        <?php if ($pickup_location): ?>
+                        <p><strong><?php _e('Pickup Location:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($pickup_location); ?></p>
+                        <?php endif; ?>
 
-                        <div class="detail-row">
-                            <span class="detail-label"><?php _e('Return Date:', 'custom-rental-manager'); ?></span>
-                            <span><?php echo esc_html($return_date); ?> <?php echo esc_html($booking['booking_data']['return_time']); ?></span>
-                        </div>
+                        <?php if ($return_location): ?>
+                        <p><strong><?php _e('Return Location:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($return_location); ?></p>
+                        <?php endif; ?>
 
-                        <div class="detail-row">
-                            <span class="detail-label"><?php _e('Pickup Location:', 'custom-rental-manager'); ?></span>
-                            <span><?php echo esc_html($pickup_location); ?></span>
-                        </div>
+                        <p><strong><?php _e('Insurance:', 'custom-rental-manager'); ?></strong> <?php echo esc_html(ucfirst($booking['booking_data']['insurance_type'])); ?></p>
 
-                        <div class="detail-row">
-                            <span class="detail-label"><?php _e('Return Location:', 'custom-rental-manager'); ?></span>
-                            <span><?php echo esc_html($return_location); ?></span>
-                        </div>
+                        <?php if (!empty($booking['booking_data']['extras'])): ?>
+                        <p><strong><?php _e('Extras:', 'custom-rental-manager'); ?></strong> <?php echo esc_html(implode(', ', $booking['booking_data']['extras'])); ?></p>
+                        <?php endif; ?>
 
-                        <div class="detail-row">
-                            <span class="detail-label"><?php _e('Total Cost:', 'custom-rental-manager'); ?></span>
-                            <span><strong><?php echo $currency_symbol . number_format($booking['payment_data']['total_cost'], 2); ?></strong></span>
-                        </div>
+                        <p style="font-size: 18px; font-weight: bold; color: #2563eb; margin-top: 15px; padding-top: 15px; border-top: 2px solid #2563eb;">
+                            <strong><?php _e('Total Amount:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($currency_symbol . number_format($booking['payment_data']['total_cost'], 2)); ?>
+                        </p>
                     </div>
 
-                    <p><?php _e('We will contact you 24 hours before your pickup date to confirm the details and provide you with specific pickup instructions.', 'custom-rental-manager'); ?></p>
+                    <h3><?php _e('What happens next?', 'custom-rental-manager'); ?></h3>
+                    <ol>
+                        <li><?php _e('We will review your booking and confirm availability', 'custom-rental-manager'); ?></li>
+                        <li><?php _e('You will receive a confirmation email within 24 hours', 'custom-rental-manager'); ?></li>
+                        <li><?php _e('Payment instructions will be provided upon confirmation', 'custom-rental-manager'); ?></li>
+                        <li><?php _e('We will send you pickup details 24 hours before your rental', 'custom-rental-manager'); ?></li>
+                    </ol>
 
-                    <p><?php _e('If you have any questions or need to make changes to your booking, please contact us as soon as possible.', 'custom-rental-manager'); ?></p>
-
-                    <p><?php _e('We look forward to serving you!', 'custom-rental-manager'); ?></p>
-
-                    <p><?php printf(__('Best regards,<br>The %s Team', 'custom-rental-manager'), esc_html($company_name)); ?></p>
+                    <p><?php _e('Thank you for choosing us for your transportation needs!', 'custom-rental-manager'); ?></p>
                 </div>
 
-                <div class="footer">
-                    <p><?php echo esc_html($company_name); ?> - <?php _e('Your trusted car rental in Ischia', 'custom-rental-manager'); ?></p>
-                    <?php if (crcm()->get_setting('show_totaliweb_credit', true)): ?>
-                    <div class="totaliweb-credit">
-                        <?php _e('Powered by', 'custom-rental-manager'); ?> <a href="<?php echo CRCM_BRAND_URL; ?>" target="_blank">Totaliweb</a>
-                    </div>
-                    <?php endif; ?>
+                <div style="background: #f1f5f9; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 14px; color: #64748b;">
+                    <p><strong><?php echo esc_html($company_name); ?></strong></p>
+                    <p><?php _e('Ischia, Italy', 'custom-rental-manager'); ?></p>
+                    <p><?php _e('Phone:', 'custom-rental-manager'); ?> +39 123 456 789</p>
+                    <p><?php _e('Email:', 'custom-rental-manager'); ?> info@costabilerent.com</p>
+                    <p style="margin-top: 20px; font-size: 12px; color: #94a3b8;">
+                        <?php printf(__('Powered by %s', 'custom-rental-manager'), '<a href="https://totaliweb.com" style="color: #2563eb;">Totaliweb</a>'); ?>
+                    </p>
                 </div>
             </div>
         </body>
@@ -267,143 +262,190 @@ class CRCM_Email_Manager {
     }
 
     /**
-     * Status change email template
+     * Get pickup reminder email template
      */
-    private function get_status_change_template($vars) {
-        $booking = $vars['booking'];
-        $customer_name = $vars['customer_name'];
-        $old_status = $vars['old_status'];
-        $new_status = $vars['new_status'];
-        $company_name = crcm()->get_setting('company_name', 'Costabilerent');
-
-        ob_start();
-        ?>
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title><?php _e('Booking Status Update', 'custom-rental-manager'); ?></title>
-            <style>
-                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
-                .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; }
-                .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; }
-                .content { padding: 30px 20px; }
-                .status-change { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center; }
-                .footer { background: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; }
-                .totaliweb-credit { font-size: 11px; color: #999; margin-top: 10px; }
-                .totaliweb-credit a { color: #667eea; text-decoration: none; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1><?php echo esc_html($company_name); ?></h1>
-                    <p><?php _e('Booking Status Update', 'custom-rental-manager'); ?></p>
-                </div>
-
-                <div class="content">
-                    <h2><?php printf(__('Dear %s,', 'custom-rental-manager'), esc_html($customer_name)); ?></h2>
-
-                    <p><?php printf(__('We wanted to inform you that the status of your booking %s has been updated.', 'custom-rental-manager'), '<strong>' . $booking['booking_number'] . '</strong>'); ?></p>
-
-                    <div class="status-change">
-                        <p><?php printf(__('Status changed from <strong>%s</strong> to <strong>%s</strong>', 'custom-rental-manager'), esc_html($old_status), esc_html($new_status)); ?></p>
-                    </div>
-
-                    <p><?php _e('If you have any questions about this status change, please don't hesitate to contact us.', 'custom-rental-manager'); ?></p>
-
-                    <p><?php printf(__('Best regards,<br>The %s Team', 'custom-rental-manager'), esc_html($company_name)); ?></p>
-                </div>
-
-                <div class="footer">
-                    <p><?php echo esc_html($company_name); ?> - <?php _e('Your trusted car rental in Ischia', 'custom-rental-manager'); ?></p>
-                    <?php if (crcm()->get_setting('show_totaliweb_credit', true)): ?>
-                    <div class="totaliweb-credit">
-                        <?php _e('Powered by', 'custom-rental-manager'); ?> <a href="<?php echo CRCM_BRAND_URL; ?>" target="_blank">Totaliweb</a>
-                    </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </body>
-        </html>
-        <?php
-        return ob_get_clean();
-    }
-
-    /**
-     * Pickup reminder email template
-     */
-    private function get_pickup_reminder_template($vars) {
-        $booking = $vars['booking'];
-        $customer_name = $vars['customer_name'];
-        $company_name = crcm()->get_setting('company_name', 'Costabilerent');
-
+    public function get_pickup_reminder_template($booking) {
         $vehicle = get_post($booking['booking_data']['vehicle_id']);
-        $vehicle_name = $vehicle ? $vehicle->post_title : __('Vehicle', 'custom-rental-manager');
+        $vehicle_name = $vehicle ? $vehicle->post_title : __('Unknown Vehicle', 'custom-rental-manager');
 
-        $pickup_date = date_i18n('F j, Y', strtotime($booking['booking_data']['pickup_date']));
+        $pickup_location = '';
+        if ($booking['booking_data']['pickup_location']) {
+            $pickup_term = get_term($booking['booking_data']['pickup_location']);
+            $pickup_location = $pickup_term ? $pickup_term->name : '';
+        }
+
+        $company_name = 'Costabilerent';
 
         ob_start();
         ?>
         <!DOCTYPE html>
         <html>
         <head>
-            <meta charset="utf-8">
+            <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title><?php _e('Pickup Reminder', 'custom-rental-manager'); ?></title>
-            <style>
-                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
-                .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; }
-                .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; }
-                .content { padding: 30px 20px; }
-                .reminder-box { background: #fff3cd; border: 1px solid #ffeaa7; padding: 20px; border-radius: 8px; margin: 20px 0; }
-                .footer { background: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; }
-                .totaliweb-credit { font-size: 11px; color: #999; margin-top: 10px; }
-                .totaliweb-credit a { color: #667eea; text-decoration: none; }
-            </style>
+            <title><?php echo esc_html__('Pickup Reminder', 'custom-rental-manager'); ?></title>
         </head>
-        <body>
-            <div class="container">
-                <div class="header">
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px;">
+            <div style="max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
                     <h1><?php echo esc_html($company_name); ?></h1>
-                    <p><?php _e('Pickup Reminder', 'custom-rental-manager'); ?></p>
+                    <h2><?php echo esc_html__('Pickup Reminder', 'custom-rental-manager'); ?></h2>
                 </div>
 
-                <div class="content">
-                    <h2><?php printf(__('Dear %s,', 'custom-rental-manager'), esc_html($customer_name)); ?></h2>
+                <div style="background: #fff; padding: 30px; border: 1px solid #e2e8f0; border-top: none;">
+                    <p><?php printf(__('Dear %s,', 'custom-rental-manager'), esc_html($booking['customer_data']['first_name'])); ?></p>
 
-                    <div class="reminder-box">
-                        <h3><?php _e('Your rental pickup is tomorrow!', 'custom-rental-manager'); ?></h3>
-                        <p><?php printf(__('Don't forget about your %s pickup on %s.', 'custom-rental-manager'), '<strong>' . esc_html($vehicle_name) . '</strong>', '<strong>' . esc_html($pickup_date) . '</strong>'); ?></p>
+                    <div style="background: #f0fdf4; border: 2px solid #059669; padding: 20px; border-radius: 6px; margin: 20px 0; text-align: center;">
+                        <h3><?php _e('Your rental is tomorrow!', 'custom-rental-manager'); ?></h3>
+                        <p><strong><?php printf(__('Booking Number: %s', 'custom-rental-manager'), $booking['booking_number']); ?></strong></p>
+                        <p><strong><?php printf(__('Vehicle: %s', 'custom-rental-manager'), $vehicle_name); ?></strong></p>
+                        <p><strong><?php printf(__('Pickup: %s at %s', 'custom-rental-manager'), $booking['booking_data']['pickup_date'], $booking['booking_data']['pickup_time']); ?></strong></p>
+                        <?php if ($pickup_location): ?>
+                        <p><strong><?php printf(__('Location: %s', 'custom-rental-manager'), $pickup_location); ?></strong></p>
+                        <?php endif; ?>
                     </div>
 
-                    <h3><?php _e('What to bring:', 'custom-rental-manager'); ?></h3>
+                    <h3><?php _e('Pickup Checklist', 'custom-rental-manager'); ?></h3>
                     <ul>
-                        <li><?php _e('Valid driver's license', 'custom-rental-manager'); ?></li>
+                        <li><?php _e('Valid driving license', 'custom-rental-manager'); ?></li>
+                        <li><?php _e('ID document (passport or national ID)', 'custom-rental-manager'); ?></li>
                         <li><?php _e('Credit card for security deposit', 'custom-rental-manager'); ?></li>
-                        <li><?php _e('Booking confirmation (this email)', 'custom-rental-manager'); ?></li>
                     </ul>
 
-                    <p><?php _e('If you need to make any changes or have questions, please contact us as soon as possible.', 'custom-rental-manager'); ?></p>
-
-                    <p><?php _e('We look forward to seeing you tomorrow!', 'custom-rental-manager'); ?></p>
-
-                    <p><?php printf(__('Best regards,<br>The %s Team', 'custom-rental-manager'), esc_html($company_name)); ?></p>
+                    <p><?php _e('We look forward to serving you tomorrow!', 'custom-rental-manager'); ?></p>
                 </div>
 
-                <div class="footer">
-                    <p><?php echo esc_html($company_name); ?> - <?php _e('Your trusted car rental in Ischia', 'custom-rental-manager'); ?></p>
-                    <?php if (crcm()->get_setting('show_totaliweb_credit', true)): ?>
-                    <div class="totaliweb-credit">
-                        <?php _e('Powered by', 'custom-rental-manager'); ?> <a href="<?php echo CRCM_BRAND_URL; ?>" target="_blank">Totaliweb</a>
-                    </div>
-                    <?php endif; ?>
+                <div style="background: #f1f5f9; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 14px; color: #64748b;">
+                    <p><strong><?php echo esc_html($company_name); ?></strong></p>
+                    <p><?php _e('Ischia, Italy', 'custom-rental-manager'); ?></p>
+                    <p style="margin-top: 20px; font-size: 12px; color: #94a3b8;">
+                        <?php printf(__('Powered by %s', 'custom-rental-manager'), '<a href="https://totaliweb.com" style="color: #059669;">Totaliweb</a>'); ?>
+                    </p>
                 </div>
             </div>
         </body>
         </html>
         <?php
         return ob_get_clean();
+    }
+
+    /**
+     * Get status change email template
+     */
+    public function get_status_change_template($booking, $new_status, $old_status) {
+        $vehicle = get_post($booking['booking_data']['vehicle_id']);
+        $vehicle_name = $vehicle ? $vehicle->post_title : __('Unknown Vehicle', 'custom-rental-manager');
+
+        $company_name = 'Costabilerent';
+
+        $status_messages = array(
+            'confirmed' => __('Your booking has been confirmed! We look forward to serving you.', 'custom-rental-manager'),
+            'active' => __('Your rental is now active. Enjoy your ride!', 'custom-rental-manager'),
+            'completed' => __('Thank you for your business! We hope you enjoyed your rental experience.', 'custom-rental-manager'),
+            'cancelled' => __('Your booking has been cancelled. If you need assistance, please contact us.', 'custom-rental-manager'),
+        );
+
+        $message = isset($status_messages[$new_status]) ? $status_messages[$new_status] : sprintf(__('Your booking status has been updated to: %s', 'custom-rental-manager'), ucfirst($new_status));
+
+        ob_start();
+        ?>
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title><?php echo esc_html__('Booking Status Update', 'custom-rental-manager'); ?></title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px;">
+            <div style="max-width: 600px; margin: 0 auto;">
+                <div style="background: #2563eb; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+                    <h1><?php echo esc_html($company_name); ?></h1>
+                    <h2><?php echo esc_html__('Booking Status Update', 'custom-rental-manager'); ?></h2>
+                </div>
+
+                <div style="background: #fff; padding: 30px; border: 1px solid #e2e8f0; border-top: none;">
+                    <p><?php printf(__('Dear %s,', 'custom-rental-manager'), esc_html($booking['customer_data']['first_name'])); ?></p>
+
+                    <div style="background: rgba(37, 99, 235, 0.1); border: 2px solid #2563eb; padding: 20px; border-radius: 6px; margin: 20px 0; text-align: center;">
+                        <h3><?php echo esc_html($message); ?></h3>
+                        <p><strong><?php printf(__('Booking Number: %s', 'custom-rental-manager'), $booking['booking_number']); ?></strong></p>
+                        <p><strong><?php printf(__('Vehicle: %s', 'custom-rental-manager'), $vehicle_name); ?></strong></p>
+                        <p><strong><?php printf(__('Status: %s', 'custom-rental-manager'), ucfirst($new_status)); ?></strong></p>
+                    </div>
+
+                    <p><?php _e('If you have any questions, please do not hesitate to contact us.', 'custom-rental-manager'); ?></p>
+                </div>
+
+                <div style="background: #f1f5f9; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 14px; color: #64748b;">
+                    <p><strong><?php echo esc_html($company_name); ?></strong></p>
+                    <p><?php _e('Phone:', 'custom-rental-manager'); ?> +39 123 456 789</p>
+                    <p style="margin-top: 20px; font-size: 12px; color: #94a3b8;">
+                        <?php printf(__('Powered by %s', 'custom-rental-manager'), '<a href="https://totaliweb.com" style="color: #2563eb;">Totaliweb</a>'); ?>
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
+     * Set from email address
+     */
+    public function set_from_email($email) {
+        return 'info@costabilerent.com';
+    }
+
+    /**
+     * Set from name
+     */
+    public function set_from_name($name) {
+        return 'Costabilerent';
+    }
+
+    /**
+     * Get booking data for email
+     */
+    private function get_booking_data($booking_id) {
+        $booking_manager = new CRCM_Booking_Manager();
+        return $booking_manager->get_booking($booking_id);
+    }
+
+    /**
+     * Send test email
+     */
+    public function send_test_email($to_email) {
+        $subject = sprintf(__('Test Email from %s', 'custom-rental-manager'), 'Costabilerent');
+
+        $message = '<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Test Email</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="background: #2563eb; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+                    <h1>Costabilerent</h1>
+                    <h2>' . __('Email System Test', 'custom-rental-manager') . '</h2>
+                </div>
+                <div style="background: #fff; padding: 20px; border: 1px solid #e2e8f0; border-top: none;">
+                    <p>' . __('This is a test email to verify that your email system is working correctly.', 'custom-rental-manager') . '</p>
+                    <p>' . __('If you received this email, your email configuration is working properly!', 'custom-rental-manager') . '</p>
+                    <p><strong>' . __('Timestamp:', 'custom-rental-manager') . '</strong> ' . current_time('mysql') . '</p>
+                </div>
+                <div style="background: #f1f5f9; padding: 15px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px; color: #64748b;">
+                    ' . sprintf(__('Powered by %s', 'custom-rental-manager'), '<a href="https://totaliweb.com" style="color: #2563eb;">Totaliweb</a>') . '
+                </div>
+            </div>
+        </body>
+        </html>';
+
+        $headers = array(
+            'Content-Type: text/html; charset=UTF-8',
+        );
+
+        return wp_mail($to_email, $subject, $message, $headers);
     }
 }
