@@ -1,24 +1,278 @@
-/*
- * Custom Rental Car Manager - Admin JavaScript
- * Enhanced admin functionality and interactions
- * Author: Totaliweb
- * Version: 1.0.0
+/**
+ * Custom Rental Car Manager - Frontend JavaScript
+ * 
+ * @package CustomRentalCarManager
+ * @author Totaliweb
+ * @since 1.0.0
  */
 
 (function($) {
     'use strict';
 
-    // Global CRCM Admin object
-    window.CRCMAdmin = {
+    // Global CRCM object
+    window.CRCM = {
         init: function() {
+            this.initSearchForm();
+            this.initBookingForm();
+            this.initCustomerDashboard();
             this.initDatePickers();
-            this.initGalleryManager();
-            this.initSettingsTabs();
-            this.initLocationManager();
-            this.initCalendarActions();
-            this.initBookingActions();
-            this.initDashboardRefresh();
-            this.initTooltips();
+            this.initVehicleActions();
+        },
+
+        // Initialize search form
+        initSearchForm: function() {
+            $('#crcm-vehicle-search').on('submit', function(e) {
+                e.preventDefault();
+                CRCM.searchVehicles();
+            });
+
+            // Set minimum dates
+            const today = new Date().toISOString().split('T')[0];
+            $('#pickup_date, #return_date').attr('min', today);
+
+            // Auto-set return date when pickup date changes
+            $('#pickup_date').on('change', function() {
+                const pickupDate = new Date($(this).val());
+                const returnDate = new Date(pickupDate);
+                returnDate.setDate(returnDate.getDate() + 1);
+
+                $('#return_date').attr('min', returnDate.toISOString().split('T')[0]);
+
+                if (!$('#return_date').val()) {
+                    $('#return_date').val(returnDate.toISOString().split('T')[0]);
+                }
+            });
+        },
+
+        // Search vehicles via AJAX
+        searchVehicles: function() {
+            const $form = $('#crcm-vehicle-search');
+            const $button = $form.find('.crcm-search-btn');
+            const $results = $('#crcm-search-results');
+
+            const formData = {
+                action: 'crcm_search_vehicles',
+                nonce: crcm_ajax.nonce,
+                pickup_date: $('#pickup_date').val(),
+                return_date: $('#return_date').val(),
+                vehicle_type: $('#vehicle_type').val(),
+                pickup_location: $('#pickup_location').val()
+            };
+
+            // Validate dates
+            if (!formData.pickup_date || !formData.return_date) {
+                CRCM.showError('Please select both pickup and return dates.');
+                return;
+            }
+
+            if (new Date(formData.pickup_date) >= new Date(formData.return_date)) {
+                CRCM.showError('Return date must be after pickup date.');
+                return;
+            }
+
+            // Show loading
+            $button.prop('disabled', true).html('<span class="crcm-loading"></span> Searching...');
+            $results.show().find('#crcm-results-content').html('<div class="crcm-loading-message">Searching available vehicles...</div>');
+
+            $.ajax({
+                url: crcm_ajax.ajax_url,
+                type: 'POST',
+                data: formData,
+                success: function(response) {
+                    if (response.success) {
+                        CRCM.displaySearchResults(response.data);
+                    } else {
+                        CRCM.showError(response.data || 'Search failed. Please try again.');
+                    }
+                },
+                error: function() {
+                    CRCM.showError('Connection error. Please check your internet connection and try again.');
+                },
+                complete: function() {
+                    $button.prop('disabled', false).html('Search Vehicles');
+                }
+            });
+        },
+
+        // Display search results
+        displaySearchResults: function(vehicles) {
+            const $container = $('#crcm-results-content');
+
+            if (!vehicles || vehicles.length === 0) {
+                $container.html('<div class="crcm-no-results"><p>No vehicles available for the selected dates.</p></div>');
+                return;
+            }
+
+            let html = '<div class="crcm-vehicles-grid">';
+
+            vehicles.forEach(function(vehicle) {
+                html += CRCM.buildVehicleCard(vehicle);
+            });
+
+            html += '</div>';
+            $container.html(html);
+        },
+
+        // Build vehicle card HTML
+        buildVehicleCard: function(vehicle) {
+            const imageHtml = vehicle.thumbnail ? 
+                '<img src="' + vehicle.thumbnail + '" alt="' + vehicle.title + '" />' :
+                '<div class="crcm-no-image"><span class="dashicons dashicons-car"></span></div>';
+
+            return `
+                <div class="crcm-vehicle-card">
+                    <div class="crcm-vehicle-image">
+                        ${imageHtml}
+                    </div>
+                    <div class="crcm-vehicle-content">
+                        <h3>${vehicle.title}</h3>
+                        <div class="crcm-vehicle-price">
+                            <span class="crcm-price">
+                                ${crcm_ajax.currency_symbol}${vehicle.daily_rate}
+                                <small>/day</small>
+                            </span>
+                        </div>
+                        <div class="crcm-vehicle-actions">
+                            <a href="#" class="crcm-btn crcm-btn-primary crcm-book-now" data-vehicle-id="${vehicle.id}">
+                                Book Now
+                            </a>
+                            <a href="${vehicle.permalink}" class="crcm-btn crcm-btn-secondary">
+                                View Details
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            `;
+        },
+
+        // Initialize booking form
+        initBookingForm: function() {
+            $('#crcm-booking-form').on('submit', function(e) {
+                e.preventDefault();
+                CRCM.submitBooking();
+            });
+
+            // Home delivery toggle
+            $('#home_delivery').on('change', function() {
+                const $addressGroup = $('.crcm-delivery-address');
+                if ($(this).is(':checked')) {
+                    $addressGroup.slideDown();
+                } else {
+                    $addressGroup.slideUp();
+                }
+            });
+
+            // Calculate pricing when dates change
+            $('#pickup_date, #return_date').on('change', function() {
+                CRCM.calculatePricing();
+            });
+
+            // Calculate pricing when extras change
+            $('input[name="extras[]"]').on('change', function() {
+                CRCM.calculatePricing();
+            });
+        },
+
+        // Submit booking
+        submitBooking: function() {
+            const $form = $('#crcm-booking-form');
+            const $button = $form.find('.crcm-submit-btn');
+
+            // Basic validation
+            if (!CRCM.validateBookingForm()) {
+                return;
+            }
+
+            const formData = $form.serialize() + '&action=crcm_create_booking&nonce=' + crcm_ajax.nonce;
+
+            // Show loading
+            $button.prop('disabled', true).html('<span class="crcm-loading"></span> Processing...');
+
+            $.ajax({
+                url: crcm_ajax.ajax_url,
+                type: 'POST',
+                data: formData,
+                success: function(response) {
+                    if (response.success) {
+                        if (response.data.redirect_url) {
+                            window.location.href = response.data.redirect_url;
+                        } else {
+                            CRCM.showSuccess('Booking submitted successfully!');
+                            $form[0].reset();
+                        }
+                    } else {
+                        CRCM.showError(response.data || 'Booking failed. Please try again.');
+                    }
+                },
+                error: function() {
+                    CRCM.showError('Connection error. Please try again.');
+                },
+                complete: function() {
+                    $button.prop('disabled', false).html('Submit Booking Request');
+                }
+            });
+        },
+
+        // Validate booking form
+        validateBookingForm: function() {
+            const $form = $('#crcm-booking-form');
+            let isValid = true;
+
+            // Clear previous errors
+            $('.crcm-field-error').remove();
+
+            // Check required fields
+            $form.find('[required]').each(function() {
+                if (!$(this).val().trim()) {
+                    CRCM.showFieldError($(this), 'This field is required.');
+                    isValid = false;
+                }
+            });
+
+            // Validate email
+            const email = $('#email').val();
+            if (email && !CRCM.isValidEmail(email)) {
+                CRCM.showFieldError($('#email'), 'Please enter a valid email address.');
+                isValid = false;
+            }
+
+            // Validate dates
+            const pickupDate = new Date($('#pickup_date').val());
+            const returnDate = new Date($('#return_date').val());
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            if (pickupDate < today) {
+                CRCM.showFieldError($('#pickup_date'), 'Pickup date cannot be in the past.');
+                isValid = false;
+            }
+
+            if (returnDate <= pickupDate) {
+                CRCM.showFieldError($('#return_date'), 'Return date must be after pickup date.');
+                isValid = false;
+            }
+
+            return isValid;
+        },
+
+        // Initialize customer dashboard
+        initCustomerDashboard: function() {
+            // Tab switching
+            $('.crcm-tab-btn').on('click', function() {
+                const tabId = $(this).data('tab');
+
+                $('.crcm-tab-btn').removeClass('active');
+                $(this).addClass('active');
+
+                $('.crcm-tab-content').hide();
+                $('#' + tabId + '-tab').show();
+            });
+
+            // Profile form submission
+            $('.crcm-profile-form').on('submit', function(e) {
+                e.preventDefault();
+                CRCM.updateProfile();
+            });
         },
 
         // Initialize date pickers
@@ -27,531 +281,156 @@
                 $('.crcm-datepicker').datepicker({
                     dateFormat: 'yy-mm-dd',
                     minDate: 0,
-                    showOtherMonths: true,
-                    selectOtherMonths: true
+                    showAnim: 'slideDown'
                 });
             }
         },
 
-        // Initialize gallery manager
-        initGalleryManager: function() {
-            var mediaUploader;
-
-            // Add gallery images
-            $(document).on('click', '#crcm-add-gallery-images', function(e) {
+        // Initialize vehicle actions
+        initVehicleActions: function() {
+            $(document).on('click', '.crcm-book-now, [data-vehicle-id]', function(e) {
                 e.preventDefault();
+                const vehicleId = $(this).data('vehicle-id');
 
-                if (mediaUploader) {
-                    mediaUploader.open();
-                    return;
-                }
-
-                mediaUploader = wp.media({
-                    title: 'Choose Images',
-                    button: {
-                        text: 'Add Images'
-                    },
-                    multiple: true
-                });
-
-                mediaUploader.on('select', function() {
-                    var attachments = mediaUploader.state().get('selection').toJSON();
-                    var currentIds = $('#crcm-gallery-ids').val().split(',').filter(Boolean);
-
-                    attachments.forEach(function(attachment) {
-                        if (currentIds.indexOf(attachment.id.toString()) === -1) {
-                            currentIds.push(attachment.id);
-
-                            var imageHtml = '<div class="crcm-gallery-image" data-id="' + attachment.id + '">' +
-                                '<img src="' + attachment.sizes.thumbnail.url + '" alt="" />' +
-                                '<button type="button" class="crcm-remove-image" aria-label="Remove image">&times;</button>' +
-                                '</div>';
-
-                            $('#crcm-gallery-images').append(imageHtml);
-                        }
-                    });
-
-                    $('#crcm-gallery-ids').val(currentIds.join(','));
-                });
-
-                mediaUploader.open();
-            });
-
-            // Remove gallery image
-            $(document).on('click', '.crcm-remove-image', function() {
-                var imageDiv = $(this).parent();
-                var imageId = imageDiv.data('id');
-                var currentIds = $('#crcm-gallery-ids').val().split(',').filter(Boolean);
-                var index = currentIds.indexOf(imageId.toString());
-
-                if (index > -1) {
-                    currentIds.splice(index, 1);
-                    $('#crcm-gallery-ids').val(currentIds.join(','));
-                }
-
-                imageDiv.remove();
-            });
-        },
-
-        // Initialize settings tabs
-        initSettingsTabs: function() {
-            $('.nav-tab').on('click', function(e) {
-                e.preventDefault();
-
-                var target = $(this).attr('href');
-
-                $('.nav-tab').removeClass('nav-tab-active');
-                $(this).addClass('nav-tab-active');
-
-                $('.tab-content').removeClass('active');
-                $(target).addClass('active');
-
-                // Store active tab
-                localStorage.setItem('crcm_active_tab', target);
-            });
-
-            // Restore active tab
-            var activeTab = localStorage.getItem('crcm_active_tab');
-            if (activeTab && $(activeTab).length) {
-                $('.nav-tab[href="' + activeTab + '"]').click();
-            }
-        },
-
-        // Initialize location manager
-        initLocationManager: function() {
-            var locationIndex = $('.location-item').length;
-
-            // Add location
-            $('#add-location').on('click', function() {
-                var html = '<div class="location-item">' +
-                    '<table class="form-table">' +
-                    '<tr>' +
-                    '<th><label>Location Name</label></th>' +
-                    '<td><input type="text" name="locations[' + locationIndex + '][name]" class="regular-text" /></td>' +
-                    '</tr>' +
-                    '<tr>' +
-                    '<th><label>Address</label></th>' +
-                    '<td>' +
-                    '<textarea name="locations[' + locationIndex + '][address]" rows="3" class="large-text"></textarea>' +
-                    '<button type="button" class="button remove-location">Remove</button>' +
-                    '</td>' +
-                    '</tr>' +
-                    '</table>' +
-                    '</div>';
-
-                $('#locations-container').append(html);
-                locationIndex++;
-            });
-
-            // Remove location
-            $(document).on('click', '.remove-location', function() {
-                if ($('.location-item').length > 1) {
-                    $(this).closest('.location-item').remove();
-                } else {
-                    alert('At least one location is required.');
+                if (vehicleId) {
+                    // Redirect to booking form or open modal
+                    const bookingUrl = '/booking-form/?vehicle=' + vehicleId;
+                    window.location.href = bookingUrl;
                 }
             });
         },
 
-        // Initialize calendar actions
-        initCalendarActions: function() {
-            // Calendar vehicle filter
-            $('#calendar-vehicle-filter').on('change', function() {
-                CRCMAdmin.loadCalendarData();
-            });
+        // Calculate pricing
+        calculatePricing: function() {
+            const pickupDate = $('#pickup_date').val();
+            const returnDate = $('#return_date').val();
 
-            // Calendar refresh
-            $('#calendar-refresh').on('click', function() {
-                CRCMAdmin.loadCalendarData();
-            });
-        },
-
-        loadCalendarData: function() {
-            var vehicleId = $('#calendar-vehicle-filter').val();
-            var currentMonth = new Date().toISOString().slice(0, 7);
-
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'crcm_get_calendar_data',
-                    nonce: crcm_admin.nonce,
-                    month: currentMonth,
-                    vehicle_id: vehicleId
-                },
-                beforeSend: function() {
-                    $('#crcm-calendar').html('<div class="crcm-admin-loading"><div class="crcm-admin-spinner"></div><p>Loading calendar...</p></div>');
-                },
-                success: function(response) {
-                    if (response.success) {
-                        CRCMAdmin.renderCalendarEvents(response.data);
-                    } else {
-                        $('#crcm-calendar').html('<p>Error loading calendar data.</p>');
-                    }
-                },
-                error: function() {
-                    $('#crcm-calendar').html('<p>Error loading calendar data.</p>');
-                }
-            });
-        },
-
-        renderCalendarEvents: function(events) {
-            // This would typically integrate with FullCalendar or similar
-            var html = '<div class="crcm-calendar-events">';
-
-            if (events && events.length > 0) {
-                events.forEach(function(event) {
-                    html += '<div class="crcm-calendar-event crcm-booking-' + event.status + '">';
-                    html += '<strong>' + event.title + '</strong><br>';
-                    html += event.start + ' - ' + event.end + '<br>';
-                    html += '<small>' + event.vehicle + '</small>';
-                    html += '</div>';
-                });
-            } else {
-                html += '<p>No events found for this period.</p>';
-            }
-
-            html += '</div>';
-            $('#crcm-calendar').html(html);
-        },
-
-        // Initialize booking actions
-        initBookingActions: function() {
-            // Update booking status
-            $(document).on('change', '#crcm_booking_status', function() {
-                var bookingId = $('#post_ID').val();
-                var newStatus = $(this).val();
-
-                if (bookingId && newStatus) {
-                    CRCMAdmin.updateBookingStatus(bookingId, newStatus);
-                }
-            });
-
-            // Send email to customer
-            $(document).on('click', '#crcm-send-email', function() {
-                var bookingId = $('#post_ID').val();
-                if (bookingId) {
-                    CRCMAdmin.sendCustomerEmail(bookingId);
-                }
-            });
-
-            // Generate contract
-            $(document).on('click', '#crcm-generate-contract', function() {
-                var bookingId = $('#post_ID').val();
-                if (bookingId) {
-                    CRCMAdmin.generateContract(bookingId);
-                }
-            });
-
-            // Process refund
-            $(document).on('click', '#crcm-process-refund', function() {
-                var bookingId = $('#post_ID').val();
-                if (bookingId) {
-                    CRCMAdmin.showRefundModal(bookingId);
-                }
-            });
-        },
-
-        updateBookingStatus: function(bookingId, status) {
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'crcm_update_booking_status',
-                    booking_id: bookingId,
-                    status: status,
-                    nonce: crcm_admin.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        CRCMAdmin.showNotice('success', response.data.message);
-                    } else {
-                        CRCMAdmin.showNotice('error', response.data || 'Status update failed.');
-                    }
-                },
-                error: function() {
-                    CRCMAdmin.showNotice('error', 'Status update failed.');
-                }
-            });
-        },
-
-        sendCustomerEmail: function(bookingId) {
-            // Show email template selection modal
-            var modalHtml = '<div class="crcm-admin-modal">' +
-                '<div class="crcm-admin-modal-content">' +
-                '<h3>Send Email to Customer</h3>' +
-                '<p>Select email template:</p>' +
-                '<select id="email-template">' +
-                '<option value="booking-confirmation">Booking Confirmation</option>' +
-                '<option value="pickup-reminder">Pickup Reminder</option>' +
-                '<option value="custom">Custom Message</option>' +
-                '</select>' +
-                '<div id="custom-message" style="display:none; margin-top:10px;">' +
-                '<textarea placeholder="Custom message..." rows="5" style="width:100%;"></textarea>' +
-                '</div>' +
-                '<div class="modal-actions">' +
-                '<button class="button button-primary" onclick="CRCMAdmin.sendEmail(' + bookingId + ')">Send Email</button>' +
-                '<button class="button" onclick="CRCMAdmin.closeModal()">Cancel</button>' +
-                '</div>' +
-                '</div>' +
-                '</div>';
-
-            $('body').append(modalHtml);
-
-            $('#email-template').on('change', function() {
-                if ($(this).val() === 'custom') {
-                    $('#custom-message').show();
-                } else {
-                    $('#custom-message').hide();
-                }
-            });
-        },
-
-        generateContract: function(bookingId) {
-            window.open(ajaxurl + '?action=crcm_generate_contract&booking_id=' + bookingId + '&nonce=' + crcm_admin.nonce, '_blank');
-        },
-
-        showRefundModal: function(bookingId) {
-            var modalHtml = '<div class="crcm-admin-modal">' +
-                '<div class="crcm-admin-modal-content">' +
-                '<h3>Process Refund</h3>' +
-                '<p><label>Refund Amount:</label><input type="number" id="refund-amount" step="0.01" /></p>' +
-                '<p><label>Reason:</label><textarea id="refund-reason" rows="3"></textarea></p>' +
-                '<div class="modal-actions">' +
-                '<button class="button button-primary" onclick="CRCMAdmin.processRefund(' + bookingId + ')">Process Refund</button>' +
-                '<button class="button" onclick="CRCMAdmin.closeModal()">Cancel</button>' +
-                '</div>' +
-                '</div>' +
-                '</div>';
-
-            $('body').append(modalHtml);
-        },
-
-        processRefund: function(bookingId) {
-            var amount = $('#refund-amount').val();
-            var reason = $('#refund-reason').val();
-
-            if (!amount || amount <= 0) {
-                alert('Please enter a valid refund amount.');
+            if (!pickupDate || !returnDate) {
                 return;
             }
 
+            const days = CRCM.calculateDays(pickupDate, returnDate);
+
+            if (days <= 0) {
+                return;
+            }
+
+            // Basic pricing calculation (extend as needed)
+            let total = 0;
+            const dailyRate = parseFloat($('#daily_rate').val() || 0);
+
+            total = dailyRate * days;
+
+            // Add extras
+            $('input[name="extras[]"]:checked').each(function() {
+                const extraCost = parseFloat($(this).data('cost') || 0);
+                total += extraCost * days;
+            });
+
+            // Update display
+            $('.crcm-pricing-summary .total').text(crcm_ajax.currency_symbol + total.toFixed(2));
+            $('.crcm-pricing-summary .days').text(days + ' days');
+        },
+
+        // Calculate days between dates
+        calculateDays: function(startDate, endDate) {
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            const timeDiff = end.getTime() - start.getTime();
+            return Math.max(1, Math.ceil(timeDiff / (1000 * 3600 * 24)));
+        },
+
+        // Update profile
+        updateProfile: function() {
+            const $form = $('.crcm-profile-form');
+            const formData = $form.serialize() + '&action=crcm_update_profile&nonce=' + crcm_ajax.nonce;
+
             $.ajax({
-                url: ajaxurl,
+                url: crcm_ajax.ajax_url,
                 type: 'POST',
-                data: {
-                    action: 'crcm_process_refund',
-                    booking_id: bookingId,
-                    refund_amount: amount,
-                    refund_reason: reason,
-                    nonce: crcm_admin.nonce
-                },
+                data: formData,
                 success: function(response) {
                     if (response.success) {
-                        CRCMAdmin.showNotice('success', response.data.message);
-                        CRCMAdmin.closeModal();
-                        location.reload(); // Refresh to show updated payment data
+                        CRCM.showSuccess('Profile updated successfully!');
                     } else {
-                        CRCMAdmin.showNotice('error', response.data || 'Refund failed.');
+                        CRCM.showError(response.data || 'Update failed.');
                     }
                 },
                 error: function() {
-                    CRCMAdmin.showNotice('error', 'Refund failed.');
+                    CRCM.showError('Connection error. Please try again.');
                 }
-            });
-        },
-
-        closeModal: function() {
-            $('.crcm-admin-modal').remove();
-        },
-
-        // Initialize dashboard refresh
-        initDashboardRefresh: function() {
-            // Auto-refresh dashboard data every 5 minutes
-            if ($('.crcm-dashboard').length) {
-                setInterval(function() {
-                    CRCMAdmin.refreshDashboardStats();
-                }, 300000); // 5 minutes
-            }
-
-            // Manual refresh button
-            $(document).on('click', '.crcm-refresh-dashboard', function() {
-                CRCMAdmin.refreshDashboardStats();
-            });
-        },
-
-        refreshDashboardStats: function() {
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'crcm_get_dashboard_stats',
-                    nonce: crcm_admin.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        CRCMAdmin.updateDashboardStats(response.data);
-                    }
-                }
-            });
-        },
-
-        updateDashboardStats: function(stats) {
-            // Update stat cards with new data
-            Object.keys(stats).forEach(function(key) {
-                var element = $('.crcm-stat-' + key);
-                if (element.length) {
-                    element.find('h3').text(stats[key]);
-                }
-            });
-        },
-
-        // Initialize tooltips
-        initTooltips: function() {
-            $(document).on('mouseenter', '[data-tooltip]', function() {
-                var tooltip = $(this).data('tooltip');
-                var tooltipElement = $('<div class="crcm-tooltip">' + tooltip + '</div>');
-                $('body').append(tooltipElement);
-
-                var rect = this.getBoundingClientRect();
-                tooltipElement.css({
-                    position: 'absolute',
-                    top: rect.top - tooltipElement.outerHeight() - 5,
-                    left: rect.left + (rect.width / 2) - (tooltipElement.outerWidth() / 2),
-                    zIndex: 10000
-                });
-            }).on('mouseleave', function() {
-                $('.crcm-tooltip').remove();
             });
         },
 
         // Utility functions
-        showNotice: function(type, message) {
-            var noticeClass = 'notice-' + type;
-            var noticeHtml = '<div class="notice ' + noticeClass + ' is-dismissible crcm-admin-notice">' +
-                '<p>' + message + '</p>' +
-                '<button type="button" class="notice-dismiss">' +
-                '<span class="screen-reader-text">Dismiss this notice.</span>' +
-                '</button>' +
-                '</div>';
+        showError: function(message) {
+            CRCM.showNotification(message, 'error');
+        },
 
-            $('.wrap h1').after(noticeHtml);
+        showSuccess: function(message) {
+            CRCM.showNotification(message, 'success');
+        },
 
-            // Auto-dismiss after 5 seconds
+        showNotification: function(message, type) {
+            const className = type === 'error' ? 'crcm-error' : 'crcm-success';
+            const $notification = $('<div class="' + className + '">' + message + '</div>');
+
+            // Remove existing notifications
+            $('.crcm-error, .crcm-success').remove();
+
+            // Add new notification
+            $('body').prepend($notification);
+
+            // Auto-remove after 5 seconds
             setTimeout(function() {
-                $('.crcm-admin-notice').fadeOut(function() {
+                $notification.fadeOut(function() {
                     $(this).remove();
                 });
             }, 5000);
         },
 
-        formatPrice: function(amount) {
-            return crcm_admin.currency_symbol + parseFloat(amount).toFixed(2);
+        showFieldError: function($field, message) {
+            const $error = $('<div class="crcm-field-error" style="color: #dc2626; font-size: 14px; margin-top: 4px;">' + message + '</div>');
+            $field.closest('.crcm-form-group').append($error);
+            $field.focus();
         },
 
-        formatDate: function(dateString) {
-            var date = new Date(dateString);
-            return date.toLocaleDateString();
+        isValidEmail: function(email) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return re.test(email);
         }
+    };
+
+    // Cancel booking function (global)
+    window.cancelBooking = function(bookingId) {
+        if (!confirm('Are you sure you want to cancel this booking?')) {
+            return;
+        }
+
+        $.ajax({
+            url: crcm_ajax.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'crcm_cancel_booking',
+                booking_id: bookingId,
+                nonce: crcm_ajax.nonce
+            },
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                } else {
+                    alert(response.data || 'Cancellation failed.');
+                }
+            },
+            error: function() {
+                alert('Connection error. Please try again.');
+            }
+        });
     };
 
     // Initialize when document is ready
     $(document).ready(function() {
-        CRCMAdmin.init();
-    });
-
-    // Accessibility improvements
-    $(document).ready(function() {
-        // Add ARIA labels
-        $('.crcm-remove-image').attr('aria-label', 'Remove image');
-        $('.remove-location').attr('aria-label', 'Remove location');
-
-        // Keyboard navigation for tabs
-        $('.nav-tab').on('keydown', function(e) {
-            var tabs = $('.nav-tab');
-            var currentIndex = tabs.index(this);
-
-            if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-                e.preventDefault();
-                var nextIndex = e.key === 'ArrowRight' ? 
-                    (currentIndex + 1) % tabs.length : 
-                    (currentIndex - 1 + tabs.length) % tabs.length;
-
-                tabs.eq(nextIndex).focus().click();
-            }
-        });
-    });
-
-    // Handle modal dismiss
-    $(document).on('click', '.notice-dismiss', function() {
-        $(this).parent().fadeOut(function() {
-            $(this).remove();
-        });
+        CRCM.init();
     });
 
 })(jQuery);
-
-// Modal styles (injected via JavaScript for better encapsulation)
-jQuery(document).ready(function($) {
-    var modalStyles = `
-        <style>
-        .crcm-admin-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 100000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .crcm-admin-modal-content {
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-        }
-
-        .crcm-admin-modal-content h3 {
-            margin-top: 0;
-            margin-bottom: 20px;
-        }
-
-        .crcm-admin-modal-content label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-        }
-
-        .crcm-admin-modal-content input,
-        .crcm-admin-modal-content select,
-        .crcm-admin-modal-content textarea {
-            width: 100%;
-            padding: 8px 12px;
-            margin-bottom: 15px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-
-        .modal-actions {
-            text-align: right;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-        }
-
-        .modal-actions .button {
-            margin-left: 10px;
-        }
-        </style>
-    `;
-
-    $('head').append(modalStyles);
-});
