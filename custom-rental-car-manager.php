@@ -1,610 +1,548 @@
 <?php
 /**
- * Vehicle Manager Class
- * 
- * Handles all vehicle-related operations including CRUD operations,
- * availability management, and pricing.
- * 
- * @package CustomRentalCarManager
- * @author Totaliweb
- * @since 1.0.0
+ * Plugin Name: Custom Rental Car Manager
+ * Plugin URI: https://totaliweb.com/plugins/custom-rental-car-manager
+ * Description: Complete rental car and scooter management system for WordPress. Perfect for rental businesses like Costabilerent in Ischia.
+ * Version: 1.0.0
+ * Author: Totaliweb
+ * Author URI: https://totaliweb.com
+ * License: GPL v2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain: custom-rental-manager
+ * Domain Path: /languages
+ * Requires at least: 5.6
+ * Tested up to: 6.8
+ * Requires PHP: 8.0
+ * Network: false
  */
 
+// Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
 }
 
-class CRCM_Vehicle_Manager {
+// Define plugin constants
+define('CRCM_PLUGIN_FILE', __FILE__);
+define('CRCM_PLUGIN_PATH', plugin_dir_path(__FILE__));
+define('CRCM_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('CRCM_VERSION', '1.0.0');
+define('CRCM_BRAND_URL', 'https://totaliweb.com');
 
+/**
+ * Main Plugin Class
+ */
+class CRCM_Plugin {
+    
+    /**
+     * Single instance of the plugin
+     */
+    private static $instance = null;
+    
+    /**
+     * Manager instances
+     */
+    public $vehicle_manager;
+    public $booking_manager;
+    public $calendar_manager;
+    public $email_manager;
+    public $payment_manager;
+    public $api_endpoints;
+    public $customer_portal;
+    
+    /**
+     * Get single instance
+     */
+    public static function get_instance() {
+        if (null === self::$instance) {
+            self::$instance = new self();
+        }
+        return self::$instance;
+    }
+    
     /**
      * Constructor
      */
-    public function __construct() {
-        add_action('add_meta_boxes', array($this, 'add_meta_boxes'));
-        add_action('save_post', array($this, 'save_vehicle_meta'));
-        add_action('wp_ajax_crcm_search_vehicles', array($this, 'ajax_search_vehicles'));
-        add_action('wp_ajax_nopriv_crcm_search_vehicles', array($this, 'ajax_search_vehicles'));
-        add_filter('manage_crcm_vehicle_posts_columns', array($this, 'vehicle_columns'));
-        add_action('manage_crcm_vehicle_posts_custom_column', array($this, 'vehicle_column_content'), 10, 2);
+    private function __construct() {
+        $this->init_hooks();
     }
-
+    
     /**
-     * Add meta boxes for vehicle post type
+     * Initialize hooks - FIX: Proper hook timing
      */
-    public function add_meta_boxes() {
-        add_meta_box(
-            'crcm_vehicle_details',
-            __('Vehicle Details', 'custom-rental-manager'),
-            array($this, 'vehicle_details_meta_box'),
-            'crcm_vehicle',
-            'normal',
-            'high'
+    private function init_hooks() {
+        register_activation_hook(__FILE__, array($this, 'activate'));
+        register_deactivation_hook(__FILE__, array($this, 'deactivate'));
+        
+        // FIX: Use proper WordPress initialization hooks with correct timing
+        add_action('init', array($this, 'init'), 10);
+        add_action('init', array($this, 'load_textdomain'), 5); // Load textdomain early in init
+        add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_assets'));
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
+    }
+    
+    /**
+     * Initialize plugin - FIX: Moved post type registration to proper timing
+     */
+    public function init() {
+        // Load dependencies first
+        $this->load_dependencies();
+        
+        // Register post types and taxonomies AFTER WordPress is fully loaded
+        $this->register_post_types();
+        $this->register_taxonomies();
+        
+        // Initialize managers after WordPress objects are ready
+        $this->init_managers();
+        
+        // Add admin menu
+        $this->add_admin_menu();
+        
+        // Initialize shortcodes
+        $this->init_shortcodes();
+    }
+    
+    /**
+     * Load plugin textdomain - FIX: Separate method called at proper time
+     */
+    public function load_textdomain() {
+        $languages_path = dirname(plugin_basename(__FILE__)) . '/languages/';
+        load_plugin_textdomain('custom-rental-manager', false, $languages_path);
+    }
+    
+    /**
+     * Load plugin dependencies
+     */
+    private function load_dependencies() {
+        // Load helper functions first
+        if (file_exists(CRCM_PLUGIN_PATH . 'inc/functions.php')) {
+            require_once CRCM_PLUGIN_PATH . 'inc/functions.php';
+        }
+        
+        // Load manager classes only if they exist
+        $classes = array(
+            'class-vehicle-manager.php',
+            'class-booking-manager.php',
+            'class-calendar-manager.php',
+            'class-email-manager.php',
+            'class-payment-manager.php',
+            'class-api-endpoints.php',
+            'class-customer-portal.php'
         );
-
-        add_meta_box(
-            'crcm_vehicle_pricing',
-            __('Pricing & Availability', 'custom-rental-manager'),
-            array($this, 'pricing_meta_box'),
-            'crcm_vehicle',
-            'normal',
-            'high'
-        );
-
-        add_meta_box(
-            'crcm_vehicle_gallery',
-            __('Vehicle Gallery', 'custom-rental-manager'),
-            array($this, 'gallery_meta_box'),
-            'crcm_vehicle',
-            'side',
-            'default'
-        );
-
-        add_meta_box(
-            'crcm_vehicle_features',
-            __('Features & Specifications', 'custom-rental-manager'),
-            array($this, 'features_meta_box'),
-            'crcm_vehicle',
-            'normal',
-            'default'
-        );
-    }
-
-    /**
-     * Vehicle details meta box
-     */
-    public function vehicle_details_meta_box($post) {
-        wp_nonce_field('crcm_vehicle_meta_nonce', 'crcm_vehicle_meta_nonce_field');
-
-        $vehicle_data = get_post_meta($post->ID, '_crcm_vehicle_data', true);
-
-        // Default values
-        if (empty($vehicle_data)) {
-            $vehicle_data = array(
-                'brand' => '',
-                'model' => '',
-                'year' => date('Y'),
-                'color' => '',
-                'license_plate' => '',
-                'engine_size' => '',
-                'fuel_type' => 'gasoline',
-                'transmission' => 'manual',
-                'seats' => 2,
-                'doors' => 2,
-                'condition' => 'excellent',
-                'mileage' => 0,
-                'vin' => '',
-                'registration_date' => '',
-                'insurance_expiry' => '',
-                'maintenance_due' => '',
-            );
-        }
-        ?>
-        <table class="form-table crcm-form-table">
-            <tr>
-                <th><label for="crcm_brand"><?php _e('Brand', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="text" id="crcm_brand" name="vehicle_data[brand]" value="<?php echo esc_attr($vehicle_data['brand']); ?>" class="regular-text" />
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_model"><?php _e('Model', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="text" id="crcm_model" name="vehicle_data[model]" value="<?php echo esc_attr($vehicle_data['model']); ?>" class="regular-text" />
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_year"><?php _e('Year', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="number" id="crcm_year" name="vehicle_data[year]" value="<?php echo esc_attr($vehicle_data['year']); ?>" min="1900" max="<?php echo date('Y') + 1; ?>" />
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_color"><?php _e('Color', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="text" id="crcm_color" name="vehicle_data[color]" value="<?php echo esc_attr($vehicle_data['color']); ?>" class="regular-text" />
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_license_plate"><?php _e('License Plate', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="text" id="crcm_license_plate" name="vehicle_data[license_plate]" value="<?php echo esc_attr($vehicle_data['license_plate']); ?>" class="regular-text" />
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_engine_size"><?php _e('Engine Size (cc)', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="number" id="crcm_engine_size" name="vehicle_data[engine_size]" value="<?php echo esc_attr($vehicle_data['engine_size']); ?>" />
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_fuel_type"><?php _e('Fuel Type', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <select id="crcm_fuel_type" name="vehicle_data[fuel_type]">
-                        <option value="gasoline" <?php selected($vehicle_data['fuel_type'], 'gasoline'); ?>><?php _e('Gasoline', 'custom-rental-manager'); ?></option>
-                        <option value="diesel" <?php selected($vehicle_data['fuel_type'], 'diesel'); ?>><?php _e('Diesel', 'custom-rental-manager'); ?></option>
-                        <option value="electric" <?php selected($vehicle_data['fuel_type'], 'electric'); ?>><?php _e('Electric', 'custom-rental-manager'); ?></option>
-                        <option value="hybrid" <?php selected($vehicle_data['fuel_type'], 'hybrid'); ?>><?php _e('Hybrid', 'custom-rental-manager'); ?></option>
-                    </select>
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_transmission"><?php _e('Transmission', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <select id="crcm_transmission" name="vehicle_data[transmission]">
-                        <option value="manual" <?php selected($vehicle_data['transmission'], 'manual'); ?>><?php _e('Manual', 'custom-rental-manager'); ?></option>
-                        <option value="automatic" <?php selected($vehicle_data['transmission'], 'automatic'); ?>><?php _e('Automatic', 'custom-rental-manager'); ?></option>
-                        <option value="cvt" <?php selected($vehicle_data['transmission'], 'cvt'); ?>><?php _e('CVT', 'custom-rental-manager'); ?></option>
-                    </select>
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_seats"><?php _e('Number of Seats', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="number" id="crcm_seats" name="vehicle_data[seats]" value="<?php echo esc_attr($vehicle_data['seats']); ?>" min="1" max="50" />
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_doors"><?php _e('Number of Doors', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="number" id="crcm_doors" name="vehicle_data[doors]" value="<?php echo esc_attr($vehicle_data['doors']); ?>" min="0" max="10" />
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_condition"><?php _e('Condition', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <select id="crcm_condition" name="vehicle_data[condition]">
-                        <option value="excellent" <?php selected($vehicle_data['condition'], 'excellent'); ?>><?php _e('Excellent', 'custom-rental-manager'); ?></option>
-                        <option value="good" <?php selected($vehicle_data['condition'], 'good'); ?>><?php _e('Good', 'custom-rental-manager'); ?></option>
-                        <option value="fair" <?php selected($vehicle_data['condition'], 'fair'); ?>><?php _e('Fair', 'custom-rental-manager'); ?></option>
-                        <option value="poor" <?php selected($vehicle_data['condition'], 'poor'); ?>><?php _e('Poor', 'custom-rental-manager'); ?></option>
-                    </select>
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_mileage"><?php _e('Mileage (km)', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="number" id="crcm_mileage" name="vehicle_data[mileage]" value="<?php echo esc_attr($vehicle_data['mileage']); ?>" />
-                </td>
-            </tr>
-        </table>
-        <?php
-    }
-
-    /**
-     * Pricing meta box
-     */
-    public function pricing_meta_box($post) {
-        $pricing_data = get_post_meta($post->ID, '_crcm_pricing_data', true);
-
-        // Default values
-        if (empty($pricing_data)) {
-            $pricing_data = array(
-                'daily_rate' => 0,
-                'weekly_rate' => 0,
-                'monthly_rate' => 0,
-                'weekly_discount' => 10,
-                'monthly_discount' => 20,
-                'security_deposit' => 200,
-                'available_quantity' => 1,
-                'min_rental_days' => 1,
-                'max_rental_days' => 30,
-            );
-        }
-        ?>
-        <table class="form-table crcm-form-table">
-            <tr>
-                <th><label for="crcm_daily_rate"><?php _e('Daily Rate (€)', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="number" id="crcm_daily_rate" name="pricing_data[daily_rate]" value="<?php echo esc_attr($pricing_data['daily_rate']); ?>" step="0.01" min="0" />
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_weekly_discount"><?php _e('Weekly Discount (%)', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="number" id="crcm_weekly_discount" name="pricing_data[weekly_discount]" value="<?php echo esc_attr($pricing_data['weekly_discount']); ?>" step="0.1" min="0" max="100" />
-                    <p class="description"><?php _e('Discount for rentals of 7+ days', 'custom-rental-manager'); ?></p>
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_monthly_discount"><?php _e('Monthly Discount (%)', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="number" id="crcm_monthly_discount" name="pricing_data[monthly_discount]" value="<?php echo esc_attr($pricing_data['monthly_discount']); ?>" step="0.1" min="0" max="100" />
-                    <p class="description"><?php _e('Discount for rentals of 30+ days', 'custom-rental-manager'); ?></p>
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_security_deposit"><?php _e('Security Deposit (€)', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="number" id="crcm_security_deposit" name="pricing_data[security_deposit]" value="<?php echo esc_attr($pricing_data['security_deposit']); ?>" step="0.01" min="0" />
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_available_quantity"><?php _e('Available Quantity', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="number" id="crcm_available_quantity" name="pricing_data[available_quantity]" value="<?php echo esc_attr($pricing_data['available_quantity']); ?>" min="0" />
-                    <p class="description"><?php _e('How many of this vehicle are available for rent', 'custom-rental-manager'); ?></p>
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_min_rental_days"><?php _e('Minimum Rental Days', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="number" id="crcm_min_rental_days" name="pricing_data[min_rental_days]" value="<?php echo esc_attr($pricing_data['min_rental_days']); ?>" min="1" />
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_max_rental_days"><?php _e('Maximum Rental Days', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="number" id="crcm_max_rental_days" name="pricing_data[max_rental_days]" value="<?php echo esc_attr($pricing_data['max_rental_days']); ?>" min="1" />
-                </td>
-            </tr>
-        </table>
-        <?php
-    }
-
-    /**
-     * Gallery meta box
-     */
-    public function gallery_meta_box($post) {
-        $gallery_ids = get_post_meta($post->ID, '_crcm_gallery_ids', true);
-        $gallery_ids = !empty($gallery_ids) ? explode(',', $gallery_ids) : array();
-        ?>
-        <div class="crcm-gallery-container">
-            <div class="crcm-gallery-images">
-                <?php foreach ($gallery_ids as $attachment_id): 
-                    if (empty($attachment_id)) continue;
-                    $image_url = wp_get_attachment_image_url($attachment_id, 'thumbnail');
-                    if ($image_url): ?>
-                        <div class="crcm-gallery-image" data-id="<?php echo esc_attr($attachment_id); ?>">
-                            <img src="<?php echo esc_url($image_url); ?>" alt="" />
-                            <button type="button" class="crcm-remove-image">&times;</button>
-                        </div>
-                    <?php endif;
-                endforeach; ?>
-            </div>
-
-            <button type="button" class="button crcm-add-images">
-                <?php _e('Add Images', 'custom-rental-manager'); ?>
-            </button>
-
-            <input type="hidden" id="crcm_gallery_ids" name="gallery_ids" value="<?php echo esc_attr(implode(',', $gallery_ids)); ?>" />
-        </div>
-        <?php
-    }
-
-    /**
-     * Features meta box
-     */
-    public function features_meta_box($post) {
-        $features = get_post_meta($post->ID, '_crcm_vehicle_features', true);
-        if (!is_array($features)) {
-            $features = array();
-        }
-
-        $available_features = array(
-            'air_conditioning' => __('Air Conditioning', 'custom-rental-manager'),
-            'gps' => __('GPS Navigation', 'custom-rental-manager'),
-            'bluetooth' => __('Bluetooth', 'custom-rental-manager'),
-            'usb_charging' => __('USB Charging', 'custom-rental-manager'),
-            'helmet_included' => __('Helmet Included', 'custom-rental-manager'),
-            'storage_box' => __('Storage Box', 'custom-rental-manager'),
-            'phone_holder' => __('Phone Holder', 'custom-rental-manager'),
-            'anti_theft' => __('Anti-theft System', 'custom-rental-manager'),
-            'abs_brakes' => __('ABS Brakes', 'custom-rental-manager'),
-            'led_lights' => __('LED Lights', 'custom-rental-manager'),
-        );
-        ?>
-        <div class="crcm-features-grid">
-            <?php foreach ($available_features as $key => $label): ?>
-                <label class="crcm-feature-item">
-                    <input type="checkbox" name="vehicle_features[]" value="<?php echo esc_attr($key); ?>" <?php checked(in_array($key, $features)); ?> />
-                    <?php echo esc_html($label); ?>
-                </label>
-            <?php endforeach; ?>
-        </div>
-
-        <style>
-        .crcm-features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .crcm-feature-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        .crcm-feature-item:hover {
-            background: #f0f0f0;
-        }
-        </style>
-        <?php
-    }
-
-    /**
-     * Save vehicle meta data
-     */
-    public function save_vehicle_meta($post_id) {
-        // Verify nonce
-        if (!isset($_POST['crcm_vehicle_meta_nonce_field']) || !wp_verify_nonce($_POST['crcm_vehicle_meta_nonce_field'], 'crcm_vehicle_meta_nonce')) {
-            return;
-        }
-
-        // Check if user has permission to edit this post
-        if (!current_user_can('edit_post', $post_id)) {
-            return;
-        }
-
-        // Skip autosave
-        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
-            return;
-        }
-
-        // Only save for vehicle post type
-        if (get_post_type($post_id) !== 'crcm_vehicle') {
-            return;
-        }
-
-        // Save vehicle data
-        if (isset($_POST['vehicle_data'])) {
-            $vehicle_data = array();
-            foreach ($_POST['vehicle_data'] as $key => $value) {
-                $vehicle_data[$key] = sanitize_text_field($value);
-            }
-            update_post_meta($post_id, '_crcm_vehicle_data', $vehicle_data);
-        }
-
-        // Save pricing data
-        if (isset($_POST['pricing_data'])) {
-            $pricing_data = array();
-            foreach ($_POST['pricing_data'] as $key => $value) {
-                $pricing_data[$key] = floatval($value);
-            }
-            update_post_meta($post_id, '_crcm_pricing_data', $pricing_data);
-        }
-
-        // Save gallery
-        if (isset($_POST['gallery_ids'])) {
-            update_post_meta($post_id, '_crcm_gallery_ids', sanitize_text_field($_POST['gallery_ids']));
-        }
-
-        // Save features
-        if (isset($_POST['vehicle_features'])) {
-            $features = array_map('sanitize_text_field', $_POST['vehicle_features']);
-            update_post_meta($post_id, '_crcm_vehicle_features', $features);
-        } else {
-            update_post_meta($post_id, '_crcm_vehicle_features', array());
-        }
-    }
-
-    /**
-     * Custom columns for vehicle list
-     */
-    public function vehicle_columns($columns) {
-        $new_columns = array();
-        $new_columns['cb'] = $columns['cb'];
-        $new_columns['title'] = $columns['title'];
-        $new_columns['crcm_image'] = __('Image', 'custom-rental-manager');
-        $new_columns['crcm_type'] = __('Type', 'custom-rental-manager');
-        $new_columns['crcm_brand_model'] = __('Brand & Model', 'custom-rental-manager');
-        $new_columns['crcm_daily_rate'] = __('Daily Rate', 'custom-rental-manager');
-        $new_columns['crcm_availability'] = __('Available', 'custom-rental-manager');
-        $new_columns['date'] = $columns['date'];
-
-        return $new_columns;
-    }
-
-    /**
-     * Display custom column content
-     */
-    public function vehicle_column_content($column, $post_id) {
-        $vehicle_data = get_post_meta($post_id, '_crcm_vehicle_data', true);
-        $pricing_data = get_post_meta($post_id, '_crcm_pricing_data', true);
-
-        switch ($column) {
-            case 'crcm_image':
-                if (has_post_thumbnail($post_id)) {
-                    echo get_the_post_thumbnail($post_id, array(60, 60));
-                } else {
-                    echo '<div style="width:60px;height:60px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;"><span class="dashicons dashicons-car"></span></div>';
-                }
-                break;
-
-            case 'crcm_type':
-                $terms = get_the_terms($post_id, 'crcm_vehicle_type');
-                if ($terms && !is_wp_error($terms)) {
-                    echo esc_html($terms[0]->name);
-                }
-                break;
-
-            case 'crcm_brand_model':
-                if ($vehicle_data && isset($vehicle_data['brand'], $vehicle_data['model'])) {
-                    echo esc_html($vehicle_data['brand'] . ' ' . $vehicle_data['model']);
-                    if (isset($vehicle_data['year'])) {
-                        echo '<br><small>(' . esc_html($vehicle_data['year']) . ')</small>';
-                    }
-                }
-                break;
-
-            case 'crcm_daily_rate':
-                if ($pricing_data && isset($pricing_data['daily_rate'])) {
-                    echo '€' . number_format($pricing_data['daily_rate'], 2);
-                }
-                break;
-
-            case 'crcm_availability':
-                if ($pricing_data && isset($pricing_data['available_quantity'])) {
-                    $available = intval($pricing_data['available_quantity']);
-                    $color = $available > 0 ? 'green' : 'red';
-                    echo '<span style="color:' . $color . ';">' . $available . '</span>';
-                }
-                break;
-        }
-    }
-
-    /**
-     * Search available vehicles
-     */
-    public function search_available_vehicles($pickup_date, $return_date, $vehicle_type = '') {
-        $args = array(
-            'post_type' => 'crcm_vehicle',
-            'post_status' => 'publish',
-            'posts_per_page' => -1,
-        );
-
-        if (!empty($vehicle_type)) {
-            $args['tax_query'] = array(
-                array(
-                    'taxonomy' => 'crcm_vehicle_type',
-                    'field' => 'term_id',
-                    'terms' => $vehicle_type,
-                ),
-            );
-        }
-
-        $vehicles = get_posts($args);
-        $available_vehicles = array();
-
-        foreach ($vehicles as $vehicle) {
-            $available_quantity = $this->check_availability($vehicle->ID, $pickup_date, $return_date);
-
-            if ($available_quantity > 0) {
-                $vehicle_data = get_post_meta($vehicle->ID, '_crcm_vehicle_data', true);
-                $pricing_data = get_post_meta($vehicle->ID, '_crcm_pricing_data', true);
-
-                $available_vehicles[] = array(
-                    'id' => $vehicle->ID,
-                    'title' => $vehicle->post_title,
-                    'permalink' => get_permalink($vehicle->ID),
-                    'thumbnail' => get_the_post_thumbnail_url($vehicle->ID, 'medium'),
-                    'daily_rate' => $pricing_data['daily_rate'] ?? 0,
-                    'brand' => $vehicle_data['brand'] ?? '',
-                    'model' => $vehicle_data['model'] ?? '',
-                    'seats' => $vehicle_data['seats'] ?? 0,
-                    'transmission' => $vehicle_data['transmission'] ?? '',
-                    'available_quantity' => $available_quantity,
-                );
+        
+        foreach ($classes as $class_file) {
+            $file_path = CRCM_PLUGIN_PATH . 'inc/' . $class_file;
+            if (file_exists($file_path)) {
+                require_once $file_path;
             }
         }
-
-        return $available_vehicles;
     }
-
+    
     /**
-     * Check vehicle availability
+     * Initialize manager instances - FIX: Only instantiate if classes exist
      */
-    public function check_availability($vehicle_id, $pickup_date, $return_date) {
-        $pricing_data = get_post_meta($vehicle_id, '_crcm_pricing_data', true);
-        $total_quantity = isset($pricing_data['available_quantity']) ? intval($pricing_data['available_quantity']) : 0;
-
-        if ($total_quantity <= 0) {
-            return 0;
+    private function init_managers() {
+        if (class_exists('CRCM_Vehicle_Manager')) {
+            $this->vehicle_manager = new CRCM_Vehicle_Manager();
         }
-
-        // Count bookings that overlap with the requested dates
-        $overlapping_bookings = get_posts(array(
-            'post_type' => 'crcm_booking',
-            'post_status' => array('publish', 'private'),
-            'posts_per_page' => -1,
-            'meta_query' => array(
-                'relation' => 'AND',
-                array(
-                    'key' => '_crcm_booking_data',
-                    'value' => 'vehicle_id";i:' . $vehicle_id,
-                    'compare' => 'LIKE',
-                ),
-                array(
-                    'key' => '_crcm_booking_status',
-                    'value' => array('pending', 'confirmed', 'active'),
-                    'compare' => 'IN',
-                ),
+        
+        if (class_exists('CRCM_Booking_Manager')) {
+            $this->booking_manager = new CRCM_Booking_Manager();
+        }
+        
+        if (class_exists('CRCM_Calendar_Manager')) {
+            $this->calendar_manager = new CRCM_Calendar_Manager();
+        }
+        
+        if (class_exists('CRCM_Email_Manager')) {
+            $this->email_manager = new CRCM_Email_Manager();
+        }
+        
+        if (class_exists('CRCM_Payment_Manager')) {
+            $this->payment_manager = new CRCM_Payment_Manager();
+        }
+        
+        if (class_exists('CRCM_API_Endpoints')) {
+            $this->api_endpoints = new CRCM_API_Endpoints();
+        }
+        
+        if (class_exists('CRCM_Customer_Portal')) {
+            $this->customer_portal = new CRCM_Customer_Portal();
+        }
+    }
+    
+    /**
+     * Register custom post types - FIX: Simplified registration without complex rewrite rules
+     */
+    private function register_post_types() {
+        // Vehicle post type
+        register_post_type('crcm_vehicle', array(
+            'labels' => array(
+                'name' => __('Vehicles', 'custom-rental-manager'),
+                'singular_name' => __('Vehicle', 'custom-rental-manager'),
+                'add_new' => __('Add New Vehicle', 'custom-rental-manager'),
+                'add_new_item' => __('Add New Vehicle', 'custom-rental-manager'),
+                'edit_item' => __('Edit Vehicle', 'custom-rental-manager'),
             ),
+            'public' => true,
+            'has_archive' => false, // FIX: Disable archive to avoid rewrite issues
+            'menu_icon' => 'dashicons-car',
+            'supports' => array('title', 'editor', 'thumbnail', 'excerpt'),
+            'show_in_rest' => false, // FIX: Disable REST API initially
+            'rewrite' => false, // FIX: Disable custom rewrite rules
         ));
-
-        $booked_quantity = 0;
-
-        foreach ($overlapping_bookings as $booking) {
-            $booking_data = get_post_meta($booking->ID, '_crcm_booking_data', true);
-
-            if (!$booking_data || !isset($booking_data['pickup_date'], $booking_data['return_date'])) {
-                continue;
-            }
-
-            // Check if dates overlap
-            if ($this->dates_overlap($pickup_date, $return_date, $booking_data['pickup_date'], $booking_data['return_date'])) {
-                $booked_quantity++;
-            }
-        }
-
-        return max(0, $total_quantity - $booked_quantity);
+        
+        // Booking post type
+        register_post_type('crcm_booking', array(
+            'labels' => array(
+                'name' => __('Bookings', 'custom-rental-manager'),
+                'singular_name' => __('Booking', 'custom-rental-manager'),
+                'add_new' => __('Add New Booking', 'custom-rental-manager'),
+                'edit_item' => __('Edit Booking', 'custom-rental-manager'),
+            ),
+            'public' => false,
+            'show_ui' => true,
+            'menu_icon' => 'dashicons-calendar-alt',
+            'supports' => array('title'),
+            'capabilities' => array(
+                'create_posts' => 'manage_options',
+                'edit_posts' => 'manage_options',
+                'edit_others_posts' => 'manage_options',
+                'publish_posts' => 'manage_options',
+                'read_private_posts' => 'manage_options',
+            ),
+            'rewrite' => false, // FIX: Disable rewrite rules
+        ));
     }
-
+    
     /**
-     * Check if two date ranges overlap
+     * Register taxonomies - FIX: Simplified taxonomy registration
      */
-    private function dates_overlap($start1, $end1, $start2, $end2) {
-        return $start1 < $end2 && $end1 > $start2;
+    private function register_taxonomies() {
+        // Vehicle type taxonomy
+        register_taxonomy('crcm_vehicle_type', 'crcm_vehicle', array(
+            'labels' => array(
+                'name' => __('Vehicle Types', 'custom-rental-manager'),
+                'singular_name' => __('Vehicle Type', 'custom-rental-manager'),
+            ),
+            'hierarchical' => true,
+            'public' => true,
+            'show_admin_column' => true,
+            'rewrite' => false, // FIX: Disable rewrite rules
+        ));
+        
+        // Location taxonomy
+        register_taxonomy('crcm_location', array('crcm_vehicle', 'crcm_booking'), array(
+            'labels' => array(
+                'name' => __('Locations', 'custom-rental-manager'),
+                'singular_name' => __('Location', 'custom-rental-manager'),
+            ),
+            'hierarchical' => true,
+            'public' => true,
+            'show_admin_column' => true,
+            'rewrite' => false, // FIX: Disable rewrite rules
+        ));
     }
-
+    
     /**
-     * AJAX search vehicles
+     * Add admin menu
      */
-    public function ajax_search_vehicles() {
-        check_ajax_referer('crcm_nonce', 'nonce');
-
-        $pickup_date = sanitize_text_field($_POST['pickup_date'] ?? '');
-        $return_date = sanitize_text_field($_POST['return_date'] ?? '');
-        $vehicle_type = sanitize_text_field($_POST['vehicle_type'] ?? '');
-
-        if (empty($pickup_date) || empty($return_date)) {
-            wp_send_json_error(__('Please select pickup and return dates.', 'custom-rental-manager'));
+    private function add_admin_menu() {
+        add_action('admin_menu', array($this, 'admin_menu'));
+    }
+    
+    /**
+     * Admin menu callback
+     */
+    public function admin_menu() {
+        add_menu_page(
+            __('Rental Manager', 'custom-rental-manager'),
+            __('Rental Manager', 'custom-rental-manager'),
+            'manage_options',
+            'crcm-dashboard',
+            array($this, 'dashboard_page'),
+            'dashicons-car',
+            30
+        );
+        
+        add_submenu_page(
+            'crcm-dashboard',
+            __('Calendar', 'custom-rental-manager'),
+            __('Calendar', 'custom-rental-manager'),
+            'manage_options',
+            'crcm-calendar',
+            array($this, 'calendar_page')
+        );
+        
+        add_submenu_page(
+            'crcm-dashboard',
+            __('Settings', 'custom-rental-manager'),
+            __('Settings', 'custom-rental-manager'),
+            'manage_options',
+            'crcm-settings',
+            array($this, 'settings_page')
+        );
+    }
+    
+    /**
+     * Dashboard page - FIX: Better error handling
+     */
+    public function dashboard_page() {
+        $template_path = CRCM_PLUGIN_PATH . 'templates/admin/dashboard.php';
+        if (file_exists($template_path)) {
+            include $template_path;
+        } else {
+            echo '<div class="wrap">';
+            echo '<h1>' . esc_html__('Rental Manager Dashboard', 'custom-rental-manager') . '</h1>';
+            echo '<div class="notice notice-warning"><p>' . esc_html__('Dashboard template not found. Please ensure all plugin files are properly uploaded.', 'custom-rental-manager') . '</p></div>';
+            
+            // Show basic stats even without template
+            echo '<div class="crcm-basic-stats">';
+            echo '<h2>' . esc_html__('Quick Stats', 'custom-rental-manager') . '</h2>';
+            
+            $vehicle_count = wp_count_posts('crcm_vehicle');
+            $booking_count = wp_count_posts('crcm_booking');
+            
+            echo '<p>' . sprintf(esc_html__('Vehicles: %d', 'custom-rental-manager'), $vehicle_count->publish ?? 0) . '</p>';
+            echo '<p>' . sprintf(esc_html__('Bookings: %d', 'custom-rental-manager'), $booking_count->publish ?? 0) . '</p>';
+            echo '</div>';
+            
+            echo '</div>';
         }
-
-        $vehicles = $this->search_available_vehicles($pickup_date, $return_date, $vehicle_type);
-
-        wp_send_json_success($vehicles);
+    }
+    
+    /**
+     * Calendar page
+     */
+    public function calendar_page() {
+        echo '<div class="wrap">';
+        echo '<h1>' . esc_html__('Rental Calendar', 'custom-rental-manager') . '</h1>';
+        echo '<p>' . esc_html__('Calendar view coming soon.', 'custom-rental-manager') . '</p>';
+        echo '</div>';
+    }
+    
+    /**
+     * Settings page
+     */
+    public function settings_page() {
+        echo '<div class="wrap">';
+        echo '<h1>' . esc_html__('Rental Settings', 'custom-rental-manager') . '</h1>';
+        echo '<p>' . esc_html__('Settings panel coming soon.', 'custom-rental-manager') . '</p>';
+        echo '</div>';
+    }
+    
+    /**
+     * Initialize shortcodes - FIX: Better error handling for templates
+     */
+    private function init_shortcodes() {
+        add_shortcode('crcm_search_form', array($this, 'search_form_shortcode'));
+        add_shortcode('crcm_vehicle_list', array($this, 'vehicle_list_shortcode'));
+        add_shortcode('crcm_booking_form', array($this, 'booking_form_shortcode'));
+        add_shortcode('crcm_customer_dashboard', array($this, 'customer_dashboard_shortcode'));
+    }
+    
+    /**
+     * Search form shortcode
+     */
+    public function search_form_shortcode($atts) {
+        $atts = shortcode_atts(array(
+            'style' => 'default',
+        ), $atts);
+        
+        ob_start();
+        $template_path = CRCM_PLUGIN_PATH . 'templates/frontend/search-form.php';
+        if (file_exists($template_path)) {
+            include $template_path;
+        } else {
+            echo '<div class="crcm-error">' . esc_html__('Search form template not found.', 'custom-rental-manager') . '</div>';
+        }
+        return ob_get_clean();
+    }
+    
+    /**
+     * Vehicle list shortcode
+     */
+    public function vehicle_list_shortcode($atts) {
+        $atts = shortcode_atts(array(
+            'type' => '',
+            'limit' => 12,
+        ), $atts);
+        
+        ob_start();
+        $template_path = CRCM_PLUGIN_PATH . 'templates/frontend/vehicle-list.php';
+        if (file_exists($template_path)) {
+            include $template_path;
+        } else {
+            echo '<div class="crcm-error">' . esc_html__('Vehicle list template not found.', 'custom-rental-manager') . '</div>';
+        }
+        return ob_get_clean();
+    }
+    
+    /**
+     * Booking form shortcode
+     */
+    public function booking_form_shortcode($atts) {
+        $atts = shortcode_atts(array(
+            'vehicle_id' => '',
+        ), $atts);
+        
+        ob_start();
+        $template_path = CRCM_PLUGIN_PATH . 'templates/frontend/booking-form.php';
+        if (file_exists($template_path)) {
+            include $template_path;
+        } else {
+            echo '<div class="crcm-error">' . esc_html__('Booking form template not found.', 'custom-rental-manager') . '</div>';
+        }
+        return ob_get_clean();
+    }
+    
+    /**
+     * Customer dashboard shortcode
+     */
+    public function customer_dashboard_shortcode($atts) {
+        if (!is_user_logged_in()) {
+            return '<div class="crcm-login-required">' . esc_html__('Please log in to access your dashboard.', 'custom-rental-manager') . '</div>';
+        }
+        
+        ob_start();
+        $template_path = CRCM_PLUGIN_PATH . 'templates/frontend/customer-dashboard.php';
+        if (file_exists($template_path)) {
+            include $template_path;
+        } else {
+            echo '<div class="crcm-error">' . esc_html__('Customer dashboard template not found.', 'custom-rental-manager') . '</div>';
+        }
+        return ob_get_clean();
+    }
+    
+    /**
+     * Enqueue frontend assets
+     */
+    public function enqueue_frontend_assets() {
+        // Only enqueue if files exist
+        $css_path = CRCM_PLUGIN_PATH . 'assets/css/frontend.css';
+        $js_path = CRCM_PLUGIN_PATH . 'assets/js/frontend.js';
+        
+        if (file_exists($css_path)) {
+            wp_enqueue_style(
+                'crcm-frontend',
+                CRCM_PLUGIN_URL . 'assets/css/frontend.css',
+                array(),
+                CRCM_VERSION
+            );
+        }
+        
+        if (file_exists($js_path)) {
+            wp_enqueue_script(
+                'crcm-frontend',
+                CRCM_PLUGIN_URL . 'assets/js/frontend.js',
+                array('jquery'),
+                CRCM_VERSION,
+                true
+            );
+            
+            wp_localize_script('crcm-frontend', 'crcm_ajax', array(
+                'ajax_url' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('crcm_nonce'),
+                'currency_symbol' => $this->get_setting('currency_symbol', '€'),
+            ));
+        }
+    }
+    
+    /**
+     * Enqueue admin assets - FIX: Better file existence checks
+     */
+    public function enqueue_admin_assets($hook) {
+        // Only load on plugin pages
+        if (strpos($hook, 'crcm') === false && !in_array(get_current_screen()->post_type, array('crcm_vehicle', 'crcm_booking'))) {
+            return;
+        }
+        
+        $css_path = CRCM_PLUGIN_PATH . 'assets/css/admin.css';
+        $js_path = CRCM_PLUGIN_PATH . 'assets/js/admin.js';
+        
+        if (file_exists($css_path)) {
+            wp_enqueue_style(
+                'crcm-admin',
+                CRCM_PLUGIN_URL . 'assets/css/admin.css',
+                array(),
+                CRCM_VERSION
+            );
+        }
+        
+        // FIX: Safer jQuery UI CSS loading
+        wp_enqueue_style(
+            'jquery-ui-datepicker-style',
+            'https://code.jquery.com/ui/1.13.2/themes/ui-lightness/jquery-ui.css',
+            array(),
+            '1.13.2'
+        );
+        
+        if (file_exists($js_path)) {
+            wp_enqueue_script(
+                'crcm-admin',
+                CRCM_PLUGIN_URL . 'assets/js/admin.js',
+                array('jquery', 'jquery-ui-datepicker'),
+                CRCM_VERSION,
+                true
+            );
+            
+            wp_localize_script('crcm-admin', 'crcm_admin', array(
+                'ajax_url' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('crcm_admin_nonce'),
+            ));
+        }
+    }
+    
+    /**
+     * Get plugin setting
+     */
+    public function get_setting($key, $default = '') {
+        $settings = get_option('crcm_settings', array());
+        return isset($settings[$key]) ? $settings[$key] : $default;
+    }
+    
+    /**
+     * Plugin activation
+     */
+    public function activate() {
+        $this->create_default_settings();
+        
+        // FIX: Delay flush_rewrite_rules to avoid early execution
+        add_action('init', 'flush_rewrite_rules', 999);
+    }
+    
+    /**
+     * Plugin deactivation
+     */
+    public function deactivate() {
+        wp_clear_scheduled_hook('crcm_daily_reminder_check');
+        flush_rewrite_rules();
+    }
+    
+    /**
+     * Create default settings
+     */
+    private function create_default_settings() {
+        $default_settings = array(
+            'company_name' => 'Costabilerent',
+            'company_address' => 'Ischia, Italy',
+            'company_phone' => '+39 123 456 789',
+            'company_email' => 'info@costabilerent.com',
+            'currency_symbol' => '€',
+            'show_totaliweb_credit' => true,
+        );
+        
+        $existing_settings = get_option('crcm_settings', array());
+        $settings = wp_parse_args($existing_settings, $default_settings);
+        update_option('crcm_settings', $settings);
     }
 }
+
+/**
+ * Initialize the plugin - FIX: Safer initialization
+ */
+function crcm() {
+    return CRCM_Plugin::get_instance();
+}
+
+// FIX: Initialize only after WordPress is loaded
+add_action('plugins_loaded', 'crcm', 10);
