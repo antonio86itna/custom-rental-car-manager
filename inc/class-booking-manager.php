@@ -2,8 +2,8 @@
 /**
  * Booking Manager Class
  * 
- * Handles all booking operations including creation, management,
- * status updates, and pricing calculations.
+ * Handles all booking-related operations including CRUD operations,
+ * status management, and booking validation.
  * 
  * @package CustomRentalCarManager
  * @author Totaliweb
@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
 }
 
 class CRCM_Booking_Manager {
-
+    
     /**
      * Constructor
      */
@@ -24,11 +24,16 @@ class CRCM_Booking_Manager {
         add_action('save_post', array($this, 'save_booking_meta'));
         add_action('wp_ajax_crcm_create_booking', array($this, 'ajax_create_booking'));
         add_action('wp_ajax_nopriv_crcm_create_booking', array($this, 'ajax_create_booking'));
-        add_action('wp_ajax_crcm_update_booking_status', array($this, 'ajax_update_booking_status'));
+        add_action('wp_ajax_crcm_cancel_booking', array($this, 'ajax_cancel_booking'));
+        add_action('wp_ajax_crcm_get_booking_details', array($this, 'ajax_get_booking_details'));
         add_filter('manage_crcm_booking_posts_columns', array($this, 'booking_columns'));
         add_action('manage_crcm_booking_posts_custom_column', array($this, 'booking_column_content'), 10, 2);
+        add_action('post_submitbox_misc_actions', array($this, 'booking_status_metabox'));
+        
+        // Status change hooks
+        add_action('transition_post_status', array($this, 'on_booking_status_change'), 10, 3);
     }
-
+    
     /**
      * Add meta boxes for booking post type
      */
@@ -41,45 +46,44 @@ class CRCM_Booking_Manager {
             'normal',
             'high'
         );
-
+        
         add_meta_box(
-            'crcm_customer_info',
+            'crcm_customer_details',
             __('Customer Information', 'custom-rental-manager'),
-            array($this, 'customer_info_meta_box'),
+            array($this, 'customer_details_meta_box'),
             'crcm_booking',
             'normal',
             'high'
         );
-
+        
         add_meta_box(
-            'crcm_payment_info',
+            'crcm_payment_details',
             __('Payment Information', 'custom-rental-manager'),
-            array($this, 'payment_info_meta_box'),
+            array($this, 'payment_details_meta_box'),
             'crcm_booking',
             'side',
             'high'
         );
-
+        
         add_meta_box(
-            'crcm_booking_actions',
-            __('Booking Actions', 'custom-rental-manager'),
-            array($this, 'booking_actions_meta_box'),
+            'crcm_booking_notes',
+            __('Booking Notes', 'custom-rental-manager'),
+            array($this, 'booking_notes_meta_box'),
             'crcm_booking',
             'side',
             'default'
         );
     }
-
+    
     /**
      * Booking details meta box
      */
     public function booking_details_meta_box($post) {
         wp_nonce_field('crcm_booking_meta_nonce', 'crcm_booking_meta_nonce_field');
-
+        
         $booking_data = get_post_meta($post->ID, '_crcm_booking_data', true);
-        $booking_status = get_post_meta($post->ID, '_crcm_booking_status', true);
         $booking_number = get_post_meta($post->ID, '_crcm_booking_number', true);
-
+        
         // Default values
         if (empty($booking_data)) {
             $booking_data = array(
@@ -93,190 +97,186 @@ class CRCM_Booking_Manager {
                 'home_delivery' => false,
                 'delivery_address' => '',
                 'extras' => array(),
-                'insurance_type' => 'basic',
-                'notes' => '',
+                'special_requests' => '',
             );
         }
-
-        if (empty($booking_status)) {
-            $booking_status = 'pending';
-        }
-
-        // Get vehicles for dropdown
+        
+        // Get available vehicles
         $vehicles = get_posts(array(
             'post_type' => 'crcm_vehicle',
             'post_status' => 'publish',
             'posts_per_page' => -1,
             'orderby' => 'title',
-            'order' => 'ASC'
+            'order' => 'ASC',
         ));
-
+        
         // Get locations
         $locations = get_terms(array(
             'taxonomy' => 'crcm_location',
             'hide_empty' => false,
         ));
         ?>
+        
         <table class="form-table crcm-form-table">
             <tr>
-                <th><label for="crcm_booking_number"><?php _e('Booking Number', 'custom-rental-manager'); ?></label></th>
+                <th><label for="booking_number"><?php _e('Booking Number', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <input type="text" id="crcm_booking_number" name="crcm_booking_number" value="<?php echo esc_attr($booking_number); ?>" class="regular-text" readonly />
-                    <p class="description"><?php _e('Auto-generated booking number', 'custom-rental-manager'); ?></p>
+                    <input type="text" id="booking_number" name="booking_number" value="<?php echo esc_attr($booking_number); ?>" class="regular-text" readonly />
+                    <p class="description"><?php _e('Automatically generated unique booking number', 'custom-rental-manager'); ?></p>
                 </td>
             </tr>
-
+            
             <tr>
-                <th><label for="crcm_booking_status"><?php _e('Booking Status', 'custom-rental-manager'); ?></label></th>
+                <th><label for="vehicle_id"><?php _e('Vehicle', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <select id="crcm_booking_status" name="crcm_booking_status">
-                        <option value="pending" <?php selected($booking_status, 'pending'); ?>><?php _e('Pending', 'custom-rental-manager'); ?></option>
-                        <option value="confirmed" <?php selected($booking_status, 'confirmed'); ?>><?php _e('Confirmed', 'custom-rental-manager'); ?></option>
-                        <option value="active" <?php selected($booking_status, 'active'); ?>><?php _e('Active', 'custom-rental-manager'); ?></option>
-                        <option value="completed" <?php selected($booking_status, 'completed'); ?>><?php _e('Completed', 'custom-rental-manager'); ?></option>
-                        <option value="cancelled" <?php selected($booking_status, 'cancelled'); ?>><?php _e('Cancelled', 'custom-rental-manager'); ?></option>
-                        <option value="refunded" <?php selected($booking_status, 'refunded'); ?>><?php _e('Refunded', 'custom-rental-manager'); ?></option>
-                    </select>
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_vehicle_id"><?php _e('Vehicle', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <select id="crcm_vehicle_id" name="booking_data[vehicle_id]" required>
+                    <select id="vehicle_id" name="booking_data[vehicle_id]" class="regular-text" required>
                         <option value=""><?php _e('Select Vehicle', 'custom-rental-manager'); ?></option>
                         <?php foreach ($vehicles as $vehicle): ?>
-                            <option value="<?php echo esc_attr($vehicle->ID); ?>" <?php selected($booking_data['vehicle_id'], $vehicle->ID); ?>>
+                            <option value="<?php echo $vehicle->ID; ?>" <?php selected($booking_data['vehicle_id'], $vehicle->ID); ?>>
                                 <?php echo esc_html($vehicle->post_title); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
                 </td>
             </tr>
-
+            
             <tr>
-                <th><label for="crcm_pickup_date"><?php _e('Pickup Date', 'custom-rental-manager'); ?></label></th>
+                <th><label for="pickup_date"><?php _e('Pickup Date', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <input type="date" id="crcm_pickup_date" name="booking_data[pickup_date]" value="<?php echo esc_attr($booking_data['pickup_date']); ?>" required />
+                    <input type="date" id="pickup_date" name="booking_data[pickup_date]" value="<?php echo esc_attr($booking_data['pickup_date']); ?>" class="crcm-datepicker" required />
+                    <input type="time" id="pickup_time" name="booking_data[pickup_time]" value="<?php echo esc_attr($booking_data['pickup_time']); ?>" />
                 </td>
             </tr>
-
+            
             <tr>
-                <th><label for="crcm_return_date"><?php _e('Return Date', 'custom-rental-manager'); ?></label></th>
+                <th><label for="return_date"><?php _e('Return Date', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <input type="date" id="crcm_return_date" name="booking_data[return_date]" value="<?php echo esc_attr($booking_data['return_date']); ?>" required />
+                    <input type="date" id="return_date" name="booking_data[return_date]" value="<?php echo esc_attr($booking_data['return_date']); ?>" class="crcm-datepicker" required />
+                    <input type="time" id="return_time" name="booking_data[return_time]" value="<?php echo esc_attr($booking_data['return_time']); ?>" />
                 </td>
             </tr>
-
+            
             <tr>
-                <th><label for="crcm_pickup_time"><?php _e('Pickup Time', 'custom-rental-manager'); ?></label></th>
+                <th><label for="pickup_location"><?php _e('Pickup Location', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <input type="time" id="crcm_pickup_time" name="booking_data[pickup_time]" value="<?php echo esc_attr($booking_data['pickup_time']); ?>" />
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_return_time"><?php _e('Return Time', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="time" id="crcm_return_time" name="booking_data[return_time]" value="<?php echo esc_attr($booking_data['return_time']); ?>" />
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_pickup_location"><?php _e('Pickup Location', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <select id="crcm_pickup_location" name="booking_data[pickup_location]">
+                    <select id="pickup_location" name="booking_data[pickup_location]">
                         <option value=""><?php _e('Select Location', 'custom-rental-manager'); ?></option>
                         <?php foreach ($locations as $location): ?>
-                            <option value="<?php echo esc_attr($location->term_id); ?>" <?php selected($booking_data['pickup_location'], $location->term_id); ?>>
+                            <option value="<?php echo $location->term_id; ?>" <?php selected($booking_data['pickup_location'], $location->term_id); ?>>
                                 <?php echo esc_html($location->name); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
                 </td>
             </tr>
-
+            
             <tr>
-                <th><label for="crcm_return_location"><?php _e('Return Location', 'custom-rental-manager'); ?></label></th>
+                <th><label for="return_location"><?php _e('Return Location', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <select id="crcm_return_location" name="booking_data[return_location]">
-                        <option value=""><?php _e('Select Location', 'custom-rental-manager'); ?></option>
+                    <select id="return_location" name="booking_data[return_location]">
+                        <option value=""><?php _e('Same as pickup', 'custom-rental-manager'); ?></option>
                         <?php foreach ($locations as $location): ?>
-                            <option value="<?php echo esc_attr($location->term_id); ?>" <?php selected($booking_data['return_location'], $location->term_id); ?>>
+                            <option value="<?php echo $location->term_id; ?>" <?php selected($booking_data['return_location'], $location->term_id); ?>>
                                 <?php echo esc_html($location->name); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
                 </td>
             </tr>
-
+            
             <tr>
-                <th><label><?php _e('Home Delivery', 'custom-rental-manager'); ?></label></th>
+                <th><?php _e('Home Delivery', 'custom-rental-manager'); ?></th>
                 <td>
                     <label>
-                        <input type="checkbox" name="booking_data[home_delivery]" value="1" <?php checked($booking_data['home_delivery'], true); ?> />
+                        <input type="checkbox" name="booking_data[home_delivery]" value="1" <?php checked($booking_data['home_delivery']); ?> />
                         <?php _e('Enable home delivery service', 'custom-rental-manager'); ?>
                     </label>
                 </td>
             </tr>
-
-            <tr>
-                <th><label for="crcm_delivery_address"><?php _e('Delivery Address', 'custom-rental-manager'); ?></label></th>
+            
+            <tr class="delivery-address-row" style="<?php echo $booking_data['home_delivery'] ? '' : 'display: none;'; ?>">
+                <th><label for="delivery_address"><?php _e('Delivery Address', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <textarea id="crcm_delivery_address" name="booking_data[delivery_address]" rows="3" class="large-text"><?php echo esc_textarea($booking_data['delivery_address']); ?></textarea>
-                    <p class="description"><?php _e('Required if home delivery is enabled', 'custom-rental-manager'); ?></p>
+                    <textarea id="delivery_address" name="booking_data[delivery_address]" rows="3" class="large-text"><?php echo esc_textarea($booking_data['delivery_address']); ?></textarea>
                 </td>
             </tr>
-
+            
             <tr>
-                <th><label for="crcm_insurance_type"><?php _e('Insurance Type', 'custom-rental-manager'); ?></label></th>
+                <th><label for="special_requests"><?php _e('Special Requests', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <select id="crcm_insurance_type" name="booking_data[insurance_type]">
-                        <option value="basic" <?php selected($booking_data['insurance_type'], 'basic'); ?>><?php _e('Basic (Included)', 'custom-rental-manager'); ?></option>
-                        <option value="premium" <?php selected($booking_data['insurance_type'], 'premium'); ?>><?php _e('Premium (+€15/day)', 'custom-rental-manager'); ?></option>
-                        <option value="full" <?php selected($booking_data['insurance_type'], 'full'); ?>><?php _e('Full Coverage (+€25/day)', 'custom-rental-manager'); ?></option>
-                    </select>
-                </td>
-            </tr>
-
-            <tr>
-                <th><label><?php _e('Extras', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <?php
-                    $available_extras = array(
-                        'helmet' => array('name' => __('Helmet', 'custom-rental-manager'), 'price' => 5),
-                        'child_seat' => array('name' => __('Child Seat', 'custom-rental-manager'), 'price' => 10),
-                        'gps' => array('name' => __('GPS Navigation', 'custom-rental-manager'), 'price' => 8),
-                        'phone_holder' => array('name' => __('Phone Holder', 'custom-rental-manager'), 'price' => 3),
-                    );
-
-                    $selected_extras = is_array($booking_data['extras']) ? $booking_data['extras'] : array();
-
-                    foreach ($available_extras as $key => $extra): ?>
-                        <label style="display: block; margin-bottom: 5px;">
-                            <input type="checkbox" name="booking_data[extras][]" value="<?php echo esc_attr($key); ?>" <?php checked(in_array($key, $selected_extras)); ?> />
-                            <?php echo esc_html($extra['name']) . ' (+€' . $extra['price'] . '/day)'; ?>
-                        </label>
-                    <?php endforeach; ?>
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_booking_notes"><?php _e('Notes', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <textarea id="crcm_booking_notes" name="booking_data[notes]" rows="4" class="large-text"><?php echo esc_textarea($booking_data['notes']); ?></textarea>
+                    <textarea id="special_requests" name="booking_data[special_requests]" rows="3" class="large-text"><?php echo esc_textarea($booking_data['special_requests']); ?></textarea>
                 </td>
             </tr>
         </table>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            $('input[name="booking_data[home_delivery]"]').on('change', function() {
+                if ($(this).is(':checked')) {
+                    $('.delivery-address-row').show();
+                } else {
+                    $('.delivery-address-row').hide();
+                }
+            });
+            
+            // Auto-calculate rental days
+            $('#pickup_date, #return_date').on('change', function() {
+                var pickupDate = new Date($('#pickup_date').val());
+                var returnDate = new Date($('#return_date').val());
+                
+                if (pickupDate && returnDate && returnDate > pickupDate) {
+                    var timeDiff = returnDate.getTime() - pickupDate.getTime();
+                    var daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+                    
+                    $('#rental_days').text(daysDiff);
+                    
+                    // Update pricing if vehicle is selected
+                    updatePricingCalculation();
+                }
+            });
+            
+            $('#vehicle_id').on('change', function() {
+                updatePricingCalculation();
+            });
+            
+            function updatePricingCalculation() {
+                var vehicleId = $('#vehicle_id').val();
+                var pickupDate = $('#pickup_date').val();
+                var returnDate = $('#return_date').val();
+                
+                if (vehicleId && pickupDate && returnDate) {
+                    // AJAX call to calculate pricing
+                    $.ajax({
+                        url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                        type: 'POST',
+                        data: {
+                            action: 'crcm_calculate_booking_price',
+                            vehicle_id: vehicleId,
+                            pickup_date: pickupDate,
+                            return_date: returnDate,
+                            nonce: '<?php echo wp_create_nonce('crcm_admin_nonce'); ?>'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                $('#calculated_total').text('€' + response.data.total);
+                                $('#daily_rate').text('€' + response.data.daily_rate);
+                                $('#rental_days').text(response.data.days);
+                            }
+                        }
+                    });
+                }
+            }
+        });
+        </script>
         <?php
     }
-
+    
     /**
-     * Customer information meta box
+     * Customer details meta box
      */
-    public function customer_info_meta_box($post) {
+    public function customer_details_meta_box($post) {
         $customer_data = get_post_meta($post->ID, '_crcm_customer_data', true);
-
+        
         // Default values
         if (empty($customer_data)) {
             $customer_data = array(
@@ -284,313 +284,227 @@ class CRCM_Booking_Manager {
                 'last_name' => '',
                 'email' => '',
                 'phone' => '',
-                'date_of_birth' => '',
-                'license_number' => '',
-                'license_country' => 'IT',
                 'address' => '',
                 'city' => '',
                 'postal_code' => '',
                 'country' => 'IT',
+                'date_of_birth' => '',
+                'license_number' => '',
+                'license_expiry' => '',
+                'emergency_contact' => '',
+                'emergency_phone' => '',
             );
         }
         ?>
+        
         <table class="form-table crcm-form-table">
             <tr>
-                <th><label for="crcm_first_name"><?php _e('First Name', 'custom-rental-manager'); ?></label></th>
+                <th><label for="first_name"><?php _e('First Name', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <input type="text" id="crcm_first_name" name="customer_data[first_name]" value="<?php echo esc_attr($customer_data['first_name']); ?>" class="regular-text" required />
+                    <input type="text" id="first_name" name="customer_data[first_name]" value="<?php echo esc_attr($customer_data['first_name']); ?>" class="regular-text" required />
                 </td>
             </tr>
-
+            
             <tr>
-                <th><label for="crcm_last_name"><?php _e('Last Name', 'custom-rental-manager'); ?></label></th>
+                <th><label for="last_name"><?php _e('Last Name', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <input type="text" id="crcm_last_name" name="customer_data[last_name]" value="<?php echo esc_attr($customer_data['last_name']); ?>" class="regular-text" required />
+                    <input type="text" id="last_name" name="customer_data[last_name]" value="<?php echo esc_attr($customer_data['last_name']); ?>" class="regular-text" required />
                 </td>
             </tr>
-
+            
             <tr>
-                <th><label for="crcm_email"><?php _e('Email', 'custom-rental-manager'); ?></label></th>
+                <th><label for="email"><?php _e('Email', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <input type="email" id="crcm_email" name="customer_data[email]" value="<?php echo esc_attr($customer_data['email']); ?>" class="regular-text" required />
+                    <input type="email" id="email" name="customer_data[email]" value="<?php echo esc_attr($customer_data['email']); ?>" class="regular-text" required />
                 </td>
             </tr>
-
+            
             <tr>
-                <th><label for="crcm_phone"><?php _e('Phone', 'custom-rental-manager'); ?></label></th>
+                <th><label for="phone"><?php _e('Phone', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <input type="tel" id="crcm_phone" name="customer_data[phone]" value="<?php echo esc_attr($customer_data['phone']); ?>" class="regular-text" required />
+                    <input type="tel" id="phone" name="customer_data[phone]" value="<?php echo esc_attr($customer_data['phone']); ?>" class="regular-text" required />
                 </td>
             </tr>
-
+            
             <tr>
-                <th><label for="crcm_date_of_birth"><?php _e('Date of Birth', 'custom-rental-manager'); ?></label></th>
+                <th><label for="address"><?php _e('Address', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <input type="date" id="crcm_date_of_birth" name="customer_data[date_of_birth]" value="<?php echo esc_attr($customer_data['date_of_birth']); ?>" />
+                    <textarea id="address" name="customer_data[address]" rows="2" class="large-text"><?php echo esc_textarea($customer_data['address']); ?></textarea>
                 </td>
             </tr>
-
+            
             <tr>
-                <th><label for="crcm_license_number"><?php _e('License Number', 'custom-rental-manager'); ?></label></th>
+                <th><label for="city"><?php _e('City', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <input type="text" id="crcm_license_number" name="customer_data[license_number]" value="<?php echo esc_attr($customer_data['license_number']); ?>" class="regular-text" required />
+                    <input type="text" id="city" name="customer_data[city]" value="<?php echo esc_attr($customer_data['city']); ?>" class="regular-text" />
                 </td>
             </tr>
-
+            
             <tr>
-                <th><label for="crcm_license_country"><?php _e('License Country', 'custom-rental-manager'); ?></label></th>
+                <th><label for="license_number"><?php _e('License Number', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <select id="crcm_license_country" name="customer_data[license_country]">
-                        <?php
-                        $countries = crcm_get_country_options();
-                        foreach ($countries as $code => $name): ?>
-                            <option value="<?php echo esc_attr($code); ?>" <?php selected($customer_data['license_country'], $code); ?>>
-                                <?php echo esc_html($name); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <input type="text" id="license_number" name="customer_data[license_number]" value="<?php echo esc_attr($customer_data['license_number']); ?>" class="regular-text" required />
                 </td>
             </tr>
-
+            
             <tr>
-                <th><label for="crcm_address"><?php _e('Address', 'custom-rental-manager'); ?></label></th>
+                <th><label for="license_expiry"><?php _e('License Expiry', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <input type="text" id="crcm_address" name="customer_data[address]" value="<?php echo esc_attr($customer_data['address']); ?>" class="large-text" />
+                    <input type="date" id="license_expiry" name="customer_data[license_expiry]" value="<?php echo esc_attr($customer_data['license_expiry']); ?>" />
                 </td>
             </tr>
-
+            
             <tr>
-                <th><label for="crcm_city"><?php _e('City', 'custom-rental-manager'); ?></label></th>
+                <th><label for="emergency_contact"><?php _e('Emergency Contact', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <input type="text" id="crcm_city" name="customer_data[city]" value="<?php echo esc_attr($customer_data['city']); ?>" class="regular-text" />
+                    <input type="text" id="emergency_contact" name="customer_data[emergency_contact]" value="<?php echo esc_attr($customer_data['emergency_contact']); ?>" class="regular-text" />
                 </td>
             </tr>
-
+            
             <tr>
-                <th><label for="crcm_postal_code"><?php _e('Postal Code', 'custom-rental-manager'); ?></label></th>
+                <th><label for="emergency_phone"><?php _e('Emergency Phone', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <input type="text" id="crcm_postal_code" name="customer_data[postal_code]" value="<?php echo esc_attr($customer_data['postal_code']); ?>" class="regular-text" />
-                </td>
-            </tr>
-
-            <tr>
-                <th><label for="crcm_country"><?php _e('Country', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <select id="crcm_country" name="customer_data[country]">
-                        <?php foreach ($countries as $code => $name): ?>
-                            <option value="<?php echo esc_attr($code); ?>" <?php selected($customer_data['country'], $code); ?>>
-                                <?php echo esc_html($name); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <input type="tel" id="emergency_phone" name="customer_data[emergency_phone]" value="<?php echo esc_attr($customer_data['emergency_phone']); ?>" class="regular-text" />
                 </td>
             </tr>
         </table>
         <?php
     }
-
+    
     /**
-     * Payment information meta box
+     * Payment details meta box
      */
-    public function payment_info_meta_box($post) {
+    public function payment_details_meta_box($post) {
         $payment_data = get_post_meta($post->ID, '_crcm_payment_data', true);
-
+        
         // Default values
         if (empty($payment_data)) {
             $payment_data = array(
                 'subtotal' => 0,
-                'extras_cost' => 0,
-                'insurance_cost' => 0,
-                'delivery_cost' => 0,
-                'total_cost' => 0,
+                'tax_amount' => 0,
+                'total_amount' => 0,
                 'deposit_amount' => 0,
-                'paid_amount' => 0,
+                'security_deposit' => 0,
+                'payment_method' => 'cash',
                 'payment_status' => 'pending',
-                'payment_method' => '',
-                'stripe_payment_intent' => '',
-                'refund_amount' => 0,
-                'refund_reason' => '',
+                'deposit_paid' => false,
+                'balance_due' => 0,
+                'currency' => 'EUR',
             );
         }
-
-        $currency_symbol = crcm()->get_setting('currency_symbol', '€');
         ?>
-        <table class="form-table crcm-form-table">
+        
+        <table class="form-table">
             <tr>
-                <th><?php _e('Subtotal', 'custom-rental-manager'); ?></th>
-                <td><strong><?php echo $currency_symbol . number_format($payment_data['subtotal'], 2); ?></strong></td>
-            </tr>
-
-            <tr>
-                <th><?php _e('Extras Cost', 'custom-rental-manager'); ?></th>
-                <td><?php echo $currency_symbol . number_format($payment_data['extras_cost'], 2); ?></td>
-            </tr>
-
-            <tr>
-                <th><?php _e('Insurance Cost', 'custom-rental-manager'); ?></th>
-                <td><?php echo $currency_symbol . number_format($payment_data['insurance_cost'], 2); ?></td>
-            </tr>
-
-            <tr>
-                <th><?php _e('Delivery Cost', 'custom-rental-manager'); ?></th>
-                <td><?php echo $currency_symbol . number_format($payment_data['delivery_cost'], 2); ?></td>
-            </tr>
-
-            <tr>
-                <th><?php _e('Total Cost', 'custom-rental-manager'); ?></th>
-                <td><strong style="font-size: 16px; color: #0073aa;"><?php echo $currency_symbol . number_format($payment_data['total_cost'], 2); ?></strong></td>
-            </tr>
-
-            <tr>
-                <th><?php _e('Deposit Required', 'custom-rental-manager'); ?></th>
-                <td><?php echo $currency_symbol . number_format($payment_data['deposit_amount'], 2); ?></td>
-            </tr>
-
-            <tr>
-                <th><?php _e('Paid Amount', 'custom-rental-manager'); ?></th>
+                <th><label><?php _e('Subtotal', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <strong style="color: #46b450;"><?php echo $currency_symbol . number_format($payment_data['paid_amount'], 2); ?></strong>
-                    <?php if ($payment_data['paid_amount'] < $payment_data['total_cost']): ?>
-                        <br><small style="color: #d63638;">
-                            <?php printf(__('Remaining: %s', 'custom-rental-manager'), $currency_symbol . number_format($payment_data['total_cost'] - $payment_data['paid_amount'], 2)); ?>
-                        </small>
-                    <?php endif; ?>
+                    <input type="number" name="payment_data[subtotal]" value="<?php echo esc_attr($payment_data['subtotal']); ?>" step="0.01" class="regular-text" />
+                    <span id="calculated_total" style="margin-left: 10px; font-weight: bold;"></span>
                 </td>
             </tr>
-
+            
             <tr>
-                <th><?php _e('Payment Status', 'custom-rental-manager'); ?></th>
+                <th><label><?php _e('Tax Amount', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <?php
-                    $status_labels = array(
-                        'pending' => __('Pending', 'custom-rental-manager'),
-                        'partial' => __('Partial', 'custom-rental-manager'),
-                        'completed' => __('Completed', 'custom-rental-manager'),
-                        'refunded' => __('Refunded', 'custom-rental-manager'),
-                        'failed' => __('Failed', 'custom-rental-manager'),
-                    );
-
-                    $status_colors = array(
-                        'pending' => '#f0ad4e',
-                        'partial' => '#5bc0de',
-                        'completed' => '#5cb85c',
-                        'refunded' => '#d9534f',
-                        'failed' => '#d9534f',
-                    );
-
-                    $status = $payment_data['payment_status'];
-                    $color = isset($status_colors[$status]) ? $status_colors[$status] : '#666';
-                    ?>
-                    <span style="background: <?php echo $color; ?>; color: white; padding: 4px 8px; border-radius: 3px; font-size: 12px; font-weight: bold;">
-                        <?php echo isset($status_labels[$status]) ? $status_labels[$status] : ucfirst($status); ?>
-                    </span>
+                    <input type="number" name="payment_data[tax_amount]" value="<?php echo esc_attr($payment_data['tax_amount']); ?>" step="0.01" class="regular-text" />
                 </td>
             </tr>
-
+            
             <tr>
-                <th><?php _e('Payment Method', 'custom-rental-manager'); ?></th>
-                <td><?php echo esc_html($payment_data['payment_method'] ? ucfirst($payment_data['payment_method']) : __('Not set', 'custom-rental-manager')); ?></td>
-            </tr>
-
-            <?php if (!empty($payment_data['stripe_payment_intent'])): ?>
-            <tr>
-                <th><?php _e('Stripe Payment ID', 'custom-rental-manager'); ?></th>
-                <td><code><?php echo esc_html($payment_data['stripe_payment_intent']); ?></code></td>
-            </tr>
-            <?php endif; ?>
-
-            <?php if ($payment_data['refund_amount'] > 0): ?>
-            <tr>
-                <th><?php _e('Refund Amount', 'custom-rental-manager'); ?></th>
+                <th><label><?php _e('Total Amount', 'custom-rental-manager'); ?></label></th>
                 <td>
-                    <strong style="color: #d63638;"><?php echo $currency_symbol . number_format($payment_data['refund_amount'], 2); ?></strong>
-                    <?php if (!empty($payment_data['refund_reason'])): ?>
-                        <br><small><?php echo esc_html($payment_data['refund_reason']); ?></small>
-                    <?php endif; ?>
+                    <input type="number" name="payment_data[total_amount]" value="<?php echo esc_attr($payment_data['total_amount']); ?>" step="0.01" class="regular-text" />
                 </td>
             </tr>
-            <?php endif; ?>
+            
+            <tr>
+                <th><label><?php _e('Security Deposit', 'custom-rental-manager'); ?></label></th>
+                <td>
+                    <input type="number" name="payment_data[security_deposit]" value="<?php echo esc_attr($payment_data['security_deposit']); ?>" step="0.01" class="regular-text" />
+                </td>
+            </tr>
+            
+            <tr>
+                <th><label><?php _e('Payment Method', 'custom-rental-manager'); ?></label></th>
+                <td>
+                    <select name="payment_data[payment_method]">
+                        <option value="cash" <?php selected($payment_data['payment_method'], 'cash'); ?>><?php _e('Cash', 'custom-rental-manager'); ?></option>
+                        <option value="card" <?php selected($payment_data['payment_method'], 'card'); ?>><?php _e('Credit Card', 'custom-rental-manager'); ?></option>
+                        <option value="bank_transfer" <?php selected($payment_data['payment_method'], 'bank_transfer'); ?>><?php _e('Bank Transfer', 'custom-rental-manager'); ?></option>
+                        <option value="paypal" <?php selected($payment_data['payment_method'], 'paypal'); ?>><?php _e('PayPal', 'custom-rental-manager'); ?></option>
+                    </select>
+                </td>
+            </tr>
+            
+            <tr>
+                <th><label><?php _e('Payment Status', 'custom-rental-manager'); ?></label></th>
+                <td>
+                    <select name="payment_data[payment_status]">
+                        <option value="pending" <?php selected($payment_data['payment_status'], 'pending'); ?>><?php _e('Pending', 'custom-rental-manager'); ?></option>
+                        <option value="deposit_paid" <?php selected($payment_data['payment_status'], 'deposit_paid'); ?>><?php _e('Deposit Paid', 'custom-rental-manager'); ?></option>
+                        <option value="paid" <?php selected($payment_data['payment_status'], 'paid'); ?>><?php _e('Fully Paid', 'custom-rental-manager'); ?></option>
+                        <option value="refunded" <?php selected($payment_data['payment_status'], 'refunded'); ?>><?php _e('Refunded', 'custom-rental-manager'); ?></option>
+                    </select>
+                </td>
+            </tr>
         </table>
-        <?php
-    }
-
-    /**
-     * Booking actions meta box
-     */
-    public function booking_actions_meta_box($post) {
-        $booking_status = get_post_meta($post->ID, '_crcm_booking_status', true);
-        $payment_data = get_post_meta($post->ID, '_crcm_payment_data', true);
-        ?>
-        <div class="crcm-booking-actions">
-            <?php if ($booking_status === 'pending'): ?>
-                <p>
-                    <button type="button" class="button button-primary button-large" id="crcm-confirm-booking">
-                        <?php _e('Confirm Booking', 'custom-rental-manager'); ?>
-                    </button>
-                </p>
-            <?php endif; ?>
-
-            <?php if ($booking_status === 'confirmed'): ?>
-                <p>
-                    <button type="button" class="button button-primary button-large" id="crcm-activate-booking">
-                        <?php _e('Start Rental', 'custom-rental-manager'); ?>
-                    </button>
-                </p>
-            <?php endif; ?>
-
-            <?php if ($booking_status === 'active'): ?>
-                <p>
-                    <button type="button" class="button button-primary button-large" id="crcm-complete-booking">
-                        <?php _e('Complete Rental', 'custom-rental-manager'); ?>
-                    </button>
-                </p>
-            <?php endif; ?>
-
-            <p>
-                <button type="button" class="button" id="crcm-send-email">
-                    <?php _e('Send Email to Customer', 'custom-rental-manager'); ?>
-                </button>
-            </p>
-
-            <p>
-                <button type="button" class="button" id="crcm-generate-contract">
-                    <?php _e('Generate Contract', 'custom-rental-manager'); ?>
-                </button>
-            </p>
-
-            <?php if ($payment_data && $payment_data['paid_amount'] > 0): ?>
-            <p>
-                <button type="button" class="button" id="crcm-process-refund">
-                    <?php _e('Process Refund', 'custom-rental-manager'); ?>
-                </button>
-            </p>
-            <?php endif; ?>
-
-            <?php if (in_array($booking_status, array('pending', 'confirmed'))): ?>
-            <p>
-                <button type="button" class="button button-link-delete" id="crcm-cancel-booking">
-                    <?php _e('Cancel Booking', 'custom-rental-manager'); ?>
-                </button>
-            </p>
-            <?php endif; ?>
+        
+        <div class="crcm-pricing-summary" style="margin-top: 15px; padding: 10px; background: #f9f9f9; border-radius: 4px;">
+            <h4><?php _e('Pricing Summary', 'custom-rental-manager'); ?></h4>
+            <p><?php _e('Daily Rate:', 'custom-rental-manager'); ?> <span id="daily_rate">-</span></p>
+            <p><?php _e('Rental Days:', 'custom-rental-manager'); ?> <span id="rental_days">-</span></p>
+            <p><strong><?php _e('Total:', 'custom-rental-manager'); ?> <span id="total_display">€0.00</span></strong></p>
         </div>
-
-        <style>
-        .crcm-booking-actions .button-large {
-            width: 100%;
-            text-align: center;
-            margin-bottom: 10px;
-        }
-
-        .crcm-booking-actions .button {
-            width: 100%;
-            text-align: center;
-            margin-bottom: 5px;
-        }
-        </style>
         <?php
     }
-
+    
+    /**
+     * Booking notes meta box
+     */
+    public function booking_notes_meta_box($post) {
+        $notes = get_post_meta($post->ID, '_crcm_booking_notes', true);
+        ?>
+        <textarea name="booking_notes" rows="5" class="large-text"><?php echo esc_textarea($notes); ?></textarea>
+        <p class="description"><?php _e('Internal notes visible only to admin', 'custom-rental-manager'); ?></p>
+        <?php
+    }
+    
+    /**
+     * Add booking status to submit box
+     */
+    public function booking_status_metabox() {
+        global $post;
+        
+        if ($post->post_type !== 'crcm_booking') {
+            return;
+        }
+        
+        $booking_status = get_post_meta($post->ID, '_crcm_booking_status', true);
+        if (empty($booking_status)) {
+            $booking_status = 'pending';
+        }
+        
+        $statuses = array(
+            'pending' => __('Pending', 'custom-rental-manager'),
+            'confirmed' => __('Confirmed', 'custom-rental-manager'),
+            'active' => __('Active', 'custom-rental-manager'),
+            'completed' => __('Completed', 'custom-rental-manager'),
+            'cancelled' => __('Cancelled', 'custom-rental-manager'),
+        );
+        ?>
+        <div class="misc-pub-section">
+            <label for="booking_status"><?php _e('Booking Status:', 'custom-rental-manager'); ?></label>
+            <select name="booking_status" id="booking_status">
+                <?php foreach ($statuses as $value => $label): ?>
+                    <option value="<?php echo esc_attr($value); ?>" <?php selected($booking_status, $value); ?>>
+                        <?php echo esc_html($label); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php
+    }
+    
     /**
      * Save booking meta data
      */
@@ -599,37 +513,42 @@ class CRCM_Booking_Manager {
         if (!isset($_POST['crcm_booking_meta_nonce_field']) || !wp_verify_nonce($_POST['crcm_booking_meta_nonce_field'], 'crcm_booking_meta_nonce')) {
             return;
         }
-
+        
         // Check if user has permission to edit this post
         if (!current_user_can('edit_post', $post_id)) {
             return;
         }
-
+        
         // Skip autosave
         if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
             return;
         }
-
+        
         // Only save for booking post type
         if (get_post_type($post_id) !== 'crcm_booking') {
             return;
         }
-
+        
+        // Generate booking number if not exists
+        $booking_number = get_post_meta($post_id, '_crcm_booking_number', true);
+        if (empty($booking_number)) {
+            $booking_number = $this->generate_booking_number();
+            update_post_meta($post_id, '_crcm_booking_number', $booking_number);
+        }
+        
         // Save booking data
         if (isset($_POST['booking_data'])) {
             $booking_data = array();
             foreach ($_POST['booking_data'] as $key => $value) {
-                if ($key === 'extras' && is_array($value)) {
+                if (is_array($value)) {
                     $booking_data[$key] = array_map('sanitize_text_field', $value);
-                } elseif ($key === 'home_delivery') {
-                    $booking_data[$key] = (bool) $value;
                 } else {
                     $booking_data[$key] = sanitize_text_field($value);
                 }
             }
             update_post_meta($post_id, '_crcm_booking_data', $booking_data);
         }
-
+        
         // Save customer data
         if (isset($_POST['customer_data'])) {
             $customer_data = array();
@@ -638,53 +557,85 @@ class CRCM_Booking_Manager {
             }
             update_post_meta($post_id, '_crcm_customer_data', $customer_data);
         }
-
+        
+        // Save payment data
+        if (isset($_POST['payment_data'])) {
+            $payment_data = array();
+            foreach ($_POST['payment_data'] as $key => $value) {
+                if (in_array($key, array('subtotal', 'tax_amount', 'total_amount', 'deposit_amount', 'security_deposit', 'balance_due'))) {
+                    $payment_data[$key] = floatval($value);
+                } else {
+                    $payment_data[$key] = sanitize_text_field($value);
+                }
+            }
+            update_post_meta($post_id, '_crcm_payment_data', $payment_data);
+        }
+        
         // Save booking status
-        if (isset($_POST['crcm_booking_status'])) {
+        if (isset($_POST['booking_status'])) {
             $old_status = get_post_meta($post_id, '_crcm_booking_status', true);
-            $new_status = sanitize_text_field($_POST['crcm_booking_status']);
-
+            $new_status = sanitize_text_field($_POST['booking_status']);
+            
             update_post_meta($post_id, '_crcm_booking_status', $new_status);
-
-            // Trigger status change action if status changed
+            
+            // Trigger status change hook if status changed
             if ($old_status !== $new_status) {
                 do_action('crcm_booking_status_changed', $post_id, $new_status, $old_status);
             }
         }
-
-        // Generate booking number if not exists
-        $booking_number = get_post_meta($post_id, '_crcm_booking_number', true);
-        if (empty($booking_number)) {
-            $booking_number = $this->generate_booking_number();
-            update_post_meta($post_id, '_crcm_booking_number', $booking_number);
+        
+        // Save booking notes
+        if (isset($_POST['booking_notes'])) {
+            update_post_meta($post_id, '_crcm_booking_notes', sanitize_textarea_field($_POST['booking_notes']));
         }
-
-        // Save booking number if provided
-        if (isset($_POST['crcm_booking_number']) && !empty($_POST['crcm_booking_number'])) {
-            update_post_meta($post_id, '_crcm_booking_number', sanitize_text_field($_POST['crcm_booking_number']));
-        }
-
-        // Recalculate pricing
-        $this->recalculate_booking_pricing($post_id);
     }
-
+    
     /**
-     * Set up custom columns for booking list
+     * Generate unique booking number
+     */
+    private function generate_booking_number() {
+        $prefix = 'CBR'; // Costabilerent
+        $year = date('y');
+        $month = date('m');
+        
+        // Get the last booking number for this month
+        global $wpdb;
+        $last_number = $wpdb->get_var($wpdb->prepare(
+            "SELECT meta_value FROM {$wpdb->postmeta} 
+             WHERE meta_key = '_crcm_booking_number' 
+             AND meta_value LIKE %s 
+             ORDER BY meta_value DESC 
+             LIMIT 1",
+            $prefix . $year . $month . '%'
+        ));
+        
+        if ($last_number) {
+            $sequence = intval(substr($last_number, -4)) + 1;
+        } else {
+            $sequence = 1;
+        }
+        
+        return $prefix . $year . $month . str_pad($sequence, 4, '0', STR_PAD_LEFT);
+    }
+    
+    /**
+     * Custom columns for booking list
      */
     public function booking_columns($columns) {
         $new_columns = array();
         $new_columns['cb'] = $columns['cb'];
-        $new_columns['title'] = __('Booking Number', 'custom-rental-manager');
+        $new_columns['title'] = $columns['title'];
+        $new_columns['crcm_booking_number'] = __('Booking #', 'custom-rental-manager');
         $new_columns['crcm_customer'] = __('Customer', 'custom-rental-manager');
         $new_columns['crcm_vehicle'] = __('Vehicle', 'custom-rental-manager');
         $new_columns['crcm_dates'] = __('Rental Period', 'custom-rental-manager');
         $new_columns['crcm_status'] = __('Status', 'custom-rental-manager');
         $new_columns['crcm_total'] = __('Total', 'custom-rental-manager');
-        $new_columns['date'] = __('Created', 'custom-rental-manager');
-
+        $new_columns['date'] = $columns['date'];
+        
         return $new_columns;
     }
-
+    
     /**
      * Display custom column content
      */
@@ -693,359 +644,225 @@ class CRCM_Booking_Manager {
         $customer_data = get_post_meta($post_id, '_crcm_customer_data', true);
         $payment_data = get_post_meta($post_id, '_crcm_payment_data', true);
         $booking_status = get_post_meta($post_id, '_crcm_booking_status', true);
-        $currency_symbol = crcm()->get_setting('currency_symbol', '€');
-
+        $booking_number = get_post_meta($post_id, '_crcm_booking_number', true);
+        
         switch ($column) {
-            case 'crcm_customer':
-                if ($customer_data) {
-                    echo esc_html($customer_data['first_name'] . ' ' . $customer_data['last_name']);
-                    echo '<br><small>' . esc_html($customer_data['email']) . '</small>';
-                }
+            case 'crcm_booking_number':
+                echo esc_html($booking_number);
                 break;
-
-            case 'crcm_vehicle':
-                if ($booking_data && !empty($booking_data['vehicle_id'])) {
-                    $vehicle = get_post($booking_data['vehicle_id']);
-                    if ($vehicle) {
-                        echo '<a href="' . get_edit_post_link($vehicle->ID) . '">' . esc_html($vehicle->post_title) . '</a>';
+                
+            case 'crcm_customer':
+                if ($customer_data && isset($customer_data['first_name'], $customer_data['last_name'])) {
+                    echo esc_html($customer_data['first_name'] . ' ' . $customer_data['last_name']);
+                    if (isset($customer_data['email'])) {
+                        echo '<br><small>' . esc_html($customer_data['email']) . '</small>';
                     }
                 }
                 break;
-
-            case 'crcm_dates':
-                if ($booking_data) {
-                    echo esc_html(crcm_format_date($booking_data['pickup_date']));
-                    echo '<br><small>' . __('to', 'custom-rental-manager') . ' ' . esc_html(crcm_format_date($booking_data['return_date'])) . '</small>';
+                
+            case 'crcm_vehicle':
+                if ($booking_data && isset($booking_data['vehicle_id'])) {
+                    $vehicle = get_post($booking_data['vehicle_id']);
+                    if ($vehicle) {
+                        echo esc_html($vehicle->post_title);
+                    }
                 }
                 break;
-
+                
+            case 'crcm_dates':
+                if ($booking_data && isset($booking_data['pickup_date'], $booking_data['return_date'])) {
+                    echo esc_html(date_i18n('M j', strtotime($booking_data['pickup_date'])));
+                    echo ' - ';
+                    echo esc_html(date_i18n('M j, Y', strtotime($booking_data['return_date'])));
+                }
+                break;
+                
             case 'crcm_status':
                 if ($booking_status) {
                     echo crcm_get_status_badge($booking_status);
                 }
                 break;
-
+                
             case 'crcm_total':
-                if ($payment_data && isset($payment_data['total_cost'])) {
-                    echo '<strong>' . $currency_symbol . number_format($payment_data['total_cost'], 2) . '</strong>';
-                    if ($payment_data['paid_amount'] > 0) {
-                        echo '<br><small style="color: #46b450;">' . __('Paid:', 'custom-rental-manager') . ' ' . $currency_symbol . number_format($payment_data['paid_amount'], 2) . '</small>';
-                    }
+                if ($payment_data && isset($payment_data['total_amount'])) {
+                    echo '€' . number_format($payment_data['total_amount'], 2);
                 }
                 break;
         }
     }
-
+    
     /**
-     * Create booking from frontend
+     * Handle booking status change
+     */
+    public function on_booking_status_change($new_status, $old_status, $post) {
+        if ($post->post_type !== 'crcm_booking') {
+            return;
+        }
+        
+        // Send email notifications based on status change
+        if (function_exists('crcm') && crcm()->email_manager) {
+            $booking_status = get_post_meta($post->ID, '_crcm_booking_status', true);
+            
+            switch ($booking_status) {
+                case 'confirmed':
+                    crcm()->email_manager->send_booking_confirmation($post->ID);
+                    break;
+                case 'cancelled':
+                    crcm()->email_manager->send_cancellation_email($post->ID);
+                    break;
+            }
+        }
+    }
+    
+    /**
+     * AJAX create booking
      */
     public function ajax_create_booking() {
         check_ajax_referer('crcm_nonce', 'nonce');
-
+        
         // Validate required fields
-        $required_fields = array('vehicle_id', 'pickup_date', 'return_date', 'customer_data');
+        $required_fields = array('vehicle_id', 'pickup_date', 'return_date');
         foreach ($required_fields as $field) {
             if (empty($_POST[$field])) {
-                wp_send_json_error(__('Missing required field: ', 'custom-rental-manager') . $field);
+                wp_send_json_error(sprintf(__('Field %s is required.', 'custom-rental-manager'), $field));
             }
         }
-
-        // Sanitize and prepare data
+        
+        // Create booking post
+        $booking_id = wp_insert_post(array(
+            'post_type' => 'crcm_booking',
+            'post_status' => 'publish',
+            'post_title' => sprintf(__('Booking - %s', 'custom-rental-manager'), date('Y-m-d H:i')),
+        ));
+        
+        if (is_wp_error($booking_id)) {
+            wp_send_json_error(__('Failed to create booking.', 'custom-rental-manager'));
+        }
+        
+        // Save booking data
         $booking_data = array(
             'vehicle_id' => intval($_POST['vehicle_id']),
             'pickup_date' => sanitize_text_field($_POST['pickup_date']),
             'return_date' => sanitize_text_field($_POST['return_date']),
             'pickup_time' => sanitize_text_field($_POST['pickup_time'] ?? '09:00'),
             'return_time' => sanitize_text_field($_POST['return_time'] ?? '18:00'),
-            'pickup_location' => intval($_POST['pickup_location'] ?? 0),
-            'return_location' => intval($_POST['return_location'] ?? 0),
-            'home_delivery' => (bool) ($_POST['home_delivery'] ?? false),
-            'delivery_address' => sanitize_textarea_field($_POST['delivery_address'] ?? ''),
-            'extras' => array_map('sanitize_text_field', $_POST['extras'] ?? array()),
-            'insurance_type' => sanitize_text_field($_POST['insurance_type'] ?? 'basic'),
-            'notes' => sanitize_textarea_field($_POST['notes'] ?? ''),
+            'pickup_location' => sanitize_text_field($_POST['pickup_location'] ?? ''),
+            'home_delivery' => isset($_POST['home_delivery']) ? 1 : 0,
+            'extras' => isset($_POST['extras']) ? array_map('sanitize_text_field', $_POST['extras']) : array(),
         );
-
-        $customer_data = array();
-        if (isset($_POST['customer_data']) && is_array($_POST['customer_data'])) {
+        
+        update_post_meta($booking_id, '_crcm_booking_data', $booking_data);
+        
+        // Save customer data
+        if (isset($_POST['customer_data'])) {
+            $customer_data = array();
             foreach ($_POST['customer_data'] as $key => $value) {
                 $customer_data[$key] = sanitize_text_field($value);
             }
+            update_post_meta($booking_id, '_crcm_customer_data', $customer_data);
         }
-
-        // Validate availability
-        $vehicle_manager = new CRCM_Vehicle_Manager();
-        $available_quantity = $vehicle_manager->check_availability(
-            $booking_data['vehicle_id'],
-            $booking_data['pickup_date'],
-            $booking_data['return_date']
-        );
-
-        if ($available_quantity < 1) {
-            wp_send_json_error(__('Selected vehicle is not available for the chosen dates.', 'custom-rental-manager'));
-        }
-
-        // Create booking post
-        $booking_post = array(
-            'post_type' => 'crcm_booking',
-            'post_status' => 'publish',
-            'post_title' => sprintf(__('Booking - %s %s', 'custom-rental-manager'), $customer_data['first_name'], $customer_data['last_name']),
-        );
-
-        $booking_id = wp_insert_post($booking_post);
-
-        if (is_wp_error($booking_id)) {
-            wp_send_json_error(__('Failed to create booking.', 'custom-rental-manager'));
-        }
-
-        // Save booking data
-        update_post_meta($booking_id, '_crcm_booking_data', $booking_data);
-        update_post_meta($booking_id, '_crcm_customer_data', $customer_data);
+        
+        // Set initial status
         update_post_meta($booking_id, '_crcm_booking_status', 'pending');
-
+        
         // Generate booking number
         $booking_number = $this->generate_booking_number();
         update_post_meta($booking_id, '_crcm_booking_number', $booking_number);
-
-        // Calculate pricing
-        $pricing = $this->calculate_booking_pricing($booking_data);
-        update_post_meta($booking_id, '_crcm_payment_data', $pricing);
-
-        // Create customer account if doesn't exist
-        $user = get_user_by('email', $customer_data['email']);
-        if (!$user) {
-            $customer_user_id = crcm_create_customer_account($customer_data);
-        }
-
-        // Trigger booking created action
-        do_action('crcm_booking_created', $booking_id);
-
+        
         wp_send_json_success(array(
             'booking_id' => $booking_id,
             'booking_number' => $booking_number,
             'message' => __('Booking created successfully!', 'custom-rental-manager'),
-            'redirect_url' => home_url('/booking-confirmation/?booking=' . $booking_number),
         ));
     }
-
+    
     /**
-     * Update booking status via AJAX
+     * AJAX cancel booking
      */
-    public function ajax_update_booking_status() {
-        check_ajax_referer('crcm_admin_nonce', 'nonce');
-
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(__('Permission denied', 'custom-rental-manager'));
-        }
-
+    public function ajax_cancel_booking() {
+        check_ajax_referer('crcm_nonce', 'nonce');
+        
         $booking_id = intval($_POST['booking_id']);
-        $new_status = sanitize_text_field($_POST['status']);
-
-        $old_status = get_post_meta($booking_id, '_crcm_booking_status', true);
-        update_post_meta($booking_id, '_crcm_booking_status', $new_status);
-
-        // Trigger status change action
-        do_action('crcm_booking_status_changed', $booking_id, $new_status, $old_status);
-
-        wp_send_json_success(array(
-            'message' => __('Booking status updated successfully', 'custom-rental-manager'),
-        ));
+        
+        if (!$booking_id || get_post_type($booking_id) !== 'crcm_booking') {
+            wp_send_json_error(__('Invalid booking ID.', 'custom-rental-manager'));
+        }
+        
+        // Check if user can cancel this booking
+        $customer_data = get_post_meta($booking_id, '_crcm_customer_data', true);
+        $current_user = wp_get_current_user();
+        
+        if (!current_user_can('manage_options') && 
+            (!$customer_data || $customer_data['email'] !== $current_user->user_email)) {
+            wp_send_json_error(__('You do not have permission to cancel this booking.', 'custom-rental-manager'));
+        }
+        
+        // Update status to cancelled
+        update_post_meta($booking_id, '_crcm_booking_status', 'cancelled');
+        
+        wp_send_json_success(__('Booking cancelled successfully.', 'custom-rental-manager'));
     }
-
+    
     /**
-     * Generate unique booking number
+     * AJAX get booking details
      */
-    public function generate_booking_number() {
-        $prefix = 'ISCHIA' . date('Y');
-        $counter = get_option('crcm_booking_counter_' . date('Y'), 0);
-        $counter++;
-
-        update_option('crcm_booking_counter_' . date('Y'), $counter);
-
-        return $prefix . str_pad($counter, 4, '0', STR_PAD_LEFT);
-    }
-
-    /**
-     * Calculate booking pricing
-     */
-    public function calculate_booking_pricing($booking_data) {
-        $vehicle_id = $booking_data['vehicle_id'];
-        $pickup_date = $booking_data['pickup_date'];
-        $return_date = $booking_data['return_date'];
-        $extras = isset($booking_data['extras']) ? $booking_data['extras'] : array();
-        $insurance_type = isset($booking_data['insurance_type']) ? $booking_data['insurance_type'] : 'basic';
-        $home_delivery = isset($booking_data['home_delivery']) ? $booking_data['home_delivery'] : false;
-
-        // Calculate rental days
-        $rental_days = crcm_calculate_rental_days($pickup_date, $return_date);
-
-        if ($rental_days <= 0) {
-            return array(
-                'subtotal' => 0,
-                'extras_cost' => 0,
-                'insurance_cost' => 0,
-                'delivery_cost' => 0,
-                'total_cost' => 0,
-                'deposit_amount' => 0,
-                'paid_amount' => 0,
-                'payment_status' => 'pending',
-            );
+    public function ajax_get_booking_details() {
+        check_ajax_referer('crcm_admin_nonce', 'nonce');
+        
+        $booking_id = intval($_POST['booking_id']);
+        
+        if (!$booking_id || get_post_type($booking_id) !== 'crcm_booking') {
+            wp_send_json_error(__('Invalid booking ID.', 'custom-rental-manager'));
         }
-
-        // Get vehicle pricing
-        $vehicle_data = get_post_meta($vehicle_id, '_crcm_vehicle_data', true);
-        $pricing_data = get_post_meta($vehicle_id, '_crcm_pricing_data', true);
-
-        $daily_rate = floatval($pricing_data['daily_rate'] ?? 0);
-
-        // Apply weekly/monthly discounts
-        $weekly_discount = floatval($pricing_data['weekly_discount'] ?? 0);
-        $monthly_discount = floatval($pricing_data['monthly_discount'] ?? 0);
-
-        $subtotal = $daily_rate * $rental_days;
-
-        if ($rental_days >= 30 && $monthly_discount > 0) {
-            $subtotal = $subtotal * (1 - $monthly_discount / 100);
-        } elseif ($rental_days >= 7 && $weekly_discount > 0) {
-            $subtotal = $subtotal * (1 - $weekly_discount / 100);
-        }
-
-        // Calculate extras cost
-        $extras_cost = 0;
-        $available_extras = array(
-            'helmet' => 5,
-            'child_seat' => 10,
-            'gps' => 8,
-            'phone_holder' => 3,
-        );
-
-        foreach ($extras as $extra) {
-            if (isset($available_extras[$extra])) {
-                $extras_cost += $available_extras[$extra] * $rental_days;
-            }
-        }
-
-        // Calculate insurance cost
-        $insurance_cost = 0;
-        $insurance_rates = array(
-            'basic' => 0,
-            'premium' => 15,
-            'full' => 25,
-        );
-
-        if (isset($insurance_rates[$insurance_type])) {
-            $insurance_cost = $insurance_rates[$insurance_type] * $rental_days;
-        }
-
-        // Calculate delivery cost
-        $delivery_cost = 0;
-        if ($home_delivery) {
-            $delivery_rate = crcm()->get_setting('home_delivery_rate', 25);
-            $delivery_cost = floatval($delivery_rate);
-        }
-
-        // Calculate total
-        $total_cost = $subtotal + $extras_cost + $insurance_cost + $delivery_cost;
-
-        // Calculate deposit (typically 30% of total or minimum €200)
-        $deposit_percentage = crcm()->get_setting('deposit_percentage', 30);
-        $minimum_deposit = crcm()->get_setting('minimum_deposit', 200);
-        $deposit_amount = max($total_cost * ($deposit_percentage / 100), $minimum_deposit);
-
-        return array(
-            'subtotal' => round($subtotal, 2),
-            'extras_cost' => round($extras_cost, 2),
-            'insurance_cost' => round($insurance_cost, 2),
-            'delivery_cost' => round($delivery_cost, 2),
-            'total_cost' => round($total_cost, 2),
-            'deposit_amount' => round($deposit_amount, 2),
-            'rental_days' => $rental_days,
-            'daily_rate' => $daily_rate,
-            'paid_amount' => 0,
-            'payment_status' => 'pending',
-            'payment_method' => '',
-            'stripe_payment_intent' => '',
-            'refund_amount' => 0,
-            'refund_reason' => '',
-        );
-    }
-
-    /**
-     * Recalculate booking pricing
-     */
-    public function recalculate_booking_pricing($booking_id) {
-        $booking_data = get_post_meta($booking_id, '_crcm_booking_data', true);
-
-        if ($booking_data) {
-            $pricing = $this->calculate_booking_pricing($booking_data);
-
-            // Preserve existing payment data
-            $existing_payment_data = get_post_meta($booking_id, '_crcm_payment_data', true);
-            if ($existing_payment_data) {
-                $pricing['paid_amount'] = $existing_payment_data['paid_amount'] ?? 0;
-                $pricing['payment_status'] = $existing_payment_data['payment_status'] ?? 'pending';
-                $pricing['payment_method'] = $existing_payment_data['payment_method'] ?? '';
-                $pricing['stripe_payment_intent'] = $existing_payment_data['stripe_payment_intent'] ?? '';
-                $pricing['refund_amount'] = $existing_payment_data['refund_amount'] ?? 0;
-                $pricing['refund_reason'] = $existing_payment_data['refund_reason'] ?? '';
-            }
-
-            update_post_meta($booking_id, '_crcm_payment_data', $pricing);
-        }
-    }
-
-    /**
-     * Get booking by ID
-     */
-    public function get_booking($booking_id) {
-        $booking = get_post($booking_id);
-
-        if (!$booking || $booking->post_type !== 'crcm_booking') {
-            return false;
-        }
-
+        
         $booking_data = get_post_meta($booking_id, '_crcm_booking_data', true);
         $customer_data = get_post_meta($booking_id, '_crcm_customer_data', true);
         $payment_data = get_post_meta($booking_id, '_crcm_payment_data', true);
         $booking_status = get_post_meta($booking_id, '_crcm_booking_status', true);
         $booking_number = get_post_meta($booking_id, '_crcm_booking_number', true);
-
-        return array(
-            'id' => $booking_id,
-            'booking_number' => $booking_number,
-            'status' => $booking_status,
-            'booking_data' => $booking_data,
-            'customer_data' => $customer_data,
-            'payment_data' => $payment_data,
-            'created_date' => $booking->post_date,
-            'modified_date' => $booking->post_modified,
-        );
-    }
-
-    /**
-     * Get bookings with filters
-     */
-    public function get_bookings($args = array()) {
-        $default_args = array(
-            'post_type' => 'crcm_booking',
-            'post_status' => array('publish', 'private'),
-            'posts_per_page' => 20,
-            'orderby' => 'date',
-            'order' => 'DESC',
-        );
-
-        $args = wp_parse_args($args, $default_args);
-
-        $posts = get_posts($args);
-        $bookings = array();
-
-        foreach ($posts as $post) {
-            $booking = $this->get_booking($post->ID);
-            if ($booking) {
-                $bookings[] = $booking;
-            }
-        }
-
-        return $bookings;
+        
+        $vehicle = get_post($booking_data['vehicle_id']);
+        
+        ob_start();
+        ?>
+        <h3><?php printf(__('Booking Details - %s', 'custom-rental-manager'), $booking_number); ?></h3>
+        
+        <table class="form-table">
+            <tr>
+                <th><?php _e('Customer:', 'custom-rental-manager'); ?></th>
+                <td><?php echo esc_html($customer_data['first_name'] . ' ' . $customer_data['last_name']); ?></td>
+            </tr>
+            <tr>
+                <th><?php _e('Vehicle:', 'custom-rental-manager'); ?></th>
+                <td><?php echo $vehicle ? esc_html($vehicle->post_title) : __('Unknown', 'custom-rental-manager'); ?></td>
+            </tr>
+            <tr>
+                <th><?php _e('Dates:', 'custom-rental-manager'); ?></th>
+                <td>
+                    <?php echo esc_html(date_i18n('M j, Y', strtotime($booking_data['pickup_date']))); ?> - 
+                    <?php echo esc_html(date_i18n('M j, Y', strtotime($booking_data['return_date']))); ?>
+                </td>
+            </tr>
+            <tr>
+                <th><?php _e('Status:', 'custom-rental-manager'); ?></th>
+                <td><?php echo crcm_get_status_badge($booking_status); ?></td>
+            </tr>
+            <?php if ($payment_data && isset($payment_data['total_amount'])): ?>
+            <tr>
+                <th><?php _e('Total:', 'custom-rental-manager'); ?></th>
+                <td>€<?php echo number_format($payment_data['total_amount'], 2); ?></td>
+            </tr>
+            <?php endif; ?>
+        </table>
+        
+        <div style="margin-top: 20px;">
+            <a href="<?php echo esc_url(get_edit_post_link($booking_id)); ?>" class="button button-primary">
+                <?php _e('Edit Booking', 'custom-rental-manager'); ?>
+            </a>
+        </div>
+        <?php
+        
+        $content = ob_get_clean();
+        wp_send_json_success($content);
     }
 }
