@@ -1,8 +1,8 @@
 <?php
 /**
- * Vehicle Manager Class - WITH EXTRA SERVICES & INSURANCE
+ * Vehicle Manager Class - COMPLETE WITH MISC SECTION & FULL TABS
  * 
- * Added Extra Services and Insurance sections with advanced functionality.
+ * Added complete Misc section and moved all metaboxes to full-width tabs.
  * 
  * @package CustomRentalCarManager
  * @author Totaliweb
@@ -126,7 +126,7 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
-     * Add meta boxes for vehicle post type
+     * Add meta boxes for vehicle post type - REORGANIZED AS FULL WIDTH TABS
      */
     public function add_meta_boxes() {
         add_meta_box(
@@ -165,30 +165,33 @@ class CRCM_Vehicle_Manager {
             'default'
         );
         
+        // MOVED TO FULL WIDTH: Extra Services
         add_meta_box(
             'crcm_vehicle_extras',
             __('Servizi Extra', 'custom-rental-manager'),
             array($this, 'extras_meta_box'),
             'crcm_vehicle',
-            'side',
+            'normal',
             'default'
         );
         
+        // MOVED TO FULL WIDTH: Insurance
         add_meta_box(
             'crcm_vehicle_insurance',
             __('Assicurazioni', 'custom-rental-manager'),
             array($this, 'insurance_meta_box'),
             'crcm_vehicle',
-            'side',
+            'normal',
             'default'
         );
         
+        // MOVED TO FULL WIDTH: Misc Settings
         add_meta_box(
             'crcm_vehicle_misc',
             __('Varie', 'custom-rental-manager'),
             array($this, 'misc_meta_box'),
             'crcm_vehicle',
-            'side',
+            'normal',
             'default'
         );
     }
@@ -864,7 +867,7 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
-     * ENHANCED: Extra Services meta box with unlimited services
+     * Extra Services meta box - NOW FULL WIDTH
      */
     public function extras_meta_box($post) {
         $extras_data = get_post_meta($post->ID, '_crcm_extras_data', true);
@@ -1009,7 +1012,7 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
-     * ENHANCED: Insurance meta box with Basic and Premium options
+     * Insurance meta box - NOW FULL WIDTH
      */
     public function insurance_meta_box($post) {
         $insurance_data = get_post_meta($post->ID, '_crcm_insurance_data', true);
@@ -1245,11 +1248,267 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
-     * Misc meta box - placeholder for future features
+     * COMPLETE: Misc meta box with all advanced settings - NOW FULL WIDTH
      */
     public function misc_meta_box($post) {
-        echo '<p>' . __('Altre opzioni verranno implementate qui.', 'custom-rental-manager') . '</p>';
-        echo '<p class="description">' . __('Questa sezione è riservata per funzionalità future come condizioni speciali, note interne, ecc.', 'custom-rental-manager') . '</p>';
+        $misc_data = get_post_meta($post->ID, '_crcm_misc_data', true);
+        
+        // Default values
+        if (empty($misc_data)) {
+            $misc_data = array(
+                'min_rental_days' => 1,
+                'max_rental_days' => 30,
+                'cancellation_enabled' => false,
+                'cancellation_days' => 5,
+                'late_return_rule' => true,
+                'late_return_time' => '10:00',
+                'featured_vehicle' => false,
+                'featured_priority' => 0
+            );
+        }
+        ?>
+        
+        <div class="crcm-misc-container">
+            <div class="crcm-misc-sections">
+                
+                <!-- Rental Duration Limits -->
+                <div class="crcm-misc-section">
+                    <h3><?php _e('Limiti Durata Noleggio', 'custom-rental-manager'); ?></h3>
+                    <table class="form-table">
+                        <tr>
+                            <th><label for="min_rental_days"><?php _e('Giorni Minimi di Noleggio', 'custom-rental-manager'); ?></label></th>
+                            <td>
+                                <input type="number" id="min_rental_days" name="misc_data[min_rental_days]" 
+                                       value="<?php echo esc_attr($misc_data['min_rental_days']); ?>" 
+                                       min="1" max="365" />
+                                <p class="description"><?php _e('Numero minimo di giorni per noleggiare questo veicolo', 'custom-rental-manager'); ?></p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><label for="max_rental_days"><?php _e('Giorni Massimi di Noleggio', 'custom-rental-manager'); ?></label></th>
+                            <td>
+                                <input type="number" id="max_rental_days" name="misc_data[max_rental_days]" 
+                                       value="<?php echo esc_attr($misc_data['max_rental_days']); ?>" 
+                                       min="1" max="365" />
+                                <p class="description"><?php _e('Numero massimo di giorni per noleggiare questo veicolo', 'custom-rental-manager'); ?></p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <!-- Cancellation Policy -->
+                <div class="crcm-misc-section">
+                    <h3><?php _e('Politica di Cancellazione', 'custom-rental-manager'); ?></h3>
+                    <table class="form-table">
+                        <tr>
+                            <th><?php _e('Cancellazione con Rimborso', 'custom-rental-manager'); ?></th>
+                            <td>
+                                <label>
+                                    <input type="checkbox" name="misc_data[cancellation_enabled]" value="1" 
+                                           <?php checked($misc_data['cancellation_enabled'], true); ?> 
+                                           id="cancellation_enabled" />
+                                    <?php _e('Abilita cancellazione con rimborso completo', 'custom-rental-manager'); ?>
+                                </label>
+                                <p class="description"><?php _e('Se disabilitata, il cliente non potrà cancellare la prenotazione e ottenere rimborso', 'custom-rental-manager'); ?></p>
+                            </td>
+                        </tr>
+                        <tr class="cancellation-days-row" style="<?php echo empty($misc_data['cancellation_enabled']) ? 'display: none;' : ''; ?>">
+                            <th><label for="cancellation_days"><?php _e('Giorni Prima per Cancellazione', 'custom-rental-manager'); ?></label></th>
+                            <td>
+                                <input type="number" id="cancellation_days" name="misc_data[cancellation_days]" 
+                                       value="<?php echo esc_attr($misc_data['cancellation_days']); ?>" 
+                                       min="0" max="30" />
+                                <p class="description"><?php _e('Quanti giorni prima dell\'inizio del noleggio il cliente può cancellare gratuitamente', 'custom-rental-manager'); ?></p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <!-- Late Return Policy -->
+                <div class="crcm-misc-section">
+                    <h3><?php _e('Regola Riconsegna Tardiva', 'custom-rental-manager'); ?></h3>
+                    <table class="form-table">
+                        <tr>
+                            <th><?php _e('Giorno Extra dopo le 10:00', 'custom-rental-manager'); ?></th>
+                            <td>
+                                <label>
+                                    <input type="checkbox" name="misc_data[late_return_rule]" value="1" 
+                                           <?php checked($misc_data['late_return_rule'], true); ?> 
+                                           id="late_return_rule" />
+                                    <?php _e('Attiva regola giorno extra per riconsegna tardiva', 'custom-rental-manager'); ?>
+                                </label>
+                                <p class="description"><?php _e('Se attiva, riconsegne dopo le 10:00 comportano un giorno extra di noleggio', 'custom-rental-manager'); ?></p>
+                            </td>
+                        </tr>
+                        <tr class="late-return-time-row" style="<?php echo empty($misc_data['late_return_rule']) ? 'display: none;' : ''; ?>">
+                            <th><label for="late_return_time"><?php _e('Orario Limite Riconsegna', 'custom-rental-manager'); ?></label></th>
+                            <td>
+                                <select id="late_return_time" name="misc_data[late_return_time]">
+                                    <option value="09:00" <?php selected($misc_data['late_return_time'], '09:00'); ?>>09:00</option>
+                                    <option value="09:30" <?php selected($misc_data['late_return_time'], '09:30'); ?>>09:30</option>
+                                    <option value="10:00" <?php selected($misc_data['late_return_time'], '10:00'); ?>>10:00</option>
+                                    <option value="10:30" <?php selected($misc_data['late_return_time'], '10:30'); ?>>10:30</option>
+                                    <option value="11:00" <?php selected($misc_data['late_return_time'], '11:00'); ?>>11:00</option>
+                                    <option value="11:30" <?php selected($misc_data['late_return_time'], '11:30'); ?>>11:30</option>
+                                    <option value="12:00" <?php selected($misc_data['late_return_time'], '12:00'); ?>>12:00</option>
+                                </select>
+                                <p class="description"><?php _e('Riconsegne dopo questo orario comportano un giorno extra di noleggio', 'custom-rental-manager'); ?></p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <!-- Featured Vehicle -->
+                <div class="crcm-misc-section">
+                    <h3><?php _e('Veicolo in Evidenza', 'custom-rental-manager'); ?></h3>
+                    <table class="form-table">
+                        <tr>
+                            <th><?php _e('Metti in Evidenza', 'custom-rental-manager'); ?></th>
+                            <td>
+                                <label>
+                                    <input type="checkbox" name="misc_data[featured_vehicle]" value="1" 
+                                           <?php checked($misc_data['featured_vehicle'], true); ?> 
+                                           id="featured_vehicle" />
+                                    <?php _e('Mostra questo veicolo in prima posizione nei risultati di ricerca', 'custom-rental-manager'); ?>
+                                </label>
+                                <p class="description"><?php _e('I veicoli in evidenza appaiono per primi e con design speciale nelle ricerche', 'custom-rental-manager'); ?></p>
+                            </td>
+                        </tr>
+                        <tr class="featured-priority-row" style="<?php echo empty($misc_data['featured_vehicle']) ? 'display: none;' : ''; ?>">
+                            <th><label for="featured_priority"><?php _e('Priorità Evidenza', 'custom-rental-manager'); ?></label></th>
+                            <td>
+                                <input type="number" id="featured_priority" name="misc_data[featured_priority]" 
+                                       value="<?php echo esc_attr($misc_data['featured_priority']); ?>" 
+                                       min="0" max="100" />
+                                <p class="description"><?php _e('Più alto il numero, più priorità ha il veicolo (0-100). Veicoli con stessa priorità ruotano', 'custom-rental-manager'); ?></p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                
+            </div>
+        </div>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            // Toggle cancellation days visibility
+            $('#cancellation_enabled').on('change', function() {
+                if ($(this).is(':checked')) {
+                    $('.cancellation-days-row').show();
+                } else {
+                    $('.cancellation-days-row').hide();
+                }
+            });
+            
+            // Toggle late return time visibility
+            $('#late_return_rule').on('change', function() {
+                if ($(this).is(':checked')) {
+                    $('.late-return-time-row').show();
+                } else {
+                    $('.late-return-time-row').hide();
+                }
+            });
+            
+            // Toggle featured priority visibility
+            $('#featured_vehicle').on('change', function() {
+                if ($(this).is(':checked')) {
+                    $('.featured-priority-row').show();
+                } else {
+                    $('.featured-priority-row').hide();
+                }
+            });
+            
+            // Validate min/max rental days
+            $('#min_rental_days, #max_rental_days').on('change', function() {
+                const minDays = parseInt($('#min_rental_days').val()) || 1;
+                const maxDays = parseInt($('#max_rental_days').val()) || 30;
+                
+                if (minDays > maxDays) {
+                    alert('<?php _e('I giorni minimi non possono essere maggiori di quelli massimi', 'custom-rental-manager'); ?>');
+                    $('#max_rental_days').val(minDays);
+                }
+            });
+        });
+        </script>
+        
+        <style>
+        .crcm-misc-container {
+            padding: 15px;
+        }
+        
+        .crcm-misc-sections {
+            display: grid;
+            gap: 25px;
+        }
+        
+        .crcm-misc-section {
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid #ddd;
+        }
+        
+        .crcm-misc-section h3 {
+            margin: 0 0 15px 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 8px;
+        }
+        
+        .crcm-misc-section .form-table {
+            margin: 0;
+        }
+        
+        .crcm-misc-section .form-table th {
+            width: 200px;
+            padding: 10px 0;
+            font-weight: 600;
+        }
+        
+        .crcm-misc-section .form-table td {
+            padding: 10px 0;
+        }
+        
+        .crcm-misc-section input[type="number"],
+        .crcm-misc-section select {
+            width: 100px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .crcm-misc-section input[type="checkbox"] {
+            margin-right: 8px;
+        }
+        
+        .crcm-misc-section .description {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .crcm-misc-section label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        
+        /* Special styling for featured section */
+        .crcm-misc-section:last-child {
+            border-color: #f39c12;
+            background: linear-gradient(135deg, #fff9e6 0%, #fff 100%);
+        }
+        
+        .crcm-misc-section:last-child h3 {
+            color: #f39c12;
+            border-color: #f39c12;
+        }
+        </style>
+        <?php
     }
     
     /**
@@ -1294,7 +1553,7 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
-     * ENHANCED: Save vehicle meta data with new sections
+     * ENHANCED: Save vehicle meta data with all new sections
      */
     public function save_vehicle_meta($post_id) {
         // Verify nonce
@@ -1411,6 +1670,27 @@ class CRCM_Vehicle_Manager {
             
             update_post_meta($post_id, '_crcm_insurance_data', $insurance_data);
         }
+        
+        // SAVE MISC DATA
+        if (isset($_POST['misc_data'])) {
+            $misc_data = array();
+            
+            $misc_data['min_rental_days'] = intval($_POST['misc_data']['min_rental_days'] ?? 1);
+            $misc_data['max_rental_days'] = intval($_POST['misc_data']['max_rental_days'] ?? 30);
+            $misc_data['cancellation_enabled'] = isset($_POST['misc_data']['cancellation_enabled']) ? true : false;
+            $misc_data['cancellation_days'] = intval($_POST['misc_data']['cancellation_days'] ?? 5);
+            $misc_data['late_return_rule'] = isset($_POST['misc_data']['late_return_rule']) ? true : false;
+            $misc_data['late_return_time'] = sanitize_text_field($_POST['misc_data']['late_return_time'] ?? '10:00');
+            $misc_data['featured_vehicle'] = isset($_POST['misc_data']['featured_vehicle']) ? true : false;
+            $misc_data['featured_priority'] = intval($_POST['misc_data']['featured_priority'] ?? 0);
+            
+            // Validate min/max days
+            if ($misc_data['min_rental_days'] > $misc_data['max_rental_days']) {
+                $misc_data['max_rental_days'] = $misc_data['min_rental_days'];
+            }
+            
+            update_post_meta($post_id, '_crcm_misc_data', $misc_data);
+        }
     }
     
     /**
@@ -1513,6 +1793,29 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
+     * Get vehicle misc settings
+     */
+    public function get_vehicle_misc($vehicle_id) {
+        return get_post_meta($vehicle_id, '_crcm_misc_data', true) ?: array();
+    }
+    
+    /**
+     * Check if vehicle is featured
+     */
+    public function is_featured_vehicle($vehicle_id) {
+        $misc_data = $this->get_vehicle_misc($vehicle_id);
+        return isset($misc_data['featured_vehicle']) && $misc_data['featured_vehicle'];
+    }
+    
+    /**
+     * Get featured vehicle priority
+     */
+    public function get_featured_priority($vehicle_id) {
+        $misc_data = $this->get_vehicle_misc($vehicle_id);
+        return intval($misc_data['featured_priority'] ?? 0);
+    }
+    
+    /**
      * Custom columns for vehicle list
      */
     public function vehicle_columns($columns) {
@@ -1524,6 +1827,7 @@ class CRCM_Vehicle_Manager {
         $new_columns['crcm_specs'] = __('Specifications', 'custom-rental-manager');
         $new_columns['crcm_daily_rate'] = __('Daily Rate', 'custom-rental-manager');
         $new_columns['crcm_extras'] = __('Extras', 'custom-rental-manager');
+        $new_columns['crcm_featured'] = __('Featured', 'custom-rental-manager');
         $new_columns['crcm_availability'] = __('Available', 'custom-rental-manager');
         $new_columns['date'] = $columns['date'];
         
@@ -1537,6 +1841,7 @@ class CRCM_Vehicle_Manager {
         $vehicle_data = get_post_meta($post_id, '_crcm_vehicle_data', true);
         $pricing_data = get_post_meta($post_id, '_crcm_pricing_data', true);
         $extras_data = get_post_meta($post_id, '_crcm_extras_data', true);
+        $misc_data = get_post_meta($post_id, '_crcm_misc_data', true);
         
         switch ($column) {
             case 'crcm_image':
@@ -1591,6 +1896,18 @@ class CRCM_Vehicle_Manager {
                 }
                 break;
                 
+            case 'crcm_featured':
+                if (isset($misc_data['featured_vehicle']) && $misc_data['featured_vehicle']) {
+                    $priority = intval($misc_data['featured_priority'] ?? 0);
+                    echo '<span class="crcm-featured-badge">★ In Evidenza</span>';
+                    if ($priority > 0) {
+                        echo '<br><small>Priorità: ' . $priority . '</small>';
+                    }
+                } else {
+                    echo '<span class="crcm-not-featured">-</span>';
+                }
+                break;
+                
             case 'crcm_availability':
                 if ($vehicle_data && isset($vehicle_data['quantity'])) {
                     $available = intval($vehicle_data['quantity']);
@@ -1602,7 +1919,7 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
-     * AJAX search vehicles
+     * AJAX search vehicles with featured sorting
      */
     public function ajax_search_vehicles() {
         check_ajax_referer('crcm_nonce', 'nonce');
@@ -1621,7 +1938,7 @@ class CRCM_Vehicle_Manager {
     }
     
     /**
-     * Search available vehicles
+     * Search available vehicles with featured priority
      */
     public function search_available_vehicles($pickup_date, $return_date, $vehicle_type = '') {
         $args = array(
@@ -1645,6 +1962,7 @@ class CRCM_Vehicle_Manager {
             $pricing_data = get_post_meta($vehicle->ID, '_crcm_pricing_data', true);
             $extras_data = get_post_meta($vehicle->ID, '_crcm_extras_data', true);
             $insurance_data = get_post_meta($vehicle->ID, '_crcm_insurance_data', true);
+            $misc_data = get_post_meta($vehicle->ID, '_crcm_misc_data', true);
             
             $available_vehicles[] = array(
                 'id' => $vehicle->ID,
@@ -1656,10 +1974,38 @@ class CRCM_Vehicle_Manager {
                 'specs' => $vehicle_data,
                 'extras' => $extras_data ?: array(),
                 'insurance' => $insurance_data ?: array(),
+                'misc' => $misc_data ?: array(),
                 'available_quantity' => $available_quantity,
                 'is_available' => $available_quantity > 0,
+                'is_featured' => isset($misc_data['featured_vehicle']) && $misc_data['featured_vehicle'],
+                'featured_priority' => intval($misc_data['featured_priority'] ?? 0),
             );
         }
+        
+        // Sort by featured status and priority
+        usort($available_vehicles, function($a, $b) {
+            // Featured vehicles first
+            if ($a['is_featured'] && !$b['is_featured']) return -1;
+            if (!$a['is_featured'] && $b['is_featured']) return 1;
+            
+            // If both featured, sort by priority (higher first)
+            if ($a['is_featured'] && $b['is_featured']) {
+                if ($a['featured_priority'] !== $b['featured_priority']) {
+                    return $b['featured_priority'] - $a['featured_priority'];
+                }
+                
+                // Same priority: rotate by using current time hash
+                $time_hash = (int)(time() / 86400); // Changes daily
+                return ($time_hash + $a['id']) % 2 === 0 ? -1 : 1;
+            }
+            
+            // Both not featured: sort by availability then price
+            if ($a['available_quantity'] !== $b['available_quantity']) {
+                return $b['available_quantity'] - $a['available_quantity'];
+            }
+            
+            return $a['daily_rate'] - $b['daily_rate'];
+        });
         
         return $available_vehicles;
     }
@@ -1699,6 +2045,19 @@ add_action('admin_head', function() {
     .crcm-no-extras {
         color: #999;
         font-style: italic;
+    }
+    
+    .crcm-featured-badge {
+        background: #f39c12;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    
+    .crcm-not-featured {
+        color: #999;
     }
     </style>
     <?php
