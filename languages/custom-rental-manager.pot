@@ -1,0 +1,83 @@
+# Custom Rental Car Manager - Translation Template
+# Copyright (C) 2024 Totaliweb
+# This file is distributed under the same license as Custom Rental Car Manager.
+msgid ""
+msgstr ""
+"Project-Id-Version: Custom Rental Car Manager 1.0.0\n"
+"Report-Msgid-Bugs-To: info@totaliweb.com\n"
+"POT-Creation-Date: 2024-12-01 12:00+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: custom-rental-car-manager.php:123
+msgid "Vehicles"
+msgstr ""
+
+#: custom-rental-car-manager.php:124
+msgid "Vehicle"
+msgstr ""
+
+#: custom-rental-car-manager.php:125
+msgid "Add New Vehicle"
+msgstr ""
+
+#: custom-rental-car-manager.php:139
+msgid "Bookings"
+msgstr ""
+
+#: custom-rental-car-manager.php:140
+msgid "Booking"
+msgstr ""
+
+#: custom-rental-car-manager.php:141
+msgid "Add New Booking"
+msgstr ""
+
+#: templates/admin/dashboard.php:15
+msgid "Rental Manager Dashboard"
+msgstr ""
+
+#: templates/admin/dashboard.php:28
+msgid "Total Vehicles"
+msgstr ""
+
+#: templates/admin/dashboard.php:38
+msgid "Total Bookings"
+msgstr ""
+
+#: templates/admin/dashboard.php:48
+msgid "This Month Revenue"
+msgstr ""
+
+#: templates/admin/dashboard.php:58
+msgid "Active Rentals"
+msgstr ""
+
+#: templates/frontend/search-form.php:18
+msgid "Find Your Perfect Rental"
+msgstr ""
+
+#: templates/frontend/search-form.php:19
+msgid "Search available vehicles for your dates"
+msgstr ""
+
+#: templates/frontend/search-form.php:24
+msgid "Pickup Date"
+msgstr ""
+
+#: templates/frontend/search-form.php:29
+msgid "Return Date"
+msgstr ""
+
+#: templates/frontend/vehicle-list.php:85
+msgid "Book Now"
+msgstr ""
+
+#: templates/frontend/vehicle-list.php:88
+msgid "View Details"
+msgstr ""
