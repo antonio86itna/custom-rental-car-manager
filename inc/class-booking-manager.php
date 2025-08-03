@@ -1,8 +1,9 @@
 <?php
 /**
- * Booking Manager Class - UPDATED WITH NEW LOCATIONS
+ * Booking Manager Class - COMPLETE SYNCHRONIZATION & USER ROLES
  * 
- * Updated with the two specific locations for Costabilerent.
+ * Full integration with vehicle data, dynamic pricing, availability, extras,
+ * insurance, and complete user role management.
  * 
  * @package CustomRentalCarManager
  * @author Totaliweb
@@ -16,40 +17,99 @@ if (!defined('ABSPATH')) {
 class CRCM_Booking_Manager {
     
     /**
-     * Predefined locations for Costabilerent
-     */
-    private $locations = array(
-        'ischia_porto' => array(
-            'name' => 'Ischia Porto',
-            'address' => 'Via Iasolino 94, Ischia',
-            'short_name' => 'Ischia Porto'
-        ),
-        'forio' => array(
-            'name' => 'Forio',
-            'address' => 'Via Filippo di Lustro 19, Forio',
-            'short_name' => 'Forio'
-        )
-    );
-    
-    /**
      * Constructor
      */
     public function __construct() {
+        add_action('init', array($this, 'ensure_user_roles'));
         add_action('add_meta_boxes', array($this, 'add_meta_boxes'));
         add_action('save_post', array($this, 'save_booking_meta'));
-        add_action('wp_ajax_crcm_create_booking', array($this, 'ajax_create_booking'));
-        add_action('wp_ajax_nopriv_crcm_create_booking', array($this, 'ajax_create_booking'));
-        add_action('wp_ajax_crcm_cancel_booking', array($this, 'ajax_cancel_booking'));
-        add_action('wp_ajax_crcm_get_booking_details', array($this, 'ajax_get_booking_details'));
+        
+        // AJAX handlers for dynamic booking creation
+        add_action('wp_ajax_crcm_get_vehicle_booking_data', array($this, 'ajax_get_vehicle_booking_data'));
+        add_action('wp_ajax_crcm_calculate_booking_total', array($this, 'ajax_calculate_booking_total'));
+        add_action('wp_ajax_crcm_check_vehicle_availability', array($this, 'ajax_check_vehicle_availability'));
+        add_action('wp_ajax_crcm_search_customers', array($this, 'ajax_search_customers'));
+        
+        // User management
+        add_action('user_register', array($this, 'assign_default_customer_role'));
+        add_filter('manage_users_columns', array($this, 'add_user_role_column'));
+        add_action('manage_users_custom_column', array($this, 'show_user_role_column'), 10, 3);
+        
+        // Booking columns
         add_filter('manage_crcm_booking_posts_columns', array($this, 'booking_columns'));
         add_action('manage_crcm_booking_posts_custom_column', array($this, 'booking_column_content'), 10, 2);
-        add_action('post_submitbox_misc_actions', array($this, 'booking_status_metabox'));
         
-        // Status change hooks
-        add_action('transition_post_status', array($this, 'on_booking_status_change'), 10, 3);
+        // Admin styles
+        add_action('admin_head', array($this, 'admin_booking_styles'));
+    }
+    
+    /**
+     * Ensure custom user roles exist and are properly configured
+     */
+    public function ensure_user_roles() {
+        // Remove roles first to ensure clean setup
+        remove_role('crcm_customer');
+        remove_role('crcm_manager');
         
-        // Customer auto-registration hooks
-        add_action('crcm_booking_created', array($this, 'auto_register_customer'), 10, 2);
+        // Create Customer role with specific capabilities
+        add_role('crcm_customer', __('Rental Customer', 'custom-rental-manager'), array(
+            'read' => true,
+            'crcm_view_own_bookings' => true,
+            'crcm_edit_own_profile' => true,
+            'crcm_cancel_bookings' => true,
+        ));
+        
+        // Create Manager role with comprehensive capabilities
+        add_role('crcm_manager', __('Rental Manager', 'custom-rental-manager'), array(
+            'read' => true,
+            'edit_posts' => true,
+            'edit_others_posts' => true,
+            'publish_posts' => true,
+            'delete_posts' => true,
+            'delete_others_posts' => true,
+            'manage_categories' => true,
+            'upload_files' => true,
+            
+            // Vehicle management
+            'crcm_manage_vehicles' => true,
+            'crcm_edit_vehicles' => true,
+            'crcm_delete_vehicles' => true,
+            'crcm_publish_vehicles' => true,
+            
+            // Booking management
+            'crcm_manage_bookings' => true,
+            'crcm_edit_bookings' => true,
+            'crcm_delete_bookings' => true,
+            'crcm_publish_bookings' => true,
+            'crcm_view_all_bookings' => true,
+            
+            // Customer management
+            'crcm_manage_customers' => true,
+            'crcm_view_customer_data' => true,
+            'crcm_edit_customer_profiles' => true,
+            
+            // Reports and analytics
+            'crcm_view_reports' => true,
+            'crcm_export_data' => true,
+        ));
+        
+        // Add capabilities to administrator
+        $admin = get_role('administrator');
+        if ($admin) {
+            $capabilities = array(
+                'crcm_manage_vehicles', 'crcm_edit_vehicles', 'crcm_delete_vehicles', 'crcm_publish_vehicles',
+                'crcm_manage_bookings', 'crcm_edit_bookings', 'crcm_delete_bookings', 'crcm_publish_bookings',
+                'crcm_view_all_bookings', 'crcm_manage_customers', 'crcm_view_customer_data',
+                'crcm_edit_customer_profiles', 'crcm_view_reports', 'crcm_export_data'
+            );
+            
+            foreach ($capabilities as $cap) {
+                $admin->add_cap($cap);
+            }
+        }
+        
+        // Ensure roles are properly registered
+        wp_roles()->reinit();
     }
     
     /**
@@ -58,7 +118,7 @@ class CRCM_Booking_Manager {
     public function add_meta_boxes() {
         add_meta_box(
             'crcm_booking_details',
-            __('Booking Details', 'custom-rental-manager'),
+            '🎯 ' . __('Booking Details', 'custom-rental-manager'),
             array($this, 'booking_details_meta_box'),
             'crcm_booking',
             'normal',
@@ -66,27 +126,36 @@ class CRCM_Booking_Manager {
         );
         
         add_meta_box(
-            'crcm_customer_selection',
-            __('Customer Selection', 'custom-rental-manager'),
-            array($this, 'customer_selection_meta_box'),
+            'crcm_booking_customer',
+            '👤 ' . __('Customer Information', 'custom-rental-manager'),
+            array($this, 'customer_meta_box'),
             'crcm_booking',
             'normal',
             'high'
         );
         
         add_meta_box(
-            'crcm_customer_details',
-            __('Customer Information', 'custom-rental-manager'),
-            array($this, 'customer_details_meta_box'),
+            'crcm_booking_vehicle',
+            '🚗 ' . __('Vehicle Selection', 'custom-rental-manager'),
+            array($this, 'vehicle_selection_meta_box'),
             'crcm_booking',
             'normal',
-            'high'
+            'default'
         );
         
         add_meta_box(
-            'crcm_payment_details',
-            __('Payment Information', 'custom-rental-manager'),
-            array($this, 'payment_details_meta_box'),
+            'crcm_booking_pricing',
+            '💰 ' . __('Pricing & Extras', 'custom-rental-manager'),
+            array($this, 'pricing_meta_box'),
+            'crcm_booking',
+            'normal',
+            'default'
+        );
+        
+        add_meta_box(
+            'crcm_booking_status',
+            '📊 ' . __('Booking Status', 'custom-rental-manager'),
+            array($this, 'status_meta_box'),
             'crcm_booking',
             'side',
             'high'
@@ -94,8 +163,8 @@ class CRCM_Booking_Manager {
         
         add_meta_box(
             'crcm_booking_notes',
-            __('Booking Notes', 'custom-rental-manager'),
-            array($this, 'booking_notes_meta_box'),
+            '📝 ' . __('Notes & Comments', 'custom-rental-manager'),
+            array($this, 'notes_meta_box'),
             'crcm_booking',
             'side',
             'default'
@@ -103,178 +172,331 @@ class CRCM_Booking_Manager {
     }
     
     /**
-     * Booking details meta box
+     * Main booking details meta box with dynamic synchronization
      */
     public function booking_details_meta_box($post) {
         wp_nonce_field('crcm_booking_meta_nonce', 'crcm_booking_meta_nonce_field');
         
         $booking_data = get_post_meta($post->ID, '_crcm_booking_data', true);
-        $booking_number = get_post_meta($post->ID, '_crcm_booking_number', true);
         
         // Default values
         if (empty($booking_data)) {
             $booking_data = array(
-                'vehicle_id' => '',
-                'pickup_date' => '',
-                'return_date' => '',
+                'pickup_date' => date('Y-m-d'),
+                'return_date' => date('Y-m-d', strtotime('+1 day')),
                 'pickup_time' => '09:00',
                 'return_time' => '18:00',
-                'pickup_location' => '',
-                'return_location' => '',
-                'home_delivery' => false,
-                'delivery_address' => '',
-                'extras' => array(),
-                'special_requests' => '',
+                'pickup_location' => 'ischia_porto',
+                'return_location' => 'ischia_porto',
+                'rental_days' => 1,
             );
         }
         
-        // Get available vehicles
-        $vehicles = get_posts(array(
-            'post_type' => 'crcm_vehicle',
-            'post_status' => 'publish',
-            'posts_per_page' => -1,
-            'orderby' => 'title',
-            'order' => 'ASC',
-        ));
+        // Get available locations from vehicle manager
+        if (class_exists('CRCM_Vehicle_Manager')) {
+            $vehicle_manager = new CRCM_Vehicle_Manager();
+            $locations = $vehicle_manager->get_locations();
+        } else {
+            $locations = array(
+                'ischia_porto' => array('name' => 'Ischia Porto', 'address' => 'Via Iasolino 94, Ischia'),
+                'forio' => array('name' => 'Forio', 'address' => 'Via Filippo di Lustro 19, Forio')
+            );
+        }
         ?>
         
-        <table class="form-table">
-            <tr>
-                <th><label for="booking_number"><?php _e('Booking Number', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="text" id="booking_number" value="<?php echo esc_attr($booking_number); ?>" readonly />
-                    <p class="description"><?php _e('Automatically generated unique booking number', 'custom-rental-manager'); ?></p>
-                </td>
-            </tr>
+        <div class="crcm-booking-details-container">
+            <div class="crcm-section-header">
+                <h4><?php _e('Dettagli Prenotazione', 'custom-rental-manager'); ?></h4>
+                <p class="description"><?php _e('Configura date, orari e luoghi per la prenotazione', 'custom-rental-manager'); ?></p>
+            </div>
             
-            <tr>
-                <th><label for="vehicle_id"><?php _e('Vehicle', 'custom-rental-manager'); ?> *</label></th>
-                <td>
-                    <select id="vehicle_id" name="booking_data[vehicle_id]" required>
-                        <option value=""><?php _e('Select Vehicle', 'custom-rental-manager'); ?></option>
-                        <?php foreach ($vehicles as $vehicle): 
-                            $vehicle_data = get_post_meta($vehicle->ID, '_crcm_vehicle_data', true);
-                            $vehicle_type = isset($vehicle_data['vehicle_type']) ? $vehicle_data['vehicle_type'] : 'auto';
-                            $type_label = $vehicle_type === 'auto' ? 'Auto' : 'Scooter';
-                        ?>
-                            <option value="<?php echo $vehicle->ID; ?>" <?php selected($booking_data['vehicle_id'], $vehicle->ID); ?>>
-                                [<?php echo $type_label; ?>] <?php echo esc_html($vehicle->post_title); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="pickup_date"><?php _e('Pickup Date', 'custom-rental-manager'); ?> *</label></th>
-                <td>
-                    <input type="date" id="pickup_date" name="booking_data[pickup_date]" 
-                           value="<?php echo esc_attr($booking_data['pickup_date']); ?>" required />
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="return_date"><?php _e('Return Date', 'custom-rental-manager'); ?> *</label></th>
-                <td>
-                    <input type="date" id="return_date" name="booking_data[return_date]" 
-                           value="<?php echo esc_attr($booking_data['return_date']); ?>" required />
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="pickup_time"><?php _e('Pickup Time', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <select id="pickup_time" name="booking_data[pickup_time]">
-                        <?php for ($h = 8; $h <= 19; $h++): 
-                            $time = sprintf('%02d:00', $h);
-                        ?>
-                            <option value="<?php echo $time; ?>" <?php selected($booking_data['pickup_time'], $time); ?>>
-                                <?php echo $time; ?>
-                            </option>
-                        <?php endfor; ?>
-                    </select>
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="return_time"><?php _e('Return Time', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <select id="return_time" name="booking_data[return_time]">
-                        <?php for ($h = 8; $h <= 19; $h++): 
-                            $time = sprintf('%02d:00', $h);
-                        ?>
-                            <option value="<?php echo $time; ?>" <?php selected($booking_data['return_time'], $time); ?>>
-                                <?php echo $time; ?>
-                            </option>
-                        <?php endfor; ?>
-                    </select>
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="pickup_location"><?php _e('Pickup Location', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <select id="pickup_location" name="booking_data[pickup_location]">
-                        <option value=""><?php _e('Select Location', 'custom-rental-manager'); ?></option>
-                        <?php foreach ($this->locations as $key => $location): ?>
-                            <option value="<?php echo $key; ?>" <?php selected($booking_data['pickup_location'], $key); ?>>
-                                <?php echo esc_html($location['name']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <p class="description">
-                        <?php foreach ($this->locations as $key => $location): ?>
-                            <small><strong><?php echo esc_html($location['name']); ?>:</strong> <?php echo esc_html($location['address']); ?></small><br>
-                        <?php endforeach; ?>
-                    </p>
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="return_location"><?php _e('Return Location', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <select id="return_location" name="booking_data[return_location]">
-                        <option value=""><?php _e('Same as pickup', 'custom-rental-manager'); ?></option>
-                        <?php foreach ($this->locations as $key => $location): ?>
-                            <option value="<?php echo $key; ?>" <?php selected($booking_data['return_location'], $key); ?>>
-                                <?php echo esc_html($location['name']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="home_delivery"><?php _e('Home Delivery', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="checkbox" id="home_delivery" name="booking_data[home_delivery]" value="1" 
-                           <?php checked($booking_data['home_delivery'], 1); ?> />
-                    <label for="home_delivery"><?php _e('Enable home delivery service', 'custom-rental-manager'); ?></label>
-                </td>
-            </tr>
-            
-            <tr class="delivery-address-row" style="<?php echo empty($booking_data['home_delivery']) ? 'display: none;' : ''; ?>">
-                <th><label for="delivery_address"><?php _e('Delivery Address', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <textarea id="delivery_address" name="booking_data[delivery_address]" rows="3" cols="50"><?php echo esc_textarea($booking_data['delivery_address']); ?></textarea>
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="special_requests"><?php _e('Special Requests', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <textarea id="special_requests" name="booking_data[special_requests]" rows="3" cols="50"><?php echo esc_textarea($booking_data['special_requests']); ?></textarea>
-                </td>
-            </tr>
-        </table>
+            <table class="form-table">
+                <tr>
+                    <th><label for="pickup_date"><?php _e('Data Ritiro', 'custom-rental-manager'); ?> *</label></th>
+                    <td>
+                        <input type="date" id="pickup_date" name="booking_data[pickup_date]" 
+                               value="<?php echo esc_attr($booking_data['pickup_date']); ?>" 
+                               min="<?php echo date('Y-m-d'); ?>" required class="crcm-date-field" />
+                    </td>
+                </tr>
+                
+                <tr>
+                    <th><label for="return_date"><?php _e('Data Riconsegna', 'custom-rental-manager'); ?> *</label></th>
+                    <td>
+                        <input type="date" id="return_date" name="booking_data[return_date]" 
+                               value="<?php echo esc_attr($booking_data['return_date']); ?>" 
+                               min="<?php echo date('Y-m-d'); ?>" required class="crcm-date-field" />
+                        <p class="description" id="rental-days-display">
+                            <?php printf(__('Giorni di noleggio: %d', 'custom-rental-manager'), $booking_data['rental_days'] ?? 1); ?>
+                        </p>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <th><label for="pickup_time"><?php _e('Orario Ritiro', 'custom-rental-manager'); ?></label></th>
+                    <td>
+                        <select id="pickup_time" name="booking_data[pickup_time]">
+                            <?php for ($h = 8; $h <= 20; $h++): ?>
+                                <?php for ($m = 0; $m < 60; $m += 30): ?>
+                                    <?php $time = sprintf('%02d:%02d', $h, $m); ?>
+                                    <option value="<?php echo $time; ?>" <?php selected($booking_data['pickup_time'] ?? '09:00', $time); ?>>
+                                        <?php echo $time; ?>
+                                    </option>
+                                <?php endfor; ?>
+                            <?php endfor; ?>
+                        </select>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <th><label for="return_time"><?php _e('Orario Riconsegna', 'custom-rental-manager'); ?></label></th>
+                    <td>
+                        <select id="return_time" name="booking_data[return_time]">
+                            <?php for ($h = 8; $h <= 20; $h++): ?>
+                                <?php for ($m = 0; $m < 60; $m += 30): ?>
+                                    <?php $time = sprintf('%02d:%02d', $h, $m); ?>
+                                    <option value="<?php echo $time; ?>" <?php selected($booking_data['return_time'] ?? '18:00', $time); ?>>
+                                        <?php echo $time; ?>
+                                    </option>
+                                <?php endfor; ?>
+                            <?php endfor; ?>
+                        </select>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <th><label for="pickup_location"><?php _e('Luogo Ritiro', 'custom-rental-manager'); ?> *</label></th>
+                    <td>
+                        <select id="pickup_location" name="booking_data[pickup_location]" required>
+                            <?php foreach ($locations as $key => $location): ?>
+                                <option value="<?php echo esc_attr($key); ?>" <?php selected($booking_data['pickup_location'] ?? '', $key); ?>>
+                                    <?php echo esc_html($location['name']); ?> - <?php echo esc_html($location['address']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <th><label for="return_location"><?php _e('Luogo Riconsegna', 'custom-rental-manager'); ?> *</label></th>
+                    <td>
+                        <select id="return_location" name="booking_data[return_location]" required>
+                            <?php foreach ($locations as $key => $location): ?>
+                                <option value="<?php echo esc_attr($key); ?>" <?php selected($booking_data['return_location'] ?? '', $key); ?>>
+                                    <?php echo esc_html($location['name']); ?> - <?php echo esc_html($location['address']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </td>
+                </tr>
+            </table>
+        </div>
         
         <script>
         jQuery(document).ready(function($) {
-            $('#home_delivery').on('change', function() {
-                if ($(this).is(':checked')) {
-                    $('.delivery-address-row').show();
-                } else {
-                    $('.delivery-address-row').hide();
+            // Calculate rental days automatically
+            function calculateRentalDays() {
+                const pickupDate = new Date($('#pickup_date').val());
+                const returnDate = new Date($('#return_date').val());
+                
+                if (pickupDate && returnDate && returnDate > pickupDate) {
+                    const timeDiff = returnDate.getTime() - pickupDate.getTime();
+                    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+                    
+                    $('#rental-days-display').text('Giorni di noleggio: ' + daysDiff);
+                    $('input[name="booking_data[rental_days]"]').val(daysDiff);
+                    
+                    // Trigger pricing recalculation
+                    $(document).trigger('booking_dates_changed', [daysDiff]);
+                    
+                    return daysDiff;
+                }
+                return 1;
+            }
+            
+            // Set minimum return date based on pickup date
+            $('#pickup_date').on('change', function() {
+                const pickupDate = $(this).val();
+                const nextDay = new Date(pickupDate);
+                nextDay.setDate(nextDay.getDate() + 1);
+                
+                $('#return_date').attr('min', nextDay.toISOString().split('T')[0]);
+                
+                // Auto-adjust return date if it's now invalid
+                if ($('#return_date').val() <= pickupDate) {
+                    $('#return_date').val(nextDay.toISOString().split('T')[0]);
+                }
+                
+                calculateRentalDays();
+            });
+            
+            $('#return_date').on('change', calculateRentalDays);
+            
+            // Initial calculation
+            calculateRentalDays();
+        });
+        </script>
+        
+        <!-- Hidden field for rental days -->
+        <input type="hidden" name="booking_data[rental_days]" value="<?php echo esc_attr($booking_data['rental_days'] ?? 1); ?>" />
+        <?php
+    }
+    
+    /**
+     * Customer selection meta box with dynamic search
+     */
+    public function customer_meta_box($post) {
+        $booking_data = get_post_meta($post->ID, '_crcm_booking_data', true);
+        $selected_customer_id = $booking_data['customer_id'] ?? '';
+        
+        // Get selected customer info
+        $selected_customer = null;
+        if ($selected_customer_id) {
+            $selected_customer = get_user_by('ID', $selected_customer_id);
+        }
+        ?>
+        
+        <div class="crcm-customer-container">
+            <div class="crcm-section-header">
+                <h4><?php _e('Selezione Cliente', 'custom-rental-manager'); ?></h4>
+                <p class="description"><?php _e('Cerca e seleziona il cliente per questa prenotazione', 'custom-rental-manager'); ?></p>
+            </div>
+            
+            <table class="form-table">
+                <tr>
+                    <th><label for="customer_search"><?php _e('Cerca Cliente', 'custom-rental-manager'); ?> *</label></th>
+                    <td>
+                        <div class="crcm-customer-search-container">
+                            <input type="text" id="customer_search" placeholder="<?php _e('Digita nome, email o telefono del cliente...', 'custom-rental-manager'); ?>" 
+                                   class="widefat" />
+                            <div id="customer_search_results" class="crcm-search-results"></div>
+                        </div>
+                        
+                        <div id="selected_customer_info" class="crcm-selected-customer" <?php echo $selected_customer ? '' : 'style="display: none;"'; ?>>
+                            <?php if ($selected_customer): ?>
+                                <div class="customer-card">
+                                    <h4><?php echo esc_html($selected_customer->display_name); ?></h4>
+                                    <p><strong>Email:</strong> <?php echo esc_html($selected_customer->user_email); ?></p>
+                                    <p><strong>Ruolo:</strong> <?php echo esc_html(ucfirst(reset($selected_customer->roles))); ?></p>
+                                    <?php
+                                    $phone = get_user_meta($selected_customer->ID, 'phone', true);
+                                    if ($phone): ?>
+                                        <p><strong>Telefono:</strong> <?php echo esc_html($phone); ?></p>
+                                    <?php endif; ?>
+                                    <button type="button" class="button button-secondary" id="change_customer">
+                                        <?php _e('Cambia Cliente', 'custom-rental-manager'); ?>
+                                    </button>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <input type="hidden" id="selected_customer_id" name="booking_data[customer_id]" 
+                               value="<?php echo esc_attr($selected_customer_id); ?>" required />
+                        
+                        <p class="description">
+                            <?php _e('Solo utenti con ruolo "Rental Customer" possono essere selezionati', 'custom-rental-manager'); ?>
+                            <br>
+                            <a href="<?php echo admin_url('user-new.php'); ?>" target="_blank">
+                                <?php _e('Crea nuovo cliente →', 'custom-rental-manager'); ?>
+                            </a>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            let searchTimeout;
+            
+            $('#customer_search').on('input', function() {
+                const query = $(this).val();
+                const $results = $('#customer_search_results');
+                
+                clearTimeout(searchTimeout);
+                
+                if (query.length < 2) {
+                    $results.empty().hide();
+                    return;
+                }
+                
+                searchTimeout = setTimeout(function() {
+                    $results.html('<div class="crcm-loading">Ricerca in corso...</div>').show();
+                    
+                    $.ajax({
+                        url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                        type: 'POST',
+                        data: {
+                            action: 'crcm_search_customers',
+                            query: query,
+                            nonce: '<?php echo wp_create_nonce('crcm_admin_nonce'); ?>'
+                        },
+                        success: function(response) {
+                            if (response.success && response.data.length > 0) {
+                                let html = '<div class="crcm-customer-results">';
+                                response.data.forEach(function(customer) {
+                                    html += `
+                                        <div class="customer-result" data-customer-id="${customer.ID}">
+                                            <div class="customer-info">
+                                                <strong>${customer.display_name}</strong>
+                                                <span class="customer-email">${customer.user_email}</span>
+                                                ${customer.phone ? `<span class="customer-phone">${customer.phone}</span>` : ''}
+                                            </div>
+                                            <button type="button" class="button button-small select-customer">Seleziona</button>
+                                        </div>
+                                    `;
+                                });
+                                html += '</div>';
+                                $results.html(html);
+                            } else {
+                                $results.html('<div class="no-results">Nessun cliente trovato</div>');
+                            }
+                        },
+                        error: function() {
+                            $results.html('<div class="error">Errore nella ricerca</div>');
+                        }
+                    });
+                }, 300);
+            });
+            
+            // Select customer
+            $(document).on('click', '.select-customer', function() {
+                const $result = $(this).closest('.customer-result');
+                const customerId = $result.data('customer-id');
+                const customerName = $result.find('strong').text();
+                const customerEmail = $result.find('.customer-email').text();
+                const customerPhone = $result.find('.customer-phone').text();
+                
+                $('#selected_customer_id').val(customerId);
+                $('#customer_search').val('');
+                $('#customer_search_results').empty().hide();
+                
+                let customerCardHtml = `
+                    <div class="customer-card">
+                        <h4>${customerName}</h4>
+                        <p><strong>Email:</strong> ${customerEmail}</p>
+                        <p><strong>Ruolo:</strong> Rental Customer</p>
+                        ${customerPhone ? `<p><strong>Telefono:</strong> ${customerPhone}</p>` : ''}
+                        <button type="button" class="button button-secondary" id="change_customer">
+                            Cambia Cliente
+                        </button>
+                    </div>
+                `;
+                
+                $('#selected_customer_info').html(customerCardHtml).show();
+            });
+            
+            // Change customer
+            $(document).on('click', '#change_customer', function() {
+                $('#selected_customer_id').val('');
+                $('#selected_customer_info').hide();
+                $('#customer_search').focus();
+            });
+            
+            // Hide results when clicking outside
+            $(document).on('click', function(e) {
+                if (!$(e.target).closest('.crcm-customer-search-container').length) {
+                    $('#customer_search_results').hide();
                 }
             });
         });
@@ -283,344 +505,664 @@ class CRCM_Booking_Manager {
     }
     
     /**
-     * Customer selection meta box - Only show rental customers
+     * Vehicle selection meta box with dynamic data loading
      */
-    public function customer_selection_meta_box($post) {
-        $selected_customer_id = get_post_meta($post->ID, '_crcm_customer_user_id', true);
+    public function vehicle_selection_meta_box($post) {
+        $booking_data = get_post_meta($post->ID, '_crcm_booking_data', true);
+        $selected_vehicle_id = $booking_data['vehicle_id'] ?? '';
         
-        // Get all users with crcm_customer role
-        $customers = get_users(array(
-            'role' => 'crcm_customer',
-            'orderby' => 'display_name',
-            'order' => 'ASC',
+        // Get available vehicles
+        $vehicles = get_posts(array(
+            'post_type' => 'crcm_vehicle',
+            'post_status' => 'publish',
+            'posts_per_page' => -1,
+            'orderby' => 'title',
+            'order' => 'ASC'
         ));
         ?>
         
-        <table class="form-table">
-            <tr>
-                <th><label for="customer_user_id"><?php _e('Select Customer', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <select id="customer_user_id" name="customer_user_id" style="width: 100%; max-width: 400px;">
-                        <option value=""><?php _e('Select existing customer or create new below', 'custom-rental-manager'); ?></option>
-                        <?php foreach ($customers as $customer): ?>
-                            <option value="<?php echo $customer->ID; ?>" <?php selected($selected_customer_id, $customer->ID); ?>>
-                                <?php echo esc_html($customer->display_name . ' (' . $customer->user_email . ')'); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <p class="description">
-                        <?php _e('Select an existing customer or leave empty to create a new customer account from the information below.', 'custom-rental-manager'); ?>
-                    </p>
-                </td>
-            </tr>
-        </table>
-        
-        <style>
-        #customer_user_id {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        </style>
-        <?php
-    }
-    
-    /**
-     * Customer details meta box
-     */
-    public function customer_details_meta_box($post) {
-        $customer_data = get_post_meta($post->ID, '_crcm_customer_data', true);
-        
-        // Default values
-        if (empty($customer_data)) {
-            $customer_data = array(
-                'first_name' => '',
-                'last_name' => '',
-                'email' => '',
-                'phone' => '',
-                'date_of_birth' => '',
-                'address' => '',
-                'city' => '',
-                'postal_code' => '',
-                'country' => 'IT',
-                'license_number' => '',
-                'license_expiry' => '',
-                'emergency_contact' => '',
-                'emergency_phone' => '',
-            );
-        }
-        ?>
-        
-        <table class="form-table">
-            <tr>
-                <th><label for="first_name"><?php _e('First Name', 'custom-rental-manager'); ?> *</label></th>
-                <td>
-                    <input type="text" id="first_name" name="customer_data[first_name]" 
-                           value="<?php echo esc_attr($customer_data['first_name']); ?>" required />
-                </td>
-            </tr>
+        <div class="crcm-vehicle-selection-container">
+            <div class="crcm-section-header">
+                <h4><?php _e('Selezione Veicolo', 'custom-rental-manager'); ?></h4>
+                <p class="description"><?php _e('Seleziona il veicolo per questa prenotazione. I dati verranno caricati dinamicamente.', 'custom-rental-manager'); ?></p>
+            </div>
             
-            <tr>
-                <th><label for="last_name"><?php _e('Last Name', 'custom-rental-manager'); ?> *</label></th>
-                <td>
-                    <input type="text" id="last_name" name="customer_data[last_name]" 
-                           value="<?php echo esc_attr($customer_data['last_name']); ?>" required />
-                </td>
-            </tr>
+            <table class="form-table">
+                <tr>
+                    <th><label for="vehicle_id"><?php _e('Veicolo', 'custom-rental-manager'); ?> *</label></th>
+                    <td>
+                        <select id="vehicle_id" name="booking_data[vehicle_id]" required class="widefat">
+                            <option value=""><?php _e('Seleziona un veicolo...', 'custom-rental-manager'); ?></option>
+                            <?php foreach ($vehicles as $vehicle): ?>
+                                <?php
+                                $vehicle_data = get_post_meta($vehicle->ID, '_crcm_vehicle_data', true);
+                                $pricing_data = get_post_meta($vehicle->ID, '_crcm_pricing_data', true);
+                                $vehicle_type = $vehicle_data['vehicle_type'] ?? 'auto';
+                                $daily_rate = $pricing_data['daily_rate'] ?? 0;
+                                ?>
+                                <option value="<?php echo $vehicle->ID; ?>" 
+                                        data-type="<?php echo esc_attr($vehicle_type); ?>"
+                                        data-rate="<?php echo esc_attr($daily_rate); ?>"
+                                        <?php selected($selected_vehicle_id, $vehicle->ID); ?>>
+                                    <?php echo esc_html($vehicle->post_title); ?> 
+                                    (<?php echo ucfirst($vehicle_type); ?> - €<?php echo number_format($daily_rate, 2); ?>/giorno)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </td>
+                </tr>
+            </table>
             
-            <tr>
-                <th><label for="email"><?php _e('Email', 'custom-rental-manager'); ?> *</label></th>
-                <td>
-                    <input type="email" id="email" name="customer_data[email]" 
-                           value="<?php echo esc_attr($customer_data['email']); ?>" required />
-                    <p class="description"><?php _e('Will be used for customer account creation if no existing customer is selected', 'custom-rental-manager'); ?></p>
-                </td>
-            </tr>
+            <!-- Vehicle Details Display -->
+            <div id="vehicle_details_display" class="crcm-vehicle-details" style="<?php echo $selected_vehicle_id ? '' : 'display: none;'; ?>">
+                <div class="crcm-section-header">
+                    <h4><?php _e('Dettagli Veicolo Selezionato', 'custom-rental-manager'); ?></h4>
+                </div>
+                <div id="vehicle_details_content">
+                    <?php if ($selected_vehicle_id): ?>
+                        <?php $this->render_vehicle_details($selected_vehicle_id); ?>
+                    <?php endif; ?>
+                </div>
+            </div>
             
-            <tr>
-                <th><label for="phone"><?php _e('Phone', 'custom-rental-manager'); ?> *</label></th>
-                <td>
-                    <input type="tel" id="phone" name="customer_data[phone]" 
-                           value="<?php echo esc_attr($customer_data['phone']); ?>" required />
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="date_of_birth"><?php _e('Date of Birth', 'custom-rental-manager'); ?> *</label></th>
-                <td>
-                    <input type="date" id="date_of_birth" name="customer_data[date_of_birth]" 
-                           value="<?php echo esc_attr($customer_data['date_of_birth']); ?>" required />
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="address"><?php _e('Address', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <textarea id="address" name="customer_data[address]" rows="3" cols="50"><?php echo esc_textarea($customer_data['address']); ?></textarea>
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="city"><?php _e('City', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="text" id="city" name="customer_data[city]" 
-                           value="<?php echo esc_attr($customer_data['city']); ?>" />
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="license_number"><?php _e('License Number', 'custom-rental-manager'); ?> *</label></th>
-                <td>
-                    <input type="text" id="license_number" name="customer_data[license_number]" 
-                           value="<?php echo esc_attr($customer_data['license_number']); ?>" required />
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="license_expiry"><?php _e('License Expiry', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="date" id="license_expiry" name="customer_data[license_expiry]" 
-                           value="<?php echo esc_attr($customer_data['license_expiry']); ?>" />
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="emergency_contact"><?php _e('Emergency Contact', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="text" id="emergency_contact" name="customer_data[emergency_contact]" 
-                           value="<?php echo esc_attr($customer_data['emergency_contact']); ?>" />
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="emergency_phone"><?php _e('Emergency Phone', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="tel" id="emergency_phone" name="customer_data[emergency_phone]" 
-                           value="<?php echo esc_attr($customer_data['emergency_phone']); ?>" />
-                </td>
-            </tr>
-        </table>
-        <?php
-    }
-    
-    /**
-     * Payment details meta box
-     */
-    public function payment_details_meta_box($post) {
-        $payment_data = get_post_meta($post->ID, '_crcm_payment_data', true);
-        
-        // Default values
-        if (empty($payment_data)) {
-            $payment_data = array(
-                'subtotal' => 0,
-                'extras_total' => 0,
-                'tax_amount' => 0,
-                'total_amount' => 0,
-                'deposit_amount' => 0,
-                'security_deposit' => 0,
-                'payment_method' => 'cash',
-                'payment_status' => 'pending',
-                'deposit_paid' => false,
-                'balance_due' => 0,
-                'currency' => 'EUR',
-            );
-        }
-        ?>
-        
-        <table class="form-table">
-            <tr>
-                <th><label for="subtotal"><?php _e('Subtotal', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="number" step="0.01" id="subtotal" name="payment_data[subtotal]" 
-                           value="<?php echo esc_attr($payment_data['subtotal']); ?>" />
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="extras_total"><?php _e('Extras Total', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="number" step="0.01" id="extras_total" name="payment_data[extras_total]" 
-                           value="<?php echo esc_attr($payment_data['extras_total']); ?>" />
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="tax_amount"><?php _e('Tax Amount', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="number" step="0.01" id="tax_amount" name="payment_data[tax_amount]" 
-                           value="<?php echo esc_attr($payment_data['tax_amount']); ?>" />
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="total_amount"><?php _e('Total Amount', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="number" step="0.01" id="total_amount" name="payment_data[total_amount]" 
-                           value="<?php echo esc_attr($payment_data['total_amount']); ?>" />
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="security_deposit"><?php _e('Security Deposit', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <input type="number" step="0.01" id="security_deposit" name="payment_data[security_deposit]" 
-                           value="<?php echo esc_attr($payment_data['security_deposit']); ?>" />
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="payment_method"><?php _e('Payment Method', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <select id="payment_method" name="payment_data[payment_method]">
-                        <option value="cash" <?php selected($payment_data['payment_method'], 'cash'); ?>><?php _e('Cash', 'custom-rental-manager'); ?></option>
-                        <option value="card" <?php selected($payment_data['payment_method'], 'card'); ?>><?php _e('Credit Card', 'custom-rental-manager'); ?></option>
-                        <option value="stripe" <?php selected($payment_data['payment_method'], 'stripe'); ?>><?php _e('Stripe', 'custom-rental-manager'); ?></option>
-                        <option value="transfer" <?php selected($payment_data['payment_method'], 'transfer'); ?>><?php _e('Bank Transfer', 'custom-rental-manager'); ?></option>
-                    </select>
-                </td>
-            </tr>
-            
-            <tr>
-                <th><label for="payment_status"><?php _e('Payment Status', 'custom-rental-manager'); ?></label></th>
-                <td>
-                    <select id="payment_status" name="payment_data[payment_status]">
-                        <option value="pending" <?php selected($payment_data['payment_status'], 'pending'); ?>><?php _e('Pending', 'custom-rental-manager'); ?></option>
-                        <option value="deposit_paid" <?php selected($payment_data['payment_status'], 'deposit_paid'); ?>><?php _e('Deposit Paid', 'custom-rental-manager'); ?></option>
-                        <option value="fully_paid" <?php selected($payment_data['payment_status'], 'fully_paid'); ?>><?php _e('Fully Paid', 'custom-rental-manager'); ?></option>
-                        <option value="refunded" <?php selected($payment_data['payment_status'], 'refunded'); ?>><?php _e('Refunded', 'custom-rental-manager'); ?></option>
-                    </select>
-                </td>
-            </tr>
-        </table>
-        
-        <div class="crcm-pricing-summary">
-            <h4><?php _e('Pricing Summary', 'custom-rental-manager'); ?></h4>
-            <div class="pricing-info">
-                <p><strong><?php _e('Daily Rate:', 'custom-rental-manager'); ?></strong> <span id="daily-rate-display">-</span></p>
-                <p><strong><?php _e('Rental Days:', 'custom-rental-manager'); ?></strong> <span id="rental-days-display">-</span></p>
-                <p><strong><?php _e('Total:', 'custom-rental-manager'); ?></strong> <span id="total-display">€0.00</span></p>
+            <!-- Availability Check -->
+            <div id="availability_check" class="crcm-availability-check" style="<?php echo $selected_vehicle_id ? '' : 'display: none;'; ?>">
+                <div class="crcm-section-header">
+                    <h4><?php _e('Controllo Disponibilità', 'custom-rental-manager'); ?></h4>
+                </div>
+                <div id="availability_status" class="crcm-availability-status">
+                    <!-- Will be populated via AJAX -->
+                </div>
             </div>
         </div>
         
         <script>
         jQuery(document).ready(function($) {
-            function updatePricingSummary() {
-                const vehicleId = $('#vehicle_id').val();
+            $('#vehicle_id').on('change', function() {
+                const vehicleId = $(this).val();
+                
+                if (!vehicleId) {
+                    $('#vehicle_details_display, #availability_check').hide();
+                    return;
+                }
+                
+                // Show loading state
+                $('#vehicle_details_content').html('<div class="crcm-loading">Caricamento dettagli veicolo...</div>');
+                $('#availability_status').html('<div class="crcm-loading">Controllo disponibilità...</div>');
+                $('#vehicle_details_display, #availability_check').show();
+                
+                // Load vehicle details
+                $.ajax({
+                    url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                    type: 'POST',
+                    data: {
+                        action: 'crcm_get_vehicle_booking_data',
+                        vehicle_id: vehicleId,
+                        nonce: '<?php echo wp_create_nonce('crcm_admin_nonce'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $('#vehicle_details_content').html(response.data.details);
+                            
+                            // Trigger pricing update
+                            $(document).trigger('vehicle_selected', [vehicleId, response.data]);
+                            
+                            // Check availability
+                            checkVehicleAvailability(vehicleId);
+                        } else {
+                            $('#vehicle_details_content').html('<div class="error">Errore nel caricamento dei dettagli</div>');
+                        }
+                    },
+                    error: function() {
+                        $('#vehicle_details_content').html('<div class="error">Errore di connessione</div>');
+                    }
+                });
+            });
+            
+            function checkVehicleAvailability(vehicleId) {
                 const pickupDate = $('#pickup_date').val();
                 const returnDate = $('#return_date').val();
                 
-                if (vehicleId && pickupDate && returnDate) {
-                    // Calculate days
-                    const pickup = new Date(pickupDate);
-                    const returnD = new Date(returnDate);
-                    const timeDiff = returnD.getTime() - pickup.getTime();
-                    const days = Math.max(1, Math.ceil(timeDiff / (1000 * 3600 * 24)));
-                    
-                    $('#rental-days-display').text(days);
-                    
-                    // You could add AJAX call here to get vehicle pricing
-                    // For now, just show the days calculation
+                if (!pickupDate || !returnDate) {
+                    $('#availability_status').html('<div class="warning">Seleziona le date per controllare la disponibilità</div>');
+                    return;
                 }
+                
+                $.ajax({
+                    url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                    type: 'POST',
+                    data: {
+                        action: 'crcm_check_vehicle_availability',
+                        vehicle_id: vehicleId,
+                        pickup_date: pickupDate,
+                        return_date: returnDate,
+                        nonce: '<?php echo wp_create_nonce('crcm_admin_nonce'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            const available = response.data.available_quantity;
+                            const total = response.data.total_quantity;
+                            
+                            if (available > 0) {
+                                $('#availability_status').html(`
+                                    <div class="success">
+                                        <strong>✅ Disponibile</strong><br>
+                                        ${available} unità disponibili su ${total} totali
+                                    </div>
+                                `);
+                            } else {
+                                $('#availability_status').html(`
+                                    <div class="error">
+                                        <strong>❌ Non Disponibile</strong><br>
+                                        Nessuna unità disponibile per le date selezionate
+                                    </div>
+                                `);
+                            }
+                        } else {
+                            $('#availability_status').html('<div class="error">Errore nel controllo disponibilità</div>');
+                        }
+                    }
+                });
             }
             
-            $('#vehicle_id, #pickup_date, #return_date').on('change', updatePricingSummary);
-            updatePricingSummary();
+            // Check availability when dates change
+            $(document).on('booking_dates_changed', function() {
+                const vehicleId = $('#vehicle_id').val();
+                if (vehicleId) {
+                    checkVehicleAvailability(vehicleId);
+                }
+            });
+            
+            // Initial check if vehicle is already selected
+            if ($('#vehicle_id').val()) {
+                $('#vehicle_id').trigger('change');
+            }
         });
         </script>
         <?php
     }
     
     /**
-     * Booking notes meta box
+     * Render vehicle details for display
      */
-    public function booking_notes_meta_box($post) {
-        $notes = get_post_meta($post->ID, '_crcm_booking_notes', true);
+    private function render_vehicle_details($vehicle_id) {
+        $vehicle = get_post($vehicle_id);
+        $vehicle_data = get_post_meta($vehicle_id, '_crcm_vehicle_data', true);
+        $pricing_data = get_post_meta($vehicle_id, '_crcm_pricing_data', true);
+        $extras_data = get_post_meta($vehicle_id, '_crcm_extras_data', true);
+        $insurance_data = get_post_meta($vehicle_id, '_crcm_insurance_data', true);
+        $misc_data = get_post_meta($vehicle_id, '_crcm_misc_data', true);
         ?>
-        <textarea name="booking_notes" rows="5" cols="50" style="width: 100%;"><?php echo esc_textarea($notes); ?></textarea>
-        <p class="description"><?php _e('Internal notes visible only to admin', 'custom-rental-manager'); ?></p>
+        
+        <div class="crcm-vehicle-summary">
+            <div class="vehicle-basic-info">
+                <h5><?php echo esc_html($vehicle->post_title); ?></h5>
+                <div class="vehicle-specs">
+                    <?php if (isset($vehicle_data['seats'])): ?>
+                        <span class="spec-item">👥 <?php echo $vehicle_data['seats']; ?> posti</span>
+                    <?php endif; ?>
+                    <?php if (isset($vehicle_data['engine_size'])): ?>
+                        <span class="spec-item">🏍️ <?php echo $vehicle_data['engine_size']; ?></span>
+                    <?php endif; ?>
+                    <?php if (isset($vehicle_data['transmission'])): ?>
+                        <span class="spec-item">⚙️ <?php echo ucfirst($vehicle_data['transmission']); ?></span>
+                    <?php endif; ?>
+                    <?php if (isset($vehicle_data['fuel_type'])): ?>
+                        <span class="spec-item">⛽ <?php echo ucfirst($vehicle_data['fuel_type']); ?></span>
+                    <?php endif; ?>
+                </div>
+                <div class="vehicle-pricing">
+                    <strong>💰 €<?php echo number_format($pricing_data['daily_rate'] ?? 0, 2); ?>/giorno</strong>
+                </div>
+            </div>
+            
+            <?php if (!empty($extras_data)): ?>
+                <div class="vehicle-extras">
+                    <h6><?php _e('Servizi Extra Disponibili', 'custom-rental-manager'); ?></h6>
+                    <ul>
+                        <?php foreach ($extras_data as $extra): ?>
+                            <li>
+                                <?php echo esc_html($extra['name']); ?> 
+                                <span class="extra-price">+€<?php echo number_format($extra['daily_rate'], 2); ?>/giorno</span>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            <?php endif; ?>
+            
+            <?php if (!empty($insurance_data) && !empty($insurance_data['premium']['enabled'])): ?>
+                <div class="vehicle-insurance">
+                    <h6><?php _e('Assicurazione Premium Disponibile', 'custom-rental-manager'); ?></h6>
+                    <p>
+                        Franchigia €<?php echo number_format($insurance_data['premium']['deductible'], 0); ?> 
+                        <span class="insurance-price">+€<?php echo number_format($insurance_data['premium']['daily_rate'], 2); ?>/giorno</span>
+                    </p>
+                </div>
+            <?php endif; ?>
+            
+            <?php if (!empty($misc_data)): ?>
+                <div class="vehicle-policies">
+                    <h6><?php _e('Politiche Veicolo', 'custom-rental-manager'); ?></h6>
+                    <ul>
+                        <li>Min/Max giorni: <?php echo $misc_data['min_rental_days'] ?? 1; ?>-<?php echo $misc_data['max_rental_days'] ?? 30; ?></li>
+                        <?php if (!empty($misc_data['cancellation_enabled'])): ?>
+                            <li>✅ Cancellazione gratuita fino a <?php echo $misc_data['cancellation_days'] ?? 5; ?> giorni prima</li>
+                        <?php else: ?>
+                            <li>❌ Cancellazione non consentita</li>
+                        <?php endif; ?>
+                        <?php if (!empty($misc_data['featured_vehicle'])): ?>
+                            <li>⭐ Veicolo in evidenza</li>
+                        <?php endif; ?>
+                    </ul>
+                </div>
+            <?php endif; ?>
+        </div>
         <?php
     }
     
     /**
-     * Add booking status to submit box
+     * Pricing and extras meta box with dynamic calculation
      */
-    public function booking_status_metabox() {
-        global $post;
+    public function pricing_meta_box($post) {
+        $booking_data = get_post_meta($post->ID, '_crcm_booking_data', true);
+        $pricing_breakdown = get_post_meta($post->ID, '_crcm_pricing_breakdown', true);
         
-        if ($post->post_type !== 'crcm_booking') {
-            return;
+        // Default values
+        if (empty($pricing_breakdown)) {
+            $pricing_breakdown = array(
+                'base_total' => 0,
+                'extras_total' => 0,
+                'insurance_total' => 0,
+                'tax_total' => 0,
+                'discount_total' => 0,
+                'final_total' => 0,
+                'selected_extras' => array(),
+                'selected_insurance' => 'basic',
+            );
         }
+        ?>
         
+        <div class="crcm-pricing-container">
+            <div class="crcm-section-header">
+                <h4><?php _e('Prezzi e Servizi Extra', 'custom-rental-manager'); ?></h4>
+                <p class="description"><?php _e('Seleziona servizi extra e visualizza il riepilogo prezzi', 'custom-rental-manager'); ?></p>
+            </div>
+            
+            <!-- Extra Services Selection -->
+            <div id="extras-selection" class="crcm-extras-selection" style="display: none;">
+                <h5><?php _e('Servizi Extra', 'custom-rental-manager'); ?></h5>
+                <div id="extras-list">
+                    <!-- Will be populated via AJAX when vehicle is selected -->
+                </div>
+            </div>
+            
+            <!-- Insurance Selection -->
+            <div id="insurance-selection" class="crcm-insurance-selection" style="display: none;">
+                <h5><?php _e('Opzioni Assicurative', 'custom-rental-manager'); ?></h5>
+                <div id="insurance-options">
+                    <!-- Will be populated via AJAX when vehicle is selected -->
+                </div>
+            </div>
+            
+            <!-- Manual Discount -->
+            <div class="crcm-discount-section">
+                <h5><?php _e('Sconto Manuale', 'custom-rental-manager'); ?></h5>
+                <table class="form-table">
+                    <tr>
+                        <th><label for="manual_discount"><?php _e('Sconto (€)', 'custom-rental-manager'); ?></label></th>
+                        <td>
+                            <input type="number" id="manual_discount" name="pricing_breakdown[manual_discount]" 
+                                   value="<?php echo esc_attr($pricing_breakdown['manual_discount'] ?? 0); ?>" 
+                                   step="0.01" min="0" class="small-text" />
+                            <p class="description"><?php _e('Sconto fisso in euro da applicare al totale', 'custom-rental-manager'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="discount_reason"><?php _e('Motivo Sconto', 'custom-rental-manager'); ?></label></th>
+                        <td>
+                            <input type="text" id="discount_reason" name="pricing_breakdown[discount_reason]" 
+                                   value="<?php echo esc_attr($pricing_breakdown['discount_reason'] ?? ''); ?>" 
+                                   class="widefat" placeholder="<?php _e('Es: Cliente fedele, promozione speciale...', 'custom-rental-manager'); ?>" />
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            
+            <!-- Pricing Breakdown -->
+            <div class="crcm-pricing-breakdown">
+                <h5><?php _e('Riepilogo Prezzi', 'custom-rental-manager'); ?></h5>
+                <table class="crcm-pricing-table">
+                    <tbody id="pricing-breakdown-content">
+                        <tr class="pricing-row">
+                            <td><?php _e('Tariffa base', 'custom-rental-manager'); ?></td>
+                            <td class="price-cell">€<span id="base-total">0.00</span></td>
+                        </tr>
+                        <tr class="pricing-row extras-row" style="display: none;">
+                            <td><?php _e('Servizi extra', 'custom-rental-manager'); ?></td>
+                            <td class="price-cell">€<span id="extras-total">0.00</span></td>
+                        </tr>
+                        <tr class="pricing-row insurance-row" style="display: none;">
+                            <td><?php _e('Assicurazione premium', 'custom-rental-manager'); ?></td>
+                            <td class="price-cell">€<span id="insurance-total">0.00</span></td>
+                        </tr>
+                        <tr class="pricing-row discount-row" style="display: none;">
+                            <td><?php _e('Sconto applicato', 'custom-rental-manager'); ?></td>
+                            <td class="price-cell discount">-€<span id="discount-total">0.00</span></td>
+                        </tr>
+                        <tr class="pricing-row total-row">
+                            <td><strong><?php _e('TOTALE', 'custom-rental-manager'); ?></strong></td>
+                            <td class="price-cell"><strong>€<span id="final-total">0.00</span></strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Hidden fields for storing pricing data -->
+            <input type="hidden" name="pricing_breakdown[base_total]" id="base_total_input" value="<?php echo esc_attr($pricing_breakdown['base_total']); ?>" />
+            <input type="hidden" name="pricing_breakdown[extras_total]" id="extras_total_input" value="<?php echo esc_attr($pricing_breakdown['extras_total']); ?>" />
+            <input type="hidden" name="pricing_breakdown[insurance_total]" id="insurance_total_input" value="<?php echo esc_attr($pricing_breakdown['insurance_total']); ?>" />
+            <input type="hidden" name="pricing_breakdown[final_total]" id="final_total_input" value="<?php echo esc_attr($pricing_breakdown['final_total']); ?>" />
+        </div>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            let vehicleData = null;
+            let rentalDays = 1;
+            
+            // Listen for vehicle selection
+            $(document).on('vehicle_selected', function(e, vehicleId, data) {
+                vehicleData = data;
+                loadVehicleExtrasAndInsurance(vehicleId);
+                calculatePricing();
+            });
+            
+            // Listen for date changes
+            $(document).on('booking_dates_changed', function(e, days) {
+                rentalDays = days;
+                calculatePricing();
+            });
+            
+            function loadVehicleExtrasAndInsurance(vehicleId) {
+                if (!vehicleData || !vehicleData.extras || !vehicleData.insurance) return;
+                
+                // Load extras
+                if (vehicleData.extras.length > 0) {
+                    let extrasHtml = '';
+                    vehicleData.extras.forEach(function(extra, index) {
+                        extrasHtml += `
+                            <label class="extra-option">
+                                <input type="checkbox" name="pricing_breakdown[selected_extras][]" 
+                                       value="${index}" data-name="${extra.name}" data-rate="${extra.daily_rate}">
+                                <span class="extra-name">${extra.name}</span>
+                                <span class="extra-price">+€${parseFloat(extra.daily_rate).toFixed(2)}/giorno</span>
+                            </label>
+                        `;
+                    });
+                    $('#extras-list').html(extrasHtml);
+                    $('#extras-selection').show();
+                } else {
+                    $('#extras-selection').hide();
+                }
+                
+                // Load insurance options
+                if (vehicleData.insurance && vehicleData.insurance.premium && vehicleData.insurance.premium.enabled) {
+                    let insuranceHtml = `
+                        <label class="insurance-option">
+                            <input type="radio" name="pricing_breakdown[selected_insurance]" value="basic" checked>
+                            <span class="insurance-name">Assicurazione Base</span>
+                            <span class="insurance-price">Inclusa</span>
+                        </label>
+                        <label class="insurance-option">
+                            <input type="radio" name="pricing_breakdown[selected_insurance]" value="premium" 
+                                   data-rate="${vehicleData.insurance.premium.daily_rate}">
+                            <span class="insurance-name">Assicurazione Premium</span>
+                            <span class="insurance-price">+€${parseFloat(vehicleData.insurance.premium.daily_rate).toFixed(2)}/giorno</span>
+                        </label>
+                    `;
+                    $('#insurance-options').html(insuranceHtml);
+                    $('#insurance-selection').show();
+                } else {
+                    $('#insurance-selection').hide();
+                }
+            }
+            
+            function calculatePricing() {
+                if (!vehicleData || !vehicleData.pricing) return;
+                
+                const baseRate = parseFloat(vehicleData.pricing.daily_rate) || 0;
+                const baseTotal = baseRate * rentalDays;
+                
+                // Calculate extras
+                let extrasTotal = 0;
+                $('input[name="pricing_breakdown[selected_extras][]"]:checked').each(function() {
+                    const rate = parseFloat($(this).data('rate')) || 0;
+                    extrasTotal += rate * rentalDays;
+                });
+                
+                // Calculate insurance
+                let insuranceTotal = 0;
+                const selectedInsurance = $('input[name="pricing_breakdown[selected_insurance]"]:checked');
+                if (selectedInsurance.val() === 'premium') {
+                    const rate = parseFloat(selectedInsurance.data('rate')) || 0;
+                    insuranceTotal = rate * rentalDays;
+                }
+                
+                // Manual discount
+                const discount = parseFloat($('#manual_discount').val()) || 0;
+                
+                // Final total
+                const finalTotal = Math.max(0, baseTotal + extrasTotal + insuranceTotal - discount);
+                
+                // Update display
+                $('#base-total').text(baseTotal.toFixed(2));
+                $('#extras-total').text(extrasTotal.toFixed(2));
+                $('#insurance-total').text(insuranceTotal.toFixed(2));
+                $('#discount-total').text(discount.toFixed(2));
+                $('#final-total').text(finalTotal.toFixed(2));
+                
+                // Update hidden inputs
+                $('#base_total_input').val(baseTotal);
+                $('#extras_total_input').val(extrasTotal);
+                $('#insurance_total_input').val(insuranceTotal);
+                $('#final_total_input').val(finalTotal);
+                
+                // Show/hide rows
+                $('.extras-row').toggle(extrasTotal > 0);
+                $('.insurance-row').toggle(insuranceTotal > 0);
+                $('.discount-row').toggle(discount > 0);
+            }
+            
+            // Event handlers for pricing changes
+            $(document).on('change', 'input[name="pricing_breakdown[selected_extras][]"]', calculatePricing);
+            $(document).on('change', 'input[name="pricing_breakdown[selected_insurance]"]', calculatePricing);
+            $('#manual_discount').on('input', calculatePricing);
+        });
+        </script>
+        <?php
+    }
+    
+    /**
+     * Status meta box
+     */
+    public function status_meta_box($post) {
         $booking_status = get_post_meta($post->ID, '_crcm_booking_status', true);
         if (empty($booking_status)) {
             $booking_status = 'pending';
         }
         
         $statuses = array(
-            'pending' => __('Pending', 'custom-rental-manager'),
-            'confirmed' => __('Confirmed', 'custom-rental-manager'),
-            'active' => __('Active', 'custom-rental-manager'),
-            'completed' => __('Completed', 'custom-rental-manager'),
-            'cancelled' => __('Cancelled', 'custom-rental-manager'),
+            'pending' => __('In Attesa', 'custom-rental-manager'),
+            'confirmed' => __('Confermata', 'custom-rental-manager'),
+            'active' => __('In Corso', 'custom-rental-manager'),
+            'completed' => __('Completata', 'custom-rental-manager'),
+            'cancelled' => __('Cancellata', 'custom-rental-manager'),
         );
         ?>
         
-        <div class="misc-pub-section">
-            <label for="booking_status"><?php _e('Booking Status:', 'custom-rental-manager'); ?></label>
-            <select name="booking_status" id="booking_status">
-                <?php foreach ($statuses as $value => $label): ?>
-                    <option value="<?php echo esc_attr($value); ?>" <?php selected($booking_status, $value); ?>>
-                        <?php echo esc_html($label); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
+        <div class="crcm-status-container">
+            <table class="form-table">
+                <tr>
+                    <th><label for="booking_status"><?php _e('Stato', 'custom-rental-manager'); ?></label></th>
+                    <td>
+                        <select id="booking_status" name="booking_status" class="widefat">
+                            <?php foreach ($statuses as $key => $label): ?>
+                                <option value="<?php echo esc_attr($key); ?>" <?php selected($booking_status, $key); ?>>
+                                    <?php echo esc_html($label); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </td>
+                </tr>
+            </table>
+            
+            <div class="status-info">
+                <p class="description">
+                    <strong>In Attesa:</strong> Prenotazione creata<br>
+                    <strong>Confermata:</strong> Pagamento ricevuto<br>
+                    <strong>In Corso:</strong> Veicolo ritirato<br>
+                    <strong>Completata:</strong> Veicolo riconsegnato<br>
+                    <strong>Cancellata:</strong> Prenotazione annullata
+                </p>
+            </div>
         </div>
         <?php
     }
     
     /**
-     * Save booking meta data with customer account integration
+     * Notes meta box
+     */
+    public function notes_meta_box($post) {
+        $notes = get_post_meta($post->ID, '_crcm_booking_notes', true);
+        $internal_notes = get_post_meta($post->ID, '_crcm_booking_internal_notes', true);
+        ?>
+        
+        <div class="crcm-notes-container">
+            <table class="form-table">
+                <tr>
+                    <th><label for="booking_notes"><?php _e('Note Cliente', 'custom-rental-manager'); ?></label></th>
+                    <td>
+                        <textarea id="booking_notes" name="booking_notes" rows="4" class="widefat"><?php echo esc_textarea($notes); ?></textarea>
+                        <p class="description"><?php _e('Note visibili al cliente', 'custom-rental-manager'); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th><label for="internal_notes"><?php _e('Note Interne', 'custom-rental-manager'); ?></label></th>
+                    <td>
+                        <textarea id="internal_notes" name="internal_notes" rows="4" class="widefat"><?php echo esc_textarea($internal_notes); ?></textarea>
+                        <p class="description"><?php _e('Note riservate allo staff', 'custom-rental-manager'); ?></p>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <?php
+    }
+    
+    /**
+     * AJAX: Search customers with role filter
+     */
+    public function ajax_search_customers() {
+        check_ajax_referer('crcm_admin_nonce', 'nonce');
+        
+        $query = sanitize_text_field($_POST['query']);
+        
+        if (strlen($query) < 2) {
+            wp_send_json_error('Query too short');
+        }
+        
+        // Search users with customer role
+        $users = get_users(array(
+            'role' => 'crcm_customer',
+            'search' => '*' . $query . '*',
+            'search_columns' => array('user_login', 'user_email', 'display_name'),
+            'number' => 10,
+            'orderby' => 'display_name',
+            'order' => 'ASC'
+        ));
+        
+        $results = array();
+        foreach ($users as $user) {
+            $results[] = array(
+                'ID' => $user->ID,
+                'display_name' => $user->display_name,
+                'user_email' => $user->user_email,
+                'phone' => get_user_meta($user->ID, 'phone', true),
+            );
+        }
+        
+        wp_send_json_success($results);
+    }
+    
+    /**
+     * AJAX: Get vehicle booking data
+     */
+    public function ajax_get_vehicle_booking_data() {
+        check_ajax_referer('crcm_admin_nonce', 'nonce');
+        
+        $vehicle_id = intval($_POST['vehicle_id']);
+        
+        if (!$vehicle_id) {
+            wp_send_json_error('Invalid vehicle ID');
+        }
+        
+        $vehicle = get_post($vehicle_id);
+        if (!$vehicle || $vehicle->post_type !== 'crcm_vehicle') {
+            wp_send_json_error('Vehicle not found');
+        }
+        
+        $vehicle_data = get_post_meta($vehicle_id, '_crcm_vehicle_data', true);
+        $pricing_data = get_post_meta($vehicle_id, '_crcm_pricing_data', true);
+        $extras_data = get_post_meta($vehicle_id, '_crcm_extras_data', true);
+        $insurance_data = get_post_meta($vehicle_id, '_crcm_insurance_data', true);
+        $misc_data = get_post_meta($vehicle_id, '_crcm_misc_data', true);
+        
+        ob_start();
+        $this->render_vehicle_details($vehicle_id);
+        $details_html = ob_get_clean();
+        
+        wp_send_json_success(array(
+            'details' => $details_html,
+            'vehicle_data' => $vehicle_data,
+            'pricing' => $pricing_data,
+            'extras' => $extras_data ?: array(),
+            'insurance' => $insurance_data ?: array(),
+            'misc' => $misc_data ?: array(),
+        ));
+    }
+    
+    /**
+     * AJAX: Check vehicle availability
+     */
+    public function ajax_check_vehicle_availability() {
+        check_ajax_referer('crcm_admin_nonce', 'nonce');
+        
+        $vehicle_id = intval($_POST['vehicle_id']);
+        $pickup_date = sanitize_text_field($_POST['pickup_date']);
+        $return_date = sanitize_text_field($_POST['return_date']);
+        
+        if (!$vehicle_id || !$pickup_date || !$return_date) {
+            wp_send_json_error('Missing required parameters');
+        }
+        
+        // Use vehicle manager to check availability
+        if (class_exists('CRCM_Vehicle_Manager')) {
+            $vehicle_manager = new CRCM_Vehicle_Manager();
+            $available_quantity = $vehicle_manager->check_availability($vehicle_id, $pickup_date, $return_date);
+            
+            $vehicle_data = get_post_meta($vehicle_id, '_crcm_vehicle_data', true);
+            $total_quantity = isset($vehicle_data['quantity']) ? intval($vehicle_data['quantity']) : 0;
+            
+            wp_send_json_success(array(
+                'available_quantity' => $available_quantity,
+                'total_quantity' => $total_quantity,
+                'is_available' => $available_quantity > 0,
+            ));
+        } else {
+            wp_send_json_error('Vehicle manager not available');
+        }
+    }
+    
+    /**
+     * Save booking meta data
      */
     public function save_booking_meta($post_id) {
         // Verify nonce
@@ -643,189 +1185,83 @@ class CRCM_Booking_Manager {
             return;
         }
         
-        // Generate booking number if not exists
-        $booking_number = get_post_meta($post_id, '_crcm_booking_number', true);
-        if (empty($booking_number)) {
-            $booking_number = $this->generate_booking_number();
-            update_post_meta($post_id, '_crcm_booking_number', $booking_number);
-        }
-        
-        // Save customer user ID
-        if (isset($_POST['customer_user_id'])) {
-            $customer_user_id = intval($_POST['customer_user_id']);
-            update_post_meta($post_id, '_crcm_customer_user_id', $customer_user_id);
-        }
-        
         // Save booking data
         if (isset($_POST['booking_data'])) {
             $booking_data = array();
             foreach ($_POST['booking_data'] as $key => $value) {
-                if (is_array($value)) {
-                    $booking_data[$key] = array_map('sanitize_text_field', $value);
-                } else {
-                    $booking_data[$key] = sanitize_text_field($value);
-                }
+                $booking_data[$key] = sanitize_text_field($value);
             }
             update_post_meta($post_id, '_crcm_booking_data', $booking_data);
         }
         
-        // Save customer data and potentially create account
-        if (isset($_POST['customer_data'])) {
-            $customer_data = array();
-            foreach ($_POST['customer_data'] as $key => $value) {
-                $customer_data[$key] = sanitize_text_field($value);
-            }
-            update_post_meta($post_id, '_crcm_customer_data', $customer_data);
-            
-            // Create customer account if no existing customer selected
-            $selected_customer_id = isset($_POST['customer_user_id']) ? intval($_POST['customer_user_id']) : 0;
-            if (empty($selected_customer_id) && !empty($customer_data['email'])) {
-                $new_customer_id = $this->create_customer_account($customer_data);
-                if ($new_customer_id) {
-                    update_post_meta($post_id, '_crcm_customer_user_id', $new_customer_id);
-                }
-            }
-        }
-        
-        // Save payment data
-        if (isset($_POST['payment_data'])) {
-            $payment_data = array();
-            foreach ($_POST['payment_data'] as $key => $value) {
-                if (in_array($key, array('subtotal', 'extras_total', 'tax_amount', 'total_amount', 'deposit_amount', 'security_deposit', 'balance_due'))) {
-                    $payment_data[$key] = floatval($value);
+        // Save pricing breakdown
+        if (isset($_POST['pricing_breakdown'])) {
+            $pricing_breakdown = array();
+            foreach ($_POST['pricing_breakdown'] as $key => $value) {
+                if (is_array($value)) {
+                    $pricing_breakdown[$key] = array_map('sanitize_text_field', $value);
                 } else {
-                    $payment_data[$key] = sanitize_text_field($value);
+                    $pricing_breakdown[$key] = sanitize_text_field($value);
                 }
             }
-            update_post_meta($post_id, '_crcm_payment_data', $payment_data);
+            update_post_meta($post_id, '_crcm_pricing_breakdown', $pricing_breakdown);
         }
         
         // Save booking status
         if (isset($_POST['booking_status'])) {
-            $old_status = get_post_meta($post_id, '_crcm_booking_status', true);
-            $new_status = sanitize_text_field($_POST['booking_status']);
-            
-            update_post_meta($post_id, '_crcm_booking_status', $new_status);
-            
-            // Trigger status change hook if status changed
-            if ($old_status !== $new_status) {
-                do_action('crcm_booking_status_changed', $post_id, $new_status, $old_status);
-            }
+            update_post_meta($post_id, '_crcm_booking_status', sanitize_text_field($_POST['booking_status']));
         }
         
-        // Save booking notes
+        // Save notes
         if (isset($_POST['booking_notes'])) {
             update_post_meta($post_id, '_crcm_booking_notes', sanitize_textarea_field($_POST['booking_notes']));
         }
+        
+        if (isset($_POST['internal_notes'])) {
+            update_post_meta($post_id, '_crcm_booking_internal_notes', sanitize_textarea_field($_POST['internal_notes']));
+        }
     }
     
     /**
-     * Create customer account with crcm_customer role
+     * Assign default customer role to new users
      */
-    private function create_customer_account($customer_data) {
-        // Check if email exists
-        if (email_exists($customer_data['email'])) {
-            return false;
-        }
-        
-        // Generate username from email
-        $username = sanitize_user($customer_data['email']);
-        if (username_exists($username)) {
-            $username = sanitize_user($customer_data['first_name'] . '.' . $customer_data['last_name']);
-            if (username_exists($username)) {
-                $username = sanitize_user($customer_data['email'] . '.' . time());
-            }
-        }
-        
-        // Generate temporary password
-        $password = wp_generate_password(12, false);
-        
-        // Create user
-        $user_id = wp_create_user($username, $password, $customer_data['email']);
-        
-        if (is_wp_error($user_id)) {
-            return false;
-        }
-        
-        // Update user profile
-        wp_update_user(array(
-            'ID' => $user_id,
-            'first_name' => $customer_data['first_name'],
-            'last_name' => $customer_data['last_name'],
-            'display_name' => $customer_data['first_name'] . ' ' . $customer_data['last_name'],
-        ));
-        
-        // Set customer role
+    public function assign_default_customer_role($user_id) {
         $user = new WP_User($user_id);
-        $user->set_role('crcm_customer');
         
-        // Save additional customer meta
-        update_user_meta($user_id, 'phone', $customer_data['phone']);
-        update_user_meta($user_id, 'date_of_birth', $customer_data['date_of_birth']);
-        update_user_meta($user_id, 'address', $customer_data['address']);
-        update_user_meta($user_id, 'city', $customer_data['city']);
-        update_user_meta($user_id, 'license_number', $customer_data['license_number']);
-        update_user_meta($user_id, 'license_expiry', $customer_data['license_expiry']);
-        update_user_meta($user_id, 'emergency_contact', $customer_data['emergency_contact']);
-        update_user_meta($user_id, 'emergency_phone', $customer_data['emergency_phone']);
-        
-        // Send welcome email with password
-        wp_send_new_user_notifications($user_id, 'user');
-        
-        return $user_id;
+        // Only assign if user has no role (new registration)
+        if (empty($user->roles)) {
+            $user->set_role('crcm_customer');
+        }
     }
     
     /**
-     * Auto-register customer from frontend booking
+     * Add role column to users table
      */
-    public function auto_register_customer($booking_id, $customer_data) {
-        if (empty($customer_data['email'])) {
-            return false;
-        }
-        
-        // Check if user already exists
-        $existing_user = get_user_by('email', $customer_data['email']);
-        if ($existing_user) {
-            // Update booking with existing customer
-            update_post_meta($booking_id, '_crcm_customer_user_id', $existing_user->ID);
-            return $existing_user->ID;
-        }
-        
-        // Create new customer account
-        $user_id = $this->create_customer_account($customer_data);
-        if ($user_id) {
-            update_post_meta($booking_id, '_crcm_customer_user_id', $user_id);
-        }
-        
-        return $user_id;
+    public function add_user_role_column($columns) {
+        $columns['crcm_role'] = __('Rental Role', 'custom-rental-manager');
+        return $columns;
     }
     
     /**
-     * Generate unique booking number
+     * Show role in users table
      */
-    private function generate_booking_number() {
-        $prefix = 'CBR'; // Costabilerent
-        $year = date('y');
-        $month = date('m');
-        
-        // Get the last booking number for this month
-        global $wpdb;
-        $last_number = $wpdb->get_var($wpdb->prepare(
-            "SELECT meta_value FROM {$wpdb->postmeta} 
-             WHERE meta_key = '_crcm_booking_number' 
-             AND meta_value LIKE %s 
-             ORDER BY meta_value DESC 
-             LIMIT 1",
-            $prefix . $year . $month . '%'
-        ));
-        
-        if ($last_number) {
-            $sequence = intval(substr($last_number, -4)) + 1;
-        } else {
-            $sequence = 1;
+    public function show_user_role_column($value, $column_name, $user_id) {
+        if ($column_name === 'crcm_role') {
+            $user = get_user_by('ID', $user_id);
+            $roles = $user->roles;
+            
+            if (in_array('crcm_customer', $roles)) {
+                return '<span class="crcm-role-badge customer">🙋‍♂️ Customer</span>';
+            } elseif (in_array('crcm_manager', $roles)) {
+                return '<span class="crcm-role-badge manager">👨‍💼 Manager</span>';
+            } elseif (in_array('administrator', $roles)) {
+                return '<span class="crcm-role-badge admin">👑 Admin</span>';
+            }
+            
+            return '-';
         }
         
-        return $prefix . $year . $month . str_pad($sequence, 4, '0', STR_PAD_LEFT);
+        return $value;
     }
     
     /**
@@ -835,12 +1271,11 @@ class CRCM_Booking_Manager {
         $new_columns = array();
         $new_columns['cb'] = $columns['cb'];
         $new_columns['title'] = $columns['title'];
-        $new_columns['crcm_booking_number'] = __('Booking #', 'custom-rental-manager');
         $new_columns['crcm_customer'] = __('Customer', 'custom-rental-manager');
         $new_columns['crcm_vehicle'] = __('Vehicle', 'custom-rental-manager');
-        $new_columns['crcm_dates'] = __('Rental Period', 'custom-rental-manager');
-        $new_columns['crcm_status'] = __('Status', 'custom-rental-manager');
+        $new_columns['crcm_dates'] = __('Dates', 'custom-rental-manager');
         $new_columns['crcm_total'] = __('Total', 'custom-rental-manager');
+        $new_columns['crcm_status'] = __('Status', 'custom-rental-manager');
         $new_columns['date'] = $columns['date'];
         
         return $new_columns;
@@ -851,287 +1286,431 @@ class CRCM_Booking_Manager {
      */
     public function booking_column_content($column, $post_id) {
         $booking_data = get_post_meta($post_id, '_crcm_booking_data', true);
-        $customer_data = get_post_meta($post_id, '_crcm_customer_data', true);
-        $payment_data = get_post_meta($post_id, '_crcm_payment_data', true);
+        $pricing_breakdown = get_post_meta($post_id, '_crcm_pricing_breakdown', true);
         $booking_status = get_post_meta($post_id, '_crcm_booking_status', true);
-        $booking_number = get_post_meta($post_id, '_crcm_booking_number', true);
-        $customer_user_id = get_post_meta($post_id, '_crcm_customer_user_id', true);
         
         switch ($column) {
-            case 'crcm_booking_number':
-                echo esc_html($booking_number);
-                break;
-                
             case 'crcm_customer':
-                if ($customer_data && isset($customer_data['first_name'], $customer_data['last_name'])) {
-                    echo esc_html($customer_data['first_name'] . ' ' . $customer_data['last_name']);
-                    
-                    // Show customer role badge
-                    if ($customer_user_id) {
-                        $user = get_user_by('ID', $customer_user_id);
-                        if ($user && in_array('crcm_customer', $user->roles)) {
-                            echo '<br><span class="crcm-customer-badge">Customer Account</span>';
-                        }
-                    }
-                    
-                    if (isset($customer_data['email'])) {
-                        echo '<br><small>' . esc_html($customer_data['email']) . '</small>';
+                if (isset($booking_data['customer_id'])) {
+                    $customer = get_user_by('ID', $booking_data['customer_id']);
+                    if ($customer) {
+                        echo '<strong>' . esc_html($customer->display_name) . '</strong><br>';
+                        echo '<small>' . esc_html($customer->user_email) . '</small>';
                     }
                 }
                 break;
                 
             case 'crcm_vehicle':
-                if ($booking_data && isset($booking_data['vehicle_id'])) {
+                if (isset($booking_data['vehicle_id'])) {
                     $vehicle = get_post($booking_data['vehicle_id']);
                     if ($vehicle) {
+                        echo '<a href="' . get_edit_post_link($vehicle->ID) . '">';
                         echo esc_html($vehicle->post_title);
-                        
-                        // Show vehicle type
-                        $vehicle_data = get_post_meta($vehicle->ID, '_crcm_vehicle_data', true);
-                        if (isset($vehicle_data['vehicle_type'])) {
-                            $type_label = $vehicle_data['vehicle_type'] === 'auto' ? 'Auto' : 'Scooter';
-                            echo '<br><small>' . $type_label . '</small>';
-                        }
+                        echo '</a>';
                     }
                 }
                 break;
                 
             case 'crcm_dates':
-                if ($booking_data && isset($booking_data['pickup_date'], $booking_data['return_date'])) {
-                    echo esc_html(date_i18n('M j', strtotime($booking_data['pickup_date'])));
-                    echo ' - ';
-                    echo esc_html(date_i18n('M j, Y', strtotime($booking_data['return_date'])));
-                }
-                break;
-                
-            case 'crcm_status':
-                if ($booking_status) {
-                    echo crcm_get_status_badge($booking_status);
+                if (isset($booking_data['pickup_date'], $booking_data['return_date'])) {
+                    $pickup = date('d/m/Y', strtotime($booking_data['pickup_date']));
+                    $return = date('d/m/Y', strtotime($booking_data['return_date']));
+                    echo '<strong>Ritiro:</strong> ' . $pickup . '<br>';
+                    echo '<strong>Riconsegna:</strong> ' . $return;
+                    
+                    if (isset($booking_data['rental_days'])) {
+                        echo '<br><small>' . $booking_data['rental_days'] . ' giorni</small>';
+                    }
                 }
                 break;
                 
             case 'crcm_total':
-                if ($payment_data && isset($payment_data['total_amount'])) {
-                    echo '€' . number_format($payment_data['total_amount'], 2);
+                if (isset($pricing_breakdown['final_total'])) {
+                    echo '<strong>€' . number_format($pricing_breakdown['final_total'], 2) . '</strong>';
                 }
+                break;
+                
+            case 'crcm_status':
+                $status_labels = array(
+                    'pending' => 'In Attesa',
+                    'confirmed' => 'Confermata',
+                    'active' => 'In Corso',
+                    'completed' => 'Completata',
+                    'cancelled' => 'Cancellata',
+                );
+                
+                $status = $booking_status ?: 'pending';
+                $label = $status_labels[$status] ?? $status;
+                
+                echo '<span class="crcm-status-badge ' . esc_attr($status) . '">' . esc_html($label) . '</span>';
                 break;
         }
     }
     
     /**
-     * AJAX create booking with auto customer registration
+     * Admin styles for booking interface
      */
-    public function ajax_create_booking() {
-        check_ajax_referer('crcm_nonce', 'nonce');
-        
-        // Validate required fields
-        $required_fields = array('vehicle_id', 'pickup_date', 'return_date', 'first_name', 'last_name', 'email');
-        foreach ($required_fields as $field) {
-            if (empty($_POST[$field])) {
-                wp_send_json_error(sprintf(__('Field %s is required.', 'custom-rental-manager'), $field));
+    public function admin_booking_styles() {
+        $screen = get_current_screen();
+        if ($screen && $screen->post_type === 'crcm_booking') {
+            ?>
+            <style>
+            /* BOOKING ADMIN STYLES */
+            .post-type-crcm_booking .postbox {
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                margin-bottom: 20px;
             }
-        }
-        
-        // Create booking post
-        $booking_id = wp_insert_post(array(
-            'post_type' => 'crcm_booking',
-            'post_status' => 'publish',
-            'post_title' => sprintf(__('Booking - %s', 'custom-rental-manager'), date('Y-m-d H:i')),
-        ));
-        
-        if (is_wp_error($booking_id)) {
-            wp_send_json_error(__('Failed to create booking.', 'custom-rental-manager'));
-        }
-        
-        // Prepare customer data
-        $customer_data = array(
-            'first_name' => sanitize_text_field($_POST['first_name']),
-            'last_name' => sanitize_text_field($_POST['last_name']),
-            'email' => sanitize_email($_POST['email']),
-            'phone' => sanitize_text_field($_POST['phone'] ?? ''),
-            'date_of_birth' => sanitize_text_field($_POST['date_of_birth'] ?? ''),
-            'address' => sanitize_textarea_field($_POST['address'] ?? ''),
-            'license_number' => sanitize_text_field($_POST['license_number'] ?? ''),
-            'emergency_contact' => sanitize_text_field($_POST['emergency_contact'] ?? ''),
-            'emergency_phone' => sanitize_text_field($_POST['emergency_phone'] ?? ''),
-        );
-        
-        // Save booking data
-        $booking_data = array(
-            'vehicle_id' => intval($_POST['vehicle_id']),
-            'pickup_date' => sanitize_text_field($_POST['pickup_date']),
-            'return_date' => sanitize_text_field($_POST['return_date']),
-            'pickup_time' => sanitize_text_field($_POST['pickup_time'] ?? '09:00'),
-            'return_time' => sanitize_text_field($_POST['return_time'] ?? '18:00'),
-            'pickup_location' => sanitize_text_field($_POST['pickup_location'] ?? ''),
-            'return_location' => sanitize_text_field($_POST['return_location'] ?? ''),
-            'home_delivery' => isset($_POST['home_delivery']) ? 1 : 0,
-            'delivery_address' => sanitize_textarea_field($_POST['delivery_address'] ?? ''),
-            'extras' => isset($_POST['extras']) ? array_map('sanitize_text_field', $_POST['extras']) : array(),
-            'special_requests' => sanitize_textarea_field($_POST['special_requests'] ?? ''),
-        );
-        
-        update_post_meta($booking_id, '_crcm_booking_data', $booking_data);
-        update_post_meta($booking_id, '_crcm_customer_data', $customer_data);
-        
-        // Set initial status
-        update_post_meta($booking_id, '_crcm_booking_status', 'pending');
-        
-        // Generate booking number
-        $booking_number = $this->generate_booking_number();
-        update_post_meta($booking_id, '_crcm_booking_number', $booking_number);
-        
-        // Auto-register customer
-        $customer_user_id = $this->auto_register_customer($booking_id, $customer_data);
-        
-        // Trigger booking created action
-        do_action('crcm_booking_created', $booking_id, $customer_data);
-        
-        wp_send_json_success(array(
-            'booking_id' => $booking_id,
-            'booking_number' => $booking_number,
-            'customer_id' => $customer_user_id,
-            'message' => __('Booking created successfully! Customer account has been created.', 'custom-rental-manager'),
-        ));
-    }
-    
-    /**
-     * AJAX cancel booking
-     */
-    public function ajax_cancel_booking() {
-        check_ajax_referer('crcm_nonce', 'nonce');
-        
-        $booking_id = intval($_POST['booking_id']);
-        
-        if (!$booking_id || get_post_type($booking_id) !== 'crcm_booking') {
-            wp_send_json_error(__('Invalid booking ID.', 'custom-rental-manager'));
-        }
-        
-        // Check if user can cancel this booking
-        $customer_user_id = get_post_meta($booking_id, '_crcm_customer_user_id', true);
-        $current_user = wp_get_current_user();
-        
-        if (!current_user_can('manage_options') && $current_user->ID != $customer_user_id) {
-            wp_send_json_error(__('You do not have permission to cancel this booking.', 'custom-rental-manager'));
-        }
-        
-        // Update status to cancelled
-        update_post_meta($booking_id, '_crcm_booking_status', 'cancelled');
-        
-        wp_send_json_success(__('Booking cancelled successfully.', 'custom-rental-manager'));
-    }
-    
-    /**
-     * Handle booking status change
-     */
-    public function on_booking_status_change($new_status, $old_status, $post) {
-        if ($post->post_type !== 'crcm_booking') {
-            return;
-        }
-        
-        // Send email notifications based on status change
-        if (function_exists('crcm') && crcm()->email_manager) {
-            $booking_status = get_post_meta($post->ID, '_crcm_booking_status', true);
             
-            switch ($booking_status) {
-                case 'confirmed':
-                    crcm()->email_manager->send_booking_confirmation($post->ID);
-                    break;
-                case 'cancelled':
-                    crcm()->email_manager->send_cancellation_email($post->ID);
-                    break;
+            .post-type-crcm_booking .postbox-header {
+                background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                border-radius: 8px 8px 0 0;
+                padding: 12px 16px;
             }
-        }
-    }
-    
-    /**
-     * AJAX get booking details
-     */
-    public function ajax_get_booking_details() {
-        check_ajax_referer('crcm_admin_nonce', 'nonce');
-        
-        $booking_id = intval($_POST['booking_id']);
-        
-        if (!$booking_id || get_post_type($booking_id) !== 'crcm_booking') {
-            wp_send_json_error(__('Invalid booking ID.', 'custom-rental-manager'));
-        }
-        
-        $booking_data = get_post_meta($booking_id, '_crcm_booking_data', true);
-        $customer_data = get_post_meta($booking_id, '_crcm_customer_data', true);
-        $payment_data = get_post_meta($booking_id, '_crcm_payment_data', true);
-        $booking_status = get_post_meta($booking_id, '_crcm_booking_status', true);
-        $booking_number = get_post_meta($booking_id, '_crcm_booking_number', true);
-        
-        $vehicle = get_post($booking_data['vehicle_id']);
-        
-        ob_start();
-        ?>
-        <div class="crcm-booking-details">
-            <h3><?php printf(__('Booking Details - %s', 'custom-rental-manager'), $booking_number); ?></h3>
             
-            <table class="widefat fixed striped">
-                <tbody>
-                    <tr>
-                        <td><strong><?php _e('Customer:', 'custom-rental-manager'); ?></strong></td>
-                        <td><?php echo esc_html($customer_data['first_name'] . ' ' . $customer_data['last_name']); ?></td>
-                    </tr>
-                    <tr>
-                        <td><strong><?php _e('Vehicle:', 'custom-rental-manager'); ?></strong></td>
-                        <td><?php echo $vehicle ? esc_html($vehicle->post_title) : __('Unknown', 'custom-rental-manager'); ?></td>
-                    </tr>
-                    <tr>
-                        <td><strong><?php _e('Dates:', 'custom-rental-manager'); ?></strong></td>
-                        <td>
-                            <?php echo esc_html(date_i18n('M j, Y', strtotime($booking_data['pickup_date']))); ?> - 
-                            <?php echo esc_html(date_i18n('M j, Y', strtotime($booking_data['return_date']))); ?>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td><strong><?php _e('Status:', 'custom-rental-manager'); ?></strong></td>
-                        <td><?php echo crcm_get_status_badge($booking_status); ?></td>
-                    </tr>
-                    <?php if ($payment_data && isset($payment_data['total_amount'])): ?>
-                    <tr>
-                        <td><strong><?php _e('Total:', 'custom-rental-manager'); ?></strong></td>
-                        <td>€<?php echo number_format($payment_data['total_amount'], 2); ?></td>
-                    </tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+            .post-type-crcm_booking .postbox-header h2 {
+                font-size: 15px;
+                font-weight: 600;
+                color: #333;
+                margin: 0;
+            }
             
-            <p>
-                <a href="<?php echo get_edit_post_link($booking_id); ?>" class="button button-primary">
-                    <?php _e('Edit Booking', 'custom-rental-manager'); ?>
-                </a>
-            </p>
-        </div>
-        <?php
-        $content = ob_get_clean();
-        wp_send_json_success($content);
-    }
-    
-    /**
-     * Get locations array
-     */
-    public function get_locations() {
-        return $this->locations;
+            /* Customer Search */
+            .crcm-customer-search-container {
+                position: relative;
+            }
+            
+            .crcm-search-results {
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: white;
+                border: 1px solid #ddd;
+                border-top: none;
+                border-radius: 0 0 4px 4px;
+                max-height: 300px;
+                overflow-y: auto;
+                z-index: 1000;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }
+            
+            .customer-result {
+                padding: 12px;
+                border-bottom: 1px solid #f0f0f0;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            .customer-result:hover {
+                background: #f8f9fa;
+            }
+            
+            .customer-info {
+                flex: 1;
+            }
+            
+            .customer-info strong {
+                display: block;
+                font-size: 14px;
+            }
+            
+            .customer-email,
+            .customer-phone {
+                display: block;
+                font-size: 12px;
+                color: #666;
+            }
+            
+            .customer-card {
+                background: #f8f9fa;
+                border: 1px solid #ddd;
+                border-radius: 6px;
+                padding: 15px;
+                margin-top: 10px;
+            }
+            
+            .customer-card h4 {
+                margin: 0 0 10px 0;
+                color: #333;
+            }
+            
+            .customer-card p {
+                margin: 5px 0;
+                font-size: 13px;
+            }
+            
+            /* Vehicle Details */
+            .crcm-vehicle-summary {
+                background: #f8f9fa;
+                border: 1px solid #ddd;
+                border-radius: 6px;
+                padding: 15px;
+            }
+            
+            .vehicle-basic-info h5 {
+                margin: 0 0 10px 0;
+                font-size: 16px;
+                color: #333;
+            }
+            
+            .vehicle-specs {
+                margin: 10px 0;
+            }
+            
+            .spec-item {
+                display: inline-block;
+                background: white;
+                padding: 4px 8px;
+                margin: 2px 4px 2px 0;
+                border-radius: 12px;
+                font-size: 12px;
+                border: 1px solid #ddd;
+            }
+            
+            .vehicle-pricing {
+                margin: 10px 0;
+                font-size: 16px;
+            }
+            
+            .vehicle-extras h6,
+            .vehicle-insurance h6,
+            .vehicle-policies h6 {
+                margin: 15px 0 8px 0;
+                font-size: 14px;
+                color: #333;
+            }
+            
+            .vehicle-extras ul,
+            .vehicle-policies ul {
+                margin: 0;
+                padding-left: 20px;
+            }
+            
+            .vehicle-extras li,
+            .vehicle-policies li {
+                margin: 5px 0;
+                font-size: 13px;
+            }
+            
+            .extra-price,
+            .insurance-price {
+                color: #666;
+                font-size: 12px;
+            }
+            
+            /* Availability Status */
+            .crcm-availability-status .success {
+                background: #d4edda;
+                color: #155724;
+                padding: 10px;
+                border-radius: 4px;
+                border: 1px solid #c3e6cb;
+            }
+            
+            .crcm-availability-status .error {
+                background: #f8d7da;
+                color: #721c24;
+                padding: 10px;
+                border-radius: 4px;
+                border: 1px solid #f5c6cb;
+            }
+            
+            .crcm-availability-status .warning {
+                background: #fff3cd;
+                color: #856404;
+                padding: 10px;
+                border-radius: 4px;
+                border: 1px solid #ffeaa7;
+            }
+            
+            /* Pricing */
+            .crcm-pricing-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 15px 0;
+            }
+            
+            .crcm-pricing-table td {
+                padding: 8px 12px;
+                border-bottom: 1px solid #f0f0f0;
+            }
+            
+            .crcm-pricing-table .price-cell {
+                text-align: right;
+                font-weight: 600;
+            }
+            
+            .crcm-pricing-table .total-row td {
+                border-top: 2px solid #333;
+                font-size: 16px;
+                padding-top: 12px;
+            }
+            
+            .crcm-pricing-table .discount {
+                color: #e74c3c;
+            }
+            
+            /* Extra Services */
+            .extra-option,
+            .insurance-option {
+                display: block;
+                padding: 10px;
+                background: #f8f9fa;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                margin: 5px 0;
+                cursor: pointer;
+            }
+            
+            .extra-option:hover,
+            .insurance-option:hover {
+                background: #e9ecef;
+            }
+            
+            .extra-option input,
+            .insurance-option input {
+                margin-right: 8px;
+            }
+            
+            .extra-name,
+            .insurance-name {
+                font-weight: 500;
+            }
+            
+            .extra-price,
+            .insurance-price {
+                float: right;
+                color: #666;
+                font-size: 13px;
+            }
+            
+            /* Status Badges */
+            .crcm-status-badge {
+                display: inline-block;
+                padding: 4px 8px;
+                border-radius: 12px;
+                font-size: 11px;
+                font-weight: 600;
+                text-transform: uppercase;
+            }
+            
+            .crcm-status-badge.pending {
+                background: #fff3cd;
+                color: #856404;
+            }
+            
+            .crcm-status-badge.confirmed {
+                background: #cce5ff;
+                color: #004085;
+            }
+            
+            .crcm-status-badge.active {
+                background: #d4edda;
+                color: #155724;
+            }
+            
+            .crcm-status-badge.completed {
+                background: #e2e3e5;
+                color: #383d41;
+            }
+            
+            .crcm-status-badge.cancelled {
+                background: #f8d7da;
+                color: #721c24;
+            }
+            
+            /* Role Badges */
+            .crcm-role-badge {
+                display: inline-block;
+                padding: 2px 6px;
+                border-radius: 10px;
+                font-size: 11px;
+                font-weight: 600;
+            }
+            
+            .crcm-role-badge.customer {
+                background: #d4edda;
+                color: #155724;
+            }
+            
+            .crcm-role-badge.manager {
+                background: #cce5ff;
+                color: #004085;
+            }
+            
+            .crcm-role-badge.admin {
+                background: #fff3cd;
+                color: #856404;
+            }
+            
+            /* Loading States */
+            .crcm-loading {
+                text-align: center;
+                padding: 20px;
+                color: #666;
+                font-style: italic;
+            }
+            
+            /* Messages */
+            .no-results,
+            .error {
+                padding: 10px;
+                text-align: center;
+                color: #666;
+                font-style: italic;
+            }
+            
+            .error {
+                color: #721c24;
+                background: #f8d7da;
+                border-radius: 4px;
+            }
+            
+            /* Section Headers */
+            .crcm-section-header {
+                margin-bottom: 15px;
+                padding-bottom: 10px;
+                border-bottom: 1px solid #eee;
+            }
+            
+            .crcm-section-header h4 {
+                margin: 0 0 5px 0;
+                font-size: 16px;
+                color: #333;
+            }
+            
+            .crcm-section-header .description {
+                margin: 0;
+                font-size: 13px;
+                color: #666;
+            }
+            
+            /* Form Elements */
+            .post-type-crcm_booking .form-table th {
+                width: 200px;
+                font-weight: 600;
+            }
+            
+            .post-type-crcm_booking .form-table input,
+            .post-type-crcm_booking .form-table select,
+            .post-type-crcm_booking .form-table textarea {
+                border-radius: 4px;
+                border: 1px solid #ddd;
+            }
+            
+            .post-type-crcm_booking .form-table input:focus,
+            .post-type-crcm_booking .form-table select:focus,
+            .post-type-crcm_booking .form-table textarea:focus {
+                border-color: #007cba;
+                box-shadow: 0 0 0 1px #007cba;
+            }
+            </style>
+            <?php
+        }
     }
 }
 
-// Add CSS for customer badge
-add_action('admin_head', function() {
-    ?>
-    <style>
-    .crcm-customer-badge {
-        display: inline-block;
-        background: #27ae60;
-        color: white;
-        padding: 2px 6px;
-        border-radius: 10px;
-        font-size: 10px;
-        font-weight: 600;
-        text-transform: uppercase;
-    }
-    </style>
-    <?php
-});
+// Initialize booking manager
+new CRCM_Booking_Manager();
