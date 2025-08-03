@@ -1,6 +1,6 @@
 <?php
 /**
- * Admin Dashboard Template
+ * Admin Dashboard Template - FIXED
  * 
  * @package CustomRentalCarManager
  * @author Totaliweb
@@ -19,8 +19,8 @@ $currency_symbol = crcm_get_setting('currency_symbol', '€');
 
 <div class="wrap crcm-dashboard">
     <h1><?php _e('Rental Manager Dashboard', 'custom-rental-manager'); ?></h1>
-
-    <!-- Statistics Cards -->
+    
+    <!-- Dashboard Stats Cards -->
     <div class="crcm-stats-grid">
         <div class="crcm-stat-card">
             <div class="crcm-stat-icon">
@@ -31,7 +31,7 @@ $currency_symbol = crcm_get_setting('currency_symbol', '€');
                 <p><?php _e('Total Vehicles', 'custom-rental-manager'); ?></p>
             </div>
         </div>
-
+        
         <div class="crcm-stat-card">
             <div class="crcm-stat-icon">
                 <span class="dashicons dashicons-calendar-alt"></span>
@@ -41,7 +41,7 @@ $currency_symbol = crcm_get_setting('currency_symbol', '€');
                 <p><?php _e('Total Bookings', 'custom-rental-manager'); ?></p>
             </div>
         </div>
-
+        
         <div class="crcm-stat-card">
             <div class="crcm-stat-icon">
                 <span class="dashicons dashicons-money-alt"></span>
@@ -51,10 +51,10 @@ $currency_symbol = crcm_get_setting('currency_symbol', '€');
                 <p><?php _e('This Month Revenue', 'custom-rental-manager'); ?></p>
             </div>
         </div>
-
+        
         <div class="crcm-stat-card">
             <div class="crcm-stat-icon">
-                <span class="dashicons dashicons-admin-users"></span>
+                <span class="dashicons dashicons-yes-alt"></span>
             </div>
             <div class="crcm-stat-content">
                 <h3><?php echo number_format($stats['active_bookings']); ?></h3>
@@ -62,52 +62,54 @@ $currency_symbol = crcm_get_setting('currency_symbol', '€');
             </div>
         </div>
     </div>
-
+    
     <!-- Today's Activity -->
     <div class="crcm-dashboard-section">
-        <h2><?php _e('Today's Activity', 'custom-rental-manager'); ?></h2>
-        <div class="crcm-today-activity">
+        <h2><?php _e('Today\'s Activity', 'custom-rental-manager'); ?></h2>
+        
+        <div class="crcm-activity-grid">
             <div class="crcm-activity-card">
                 <h3><?php echo number_format($stats['todays_pickups']); ?></h3>
                 <p><?php _e('Pickups Today', 'custom-rental-manager'); ?></p>
-                <span class="dashicons dashicons-arrow-up-alt"></span>
             </div>
+            
             <div class="crcm-activity-card">
                 <h3><?php echo number_format($stats['todays_returns']); ?></h3>
                 <p><?php _e('Returns Today', 'custom-rental-manager'); ?></p>
-                <span class="dashicons dashicons-arrow-down-alt"></span>
             </div>
         </div>
     </div>
-
+    
     <!-- Booking Status Overview -->
     <div class="crcm-dashboard-section">
         <h2><?php _e('Booking Status Overview', 'custom-rental-manager'); ?></h2>
-        <div class="crcm-status-overview">
+        
+        <div class="crcm-status-grid">
             <div class="crcm-status-item">
-                <span class="crcm-status-count"><?php echo number_format($stats['pending_bookings']); ?></span>
-                <span class="crcm-status-label"><?php _e('Pending', 'custom-rental-manager'); ?></span>
+                <?php echo number_format($stats['pending_bookings']); ?>
+                <?php _e('Pending', 'custom-rental-manager'); ?>
             </div>
             <div class="crcm-status-item">
-                <span class="crcm-status-count"><?php echo number_format($stats['confirmed_bookings']); ?></span>
-                <span class="crcm-status-label"><?php _e('Confirmed', 'custom-rental-manager'); ?></span>
+                <?php echo number_format($stats['confirmed_bookings']); ?>
+                <?php _e('Confirmed', 'custom-rental-manager'); ?>
             </div>
             <div class="crcm-status-item">
-                <span class="crcm-status-count"><?php echo number_format($stats['active_bookings']); ?></span>
-                <span class="crcm-status-label"><?php _e('Active', 'custom-rental-manager'); ?></span>
+                <?php echo number_format($stats['active_bookings']); ?>
+                <?php _e('Active', 'custom-rental-manager'); ?>
             </div>
             <div class="crcm-status-item">
-                <span class="crcm-status-count"><?php echo number_format($stats['completed_bookings']); ?></span>
-                <span class="crcm-status-label"><?php _e('Completed', 'custom-rental-manager'); ?></span>
+                <?php echo number_format($stats['completed_bookings']); ?>
+                <?php _e('Completed', 'custom-rental-manager'); ?>
             </div>
         </div>
     </div>
-
+    
     <!-- Upcoming Bookings -->
     <div class="crcm-dashboard-section">
         <h2><?php _e('Upcoming Bookings', 'custom-rental-manager'); ?></h2>
+        
         <?php if (!empty($upcoming_bookings)): ?>
-            <div class="crcm-upcoming-bookings">
+            <div class="crcm-bookings-table">
                 <table class="wp-list-table widefat fixed striped">
                     <thead>
                         <tr>
@@ -127,9 +129,7 @@ $currency_symbol = crcm_get_setting('currency_symbol', '€');
                             $vehicle = get_post($booking_data['vehicle_id']);
                         ?>
                             <tr>
-                                <td>
-                                    <strong><?php echo esc_html($booking_number); ?></strong>
-                                </td>
+                                <td><strong><?php echo esc_html($booking_number); ?></strong></td>
                                 <td>
                                     <?php if ($customer_data): ?>
                                         <?php echo esc_html($customer_data['first_name'] . ' ' . $customer_data['last_name']); ?>
@@ -145,9 +145,7 @@ $currency_symbol = crcm_get_setting('currency_symbol', '€');
                                         <?php echo esc_html(crcm_format_date($booking_data['pickup_date'])); ?>
                                     <?php endif; ?>
                                 </td>
-                                <td>
-                                    <?php echo crcm_get_status_badge($booking['status']); ?>
-                                </td>
+                                <td><?php echo crcm_get_status_badge($booking['status']); ?></td>
                                 <td>
                                     <a href="<?php echo esc_url(get_edit_post_link($booking['ID'])); ?>" class="button button-small">
                                         <?php _e('Edit', 'custom-rental-manager'); ?>
@@ -162,48 +160,47 @@ $currency_symbol = crcm_get_setting('currency_symbol', '€');
             <p><?php _e('No upcoming bookings found.', 'custom-rental-manager'); ?></p>
         <?php endif; ?>
     </div>
-
+    
     <!-- Quick Actions -->
     <div class="crcm-dashboard-section">
         <h2><?php _e('Quick Actions', 'custom-rental-manager'); ?></h2>
+        
         <div class="crcm-quick-actions">
-            <a href="<?php echo esc_url(admin_url('post-new.php?post_type=crcm_vehicle')); ?>" class="button button-primary">
+            <a href="<?php echo admin_url('post-new.php?post_type=crcm_vehicle'); ?>" class="button button-primary">
                 <span class="dashicons dashicons-plus-alt"></span>
                 <?php _e('Add New Vehicle', 'custom-rental-manager'); ?>
             </a>
-            <a href="<?php echo esc_url(admin_url('post-new.php?post_type=crcm_booking')); ?>" class="button button-secondary">
+            <a href="<?php echo admin_url('post-new.php?post_type=crcm_booking'); ?>" class="button button-primary">
                 <span class="dashicons dashicons-calendar-alt"></span>
                 <?php _e('New Booking', 'custom-rental-manager'); ?>
             </a>
-            <a href="<?php echo esc_url(admin_url('admin.php?page=crcm-calendar')); ?>" class="button button-secondary">
+            <a href="<?php echo admin_url('admin.php?page=crcm-calendar'); ?>" class="button">
                 <span class="dashicons dashicons-calendar"></span>
                 <?php _e('View Calendar', 'custom-rental-manager'); ?>
             </a>
-            <a href="<?php echo esc_url(admin_url('admin.php?page=crcm-settings')); ?>" class="button button-secondary">
+            <a href="<?php echo admin_url('admin.php?page=crcm-settings'); ?>" class="button">
                 <span class="dashicons dashicons-admin-settings"></span>
                 <?php _e('Settings', 'custom-rental-manager'); ?>
             </a>
         </div>
     </div>
-
-    <!-- Totaliweb Credit -->
+    
+    <!-- Footer Credit -->
     <?php if (crcm_get_setting('show_totaliweb_credit', true)): ?>
-    <div class="crcm-dashboard-footer">
-        <p>
-            <?php printf(
-                __('Custom Rental Car Manager developed by %s', 'custom-rental-manager'),
-                '<a href="' . CRCM_BRAND_URL . '" target="_blank">Totaliweb</a>'
-            ); ?>
-        </p>
-    </div>
+        <div class="crcm-footer-credit">
+            <p>
+                <?php printf(
+                    __('Custom Rental Car Manager developed by %s', 'custom-rental-manager'),
+                    '<a href="' . CRCM_BRAND_URL . '" target="_blank">Totaliweb</a>'
+                ); ?>
+            </p>
+        </div>
     <?php endif; ?>
 </div>
 
 <style>
 .crcm-dashboard {
-    background: #f1f1f1;
-    margin: 20px 0;
-    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .crcm-stats-grid {
@@ -215,11 +212,12 @@ $currency_symbol = crcm_get_setting('currency_symbol', '€');
 
 .crcm-stat-card {
     background: white;
-    padding: 20px;
+    border: 1px solid #ccd0d4;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 20px;
     display: flex;
     align-items: center;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
 }
 
 .crcm-stat-icon {
@@ -228,39 +226,40 @@ $currency_symbol = crcm_get_setting('currency_symbol', '€');
 
 .crcm-stat-icon .dashicons {
     font-size: 40px;
-    color: #2271b1;
     width: 40px;
     height: 40px;
+    color: #0073aa;
 }
 
 .crcm-stat-content h3 {
-    margin: 0;
-    font-size: 28px;
+    margin: 0 0 5px 0;
+    font-size: 24px;
     color: #1d2327;
 }
 
 .crcm-stat-content p {
-    margin: 5px 0 0 0;
+    margin: 0;
     color: #646970;
     font-size: 14px;
 }
 
 .crcm-dashboard-section {
     background: white;
-    padding: 20px;
+    border: 1px solid #ccd0d4;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 20px;
     margin-bottom: 20px;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
 }
 
 .crcm-dashboard-section h2 {
-    margin-top: 0;
+    margin: 0 0 20px 0;
     color: #1d2327;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid #eee;
     padding-bottom: 10px;
 }
 
-.crcm-today-activity {
+.crcm-activity-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 20px;
@@ -271,24 +270,20 @@ $currency_symbol = crcm_get_setting('currency_symbol', '€');
     padding: 20px;
     background: #f8f9fa;
     border-radius: 6px;
-    position: relative;
 }
 
 .crcm-activity-card h3 {
-    font-size: 36px;
+    margin: 0 0 10px 0;
+    font-size: 28px;
+    color: #0073aa;
+}
+
+.crcm-activity-card p {
     margin: 0;
-    color: #2271b1;
+    color: #646970;
 }
 
-.crcm-activity-card .dashicons {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    color: #2271b1;
-    font-size: 20px;
-}
-
-.crcm-status-overview {
+.crcm-status-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 15px;
@@ -299,18 +294,11 @@ $currency_symbol = crcm_get_setting('currency_symbol', '€');
     padding: 15px;
     background: #f8f9fa;
     border-radius: 6px;
+    font-weight: 600;
 }
 
-.crcm-status-count {
-    display: block;
-    font-size: 24px;
-    font-weight: bold;
-    color: #2271b1;
-}
-
-.crcm-status-label {
-    font-size: 14px;
-    color: #646970;
+.crcm-bookings-table {
+    overflow-x: auto;
 }
 
 .crcm-quick-actions {
@@ -325,15 +313,17 @@ $currency_symbol = crcm_get_setting('currency_symbol', '€');
     gap: 5px;
 }
 
-.crcm-dashboard-footer {
+.crcm-footer-credit {
     text-align: center;
-    padding: 20px;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
     color: #646970;
     font-size: 12px;
 }
 
-.crcm-dashboard-footer a {
-    color: #2271b1;
+.crcm-footer-credit a {
+    color: #0073aa;
     text-decoration: none;
 }
 
@@ -341,13 +331,12 @@ $currency_symbol = crcm_get_setting('currency_symbol', '€');
     .crcm-stats-grid {
         grid-template-columns: 1fr;
     }
-
+    
     .crcm-quick-actions {
         flex-direction: column;
     }
-
+    
     .crcm-quick-actions .button {
-        width: 100%;
         justify-content: center;
     }
 }
