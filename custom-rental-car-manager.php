@@ -171,10 +171,10 @@ class CRCM_Plugin {
     }
     
     /**
-     * Register custom post types - FIX: Simplified registration without complex rewrite rules
+     * Register custom post types - FIX: Clean menu structure
      */
     private function register_post_types() {
-        // Vehicle post type
+        // Vehicle post type - NO MENU (will be under main menu)
         register_post_type('crcm_vehicle', array(
             'labels' => array(
                 'name' => __('Vehicles', 'custom-rental-manager'),
@@ -184,14 +184,15 @@ class CRCM_Plugin {
                 'edit_item' => __('Edit Vehicle', 'custom-rental-manager'),
             ),
             'public' => true,
-            'has_archive' => false, // FIX: Disable archive to avoid rewrite issues
+            'has_archive' => false,
             'menu_icon' => 'dashicons-car',
             'supports' => array('title', 'editor', 'thumbnail', 'excerpt'),
-            'show_in_rest' => false, // FIX: Disable REST API initially
-            'rewrite' => false, // FIX: Disable custom rewrite rules
+            'show_in_rest' => false,
+            'rewrite' => false,
+            'show_in_menu' => false, // FIX: Don't show separate menu
         ));
         
-        // Booking post type
+        // Booking post type - NO MENU (will be under main menu)
         register_post_type('crcm_booking', array(
             'labels' => array(
                 'name' => __('Bookings', 'custom-rental-manager'),
@@ -210,12 +211,13 @@ class CRCM_Plugin {
                 'publish_posts' => 'manage_options',
                 'read_private_posts' => 'manage_options',
             ),
-            'rewrite' => false, // FIX: Disable rewrite rules
+            'rewrite' => false,
+            'show_in_menu' => false, // FIX: Don't show separate menu
         ));
     }
     
     /**
-     * Register taxonomies - FIX: Simplified taxonomy registration
+     * Register taxonomies - FIX: Clean taxonomy registration
      */
     private function register_taxonomies() {
         // Vehicle type taxonomy
@@ -227,11 +229,12 @@ class CRCM_Plugin {
             'hierarchical' => true,
             'public' => true,
             'show_admin_column' => true,
-            'rewrite' => false, // FIX: Disable rewrite rules
+            'rewrite' => false,
+            'show_in_menu' => true,
         ));
         
-        // Location taxonomy
-        register_taxonomy('crcm_location', array('crcm_vehicle', 'crcm_booking'), array(
+        // Location taxonomy - ONLY for vehicles, NOT bookings
+        register_taxonomy('crcm_location', 'crcm_vehicle', array(
             'labels' => array(
                 'name' => __('Locations', 'custom-rental-manager'),
                 'singular_name' => __('Location', 'custom-rental-manager'),
@@ -239,21 +242,23 @@ class CRCM_Plugin {
             'hierarchical' => true,
             'public' => true,
             'show_admin_column' => true,
-            'rewrite' => false, // FIX: Disable rewrite rules
+            'rewrite' => false,
+            'show_in_menu' => true,
         ));
     }
     
     /**
-     * Add admin menu
+     * Add admin menu - FIX: Clean organized menu structure
      */
     private function add_admin_menu() {
         add_action('admin_menu', array($this, 'admin_menu'));
     }
     
     /**
-     * Admin menu callback
+     * Admin menu callback - FIX: Single organized menu
      */
     public function admin_menu() {
+        // Main menu page
         add_menu_page(
             __('Rental Manager', 'custom-rental-manager'),
             __('Rental Manager', 'custom-rental-manager'),
@@ -264,6 +269,61 @@ class CRCM_Plugin {
             30
         );
         
+        // Vehicles submenu
+        add_submenu_page(
+            'crcm-dashboard',
+            __('Vehicles', 'custom-rental-manager'),
+            __('Vehicles', 'custom-rental-manager'),
+            'manage_options',
+            'edit.php?post_type=crcm_vehicle'
+        );
+        
+        // Add Vehicle submenu
+        add_submenu_page(
+            'crcm-dashboard',
+            __('Add Vehicle', 'custom-rental-manager'),
+            __('Add Vehicle', 'custom-rental-manager'),
+            'manage_options',
+            'post-new.php?post_type=crcm_vehicle'
+        );
+        
+        // Vehicle Types submenu
+        add_submenu_page(
+            'crcm-dashboard',
+            __('Vehicle Types', 'custom-rental-manager'),
+            __('Vehicle Types', 'custom-rental-manager'),
+            'manage_options',
+            'edit-tags.php?taxonomy=crcm_vehicle_type&post_type=crcm_vehicle'
+        );
+        
+        // Locations submenu
+        add_submenu_page(
+            'crcm-dashboard',
+            __('Locations', 'custom-rental-manager'),
+            __('Locations', 'custom-rental-manager'),
+            'manage_options',
+            'edit-tags.php?taxonomy=crcm_location&post_type=crcm_vehicle'
+        );
+        
+        // Bookings submenu
+        add_submenu_page(
+            'crcm-dashboard',
+            __('Bookings', 'custom-rental-manager'),
+            __('Bookings', 'custom-rental-manager'),
+            'manage_options',
+            'edit.php?post_type=crcm_booking'
+        );
+        
+        // Add Booking submenu
+        add_submenu_page(
+            'crcm-dashboard',
+            __('Add Booking', 'custom-rental-manager'),
+            __('Add Booking', 'custom-rental-manager'),
+            'manage_options',
+            'post-new.php?post_type=crcm_booking'
+        );
+        
+        // Calendar submenu
         add_submenu_page(
             'crcm-dashboard',
             __('Calendar', 'custom-rental-manager'),
@@ -273,6 +333,7 @@ class CRCM_Plugin {
             array($this, 'calendar_page')
         );
         
+        // Settings submenu
         add_submenu_page(
             'crcm-dashboard',
             __('Settings', 'custom-rental-manager'),
@@ -314,20 +375,30 @@ class CRCM_Plugin {
      * Calendar page
      */
     public function calendar_page() {
-        echo '<div class="wrap">';
-        echo '<h1>' . esc_html__('Rental Calendar', 'custom-rental-manager') . '</h1>';
-        echo '<p>' . esc_html__('Calendar view coming soon.', 'custom-rental-manager') . '</p>';
-        echo '</div>';
+        $template_path = CRCM_PLUGIN_PATH . 'templates/admin/calendar.php';
+        if (file_exists($template_path)) {
+            include $template_path;
+        } else {
+            echo '<div class="wrap">';
+            echo '<h1>' . esc_html__('Rental Calendar', 'custom-rental-manager') . '</h1>';
+            echo '<p>' . esc_html__('Calendar template not found.', 'custom-rental-manager') . '</p>';
+            echo '</div>';
+        }
     }
     
     /**
      * Settings page
      */
     public function settings_page() {
-        echo '<div class="wrap">';
-        echo '<h1>' . esc_html__('Rental Settings', 'custom-rental-manager') . '</h1>';
-        echo '<p>' . esc_html__('Settings panel coming soon.', 'custom-rental-manager') . '</p>';
-        echo '</div>';
+        $template_path = CRCM_PLUGIN_PATH . 'templates/admin/settings.php';
+        if (file_exists($template_path)) {
+            include $template_path;
+        } else {
+            echo '<div class="wrap">';
+            echo '<h1>' . esc_html__('Rental Settings', 'custom-rental-manager') . '</h1>';
+            echo '<p>' . esc_html__('Settings template not found.', 'custom-rental-manager') . '</p>';
+            echo '</div>';
+        }
     }
     
     /**
@@ -414,17 +485,17 @@ class CRCM_Plugin {
     }
     
     /**
-     * Enqueue frontend assets
+     * Enqueue frontend assets - FIX: Correct asset path
      */
     public function enqueue_frontend_assets() {
-        // Only enqueue if files exist
-        $css_path = CRCM_PLUGIN_PATH . 'assets/css/frontend.css';
-        $js_path = CRCM_PLUGIN_PATH . 'assets/js/frontend.js';
+        // FIX: Use 'asset' directory (not 'assets')
+        $css_path = CRCM_PLUGIN_PATH . 'asset/css/frontend.css';
+        $js_path = CRCM_PLUGIN_PATH . 'asset/js/frontend.js';
         
         if (file_exists($css_path)) {
             wp_enqueue_style(
                 'crcm-frontend',
-                CRCM_PLUGIN_URL . 'assets/css/frontend.css',
+                CRCM_PLUGIN_URL . 'asset/css/frontend.css',
                 array(),
                 CRCM_VERSION
             );
@@ -433,7 +504,7 @@ class CRCM_Plugin {
         if (file_exists($js_path)) {
             wp_enqueue_script(
                 'crcm-frontend',
-                CRCM_PLUGIN_URL . 'assets/js/frontend.js',
+                CRCM_PLUGIN_URL . 'asset/js/frontend.js',
                 array('jquery'),
                 CRCM_VERSION,
                 true
@@ -443,6 +514,7 @@ class CRCM_Plugin {
                 'ajax_url' => admin_url('admin-ajax.php'),
                 'nonce' => wp_create_nonce('crcm_nonce'),
                 'currency_symbol' => $this->get_setting('currency_symbol', '€'),
+                'booking_page_url' => home_url('/booking/'), // FIX: Add booking page URL
             ));
         }
     }
@@ -456,13 +528,14 @@ class CRCM_Plugin {
             return;
         }
         
-        $css_path = CRCM_PLUGIN_PATH . 'assets/css/admin.css';
-        $js_path = CRCM_PLUGIN_PATH . 'assets/js/admin.js';
+        // FIX: Use 'asset' directory (not 'assets')
+        $css_path = CRCM_PLUGIN_PATH . 'asset/css/admin.css';
+        $js_path = CRCM_PLUGIN_PATH . 'asset/js/admin.js';
         
         if (file_exists($css_path)) {
             wp_enqueue_style(
                 'crcm-admin',
-                CRCM_PLUGIN_URL . 'assets/css/admin.css',
+                CRCM_PLUGIN_URL . 'asset/css/admin.css',
                 array(),
                 CRCM_VERSION
             );
@@ -479,7 +552,7 @@ class CRCM_Plugin {
         if (file_exists($js_path)) {
             wp_enqueue_script(
                 'crcm-admin',
-                CRCM_PLUGIN_URL . 'assets/js/admin.js',
+                CRCM_PLUGIN_URL . 'asset/js/admin.js',
                 array('jquery', 'jquery-ui-datepicker'),
                 CRCM_VERSION,
                 true
