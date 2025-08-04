@@ -1,8 +1,8 @@
 /**
  * Enhanced Admin JavaScript for Custom Rental Car Manager
  * 
- * UPDATED with advanced pricing calculations, insurance integration,
- * custom rates handling, and late return penalty calculations.
+ * COMPLETE ECOSYSTEM INTEGRATION with fixed AJAX connections
+ * and proper error handling for booking management.
  * 
  * @package CustomRentalCarManager
  * @author Totaliweb
@@ -11,6 +11,16 @@
 
 jQuery(document).ready(function($) {
     'use strict';
+    
+    console.log('CRCM Admin JS: Starting initialization...');
+    
+    // Check if crcm_admin object exists
+    if (typeof crcm_admin === 'undefined') {
+        console.error('CRCM Admin JS: crcm_admin object not found! Check wp_localize_script.');
+        return;
+    }
+    
+    console.log('CRCM Admin JS: Configuration loaded', crcm_admin);
     
     // Global variables
     let selectedVehicleData = null;
@@ -25,6 +35,8 @@ jQuery(document).ready(function($) {
      * Initialize enhanced booking manager
      */
     function initBookingManager() {
+        console.log('CRCM: Initializing booking manager...');
+        
         // Date picker initialization
         $('.crcm-datepicker').datepicker({
             dateFormat: 'yy-mm-dd',
@@ -43,6 +55,8 @@ jQuery(document).ready(function($) {
         // Vehicle selection change
         $('#vehicle_id').on('change', function() {
             const vehicleId = $(this).val();
+            console.log('CRCM: Vehicle selection changed to:', vehicleId);
+            
             if (vehicleId) {
                 loadVehicleData(vehicleId);
             } else {
@@ -52,6 +66,7 @@ jQuery(document).ready(function($) {
         
         // Date and time changes
         $('#pickup_date, #return_date, #pickup_time, #return_time').on('change', function() {
+            console.log('CRCM: Date/time changed');
             calculateRentalDays();
             checkVehicleAvailability();
             if (selectedVehicleData) {
@@ -61,6 +76,7 @@ jQuery(document).ready(function($) {
         
         // Service selections changes
         $(document).on('change', 'input[name="selected_extras[]"], input[name="selected_insurance"], #manual_discount', function() {
+            console.log('CRCM: Service selection changed');
             if (selectedVehicleData) {
                 calculateAdvancedPricing();
             }
@@ -74,6 +90,8 @@ jQuery(document).ready(function($) {
         
         // Initialize existing data if editing
         initializeExistingBooking();
+        
+        console.log('CRCM: Booking manager initialized successfully');
     }
     
     /**
@@ -82,6 +100,7 @@ jQuery(document).ready(function($) {
     function initializeExistingBooking() {
         const vehicleId = $('#vehicle_id').val();
         if (vehicleId) {
+            console.log('CRCM: Loading existing vehicle data for editing:', vehicleId);
             loadVehicleData(vehicleId);
         }
     }
@@ -102,23 +121,23 @@ jQuery(document).ready(function($) {
             currentBookingDays = Math.max(1, daysDiff);
             
             // Update display
-            $('.rental-days-display').text(currentBookingDays + ' giorni di noleggio');
+            $('.rental-days-display').text('Rental days: ' + currentBookingDays);
             $('#rental_days').val(currentBookingDays);
             
-            console.log('Calculated rental days:', currentBookingDays);
+            console.log('CRCM: Calculated rental days:', currentBookingDays);
         }
     }
     
     /**
-     * Load vehicle data via AJAX with enhanced data
+     * Load vehicle data via AJAX with enhanced error handling
      */
     function loadVehicleData(vehicleId) {
-        console.log('Loading vehicle data for ID:', vehicleId);
+        console.log('CRCM: Loading vehicle data for ID:', vehicleId);
         
         // Show loading state
-        $('.vehicle-details-container').html('<div class="crcm-loading">🔄 Caricamento dati veicolo...</div>');
-        $('.availability-status').html('<div class="crcm-loading">🔄 Controllo disponibilità...</div>');
-        $('.extras-container, .insurance-container').html('<div class="crcm-loading">🔄 Caricamento servizi...</div>');
+        $('.vehicle-details-container').html('<div class="crcm-loading">🔄 Loading vehicle data...</div>');
+        $('.availability-status').html('<div class="crcm-loading">🔄 Checking availability...</div>');
+        $('.extras-container, .insurance-container .premium-insurance-container').html('<div class="crcm-loading">🔄 Loading services...</div>');
         
         $.ajax({
             url: crcm_admin.ajax_url,
@@ -128,10 +147,13 @@ jQuery(document).ready(function($) {
                 vehicle_id: vehicleId,
                 nonce: crcm_admin.nonce
             },
+            timeout: 10000, // 10 second timeout
             success: function(response) {
+                console.log('CRCM: Vehicle data AJAX response:', response);
+                
                 if (response.success) {
                     selectedVehicleData = response.data;
-                    console.log('Vehicle data loaded:', selectedVehicleData);
+                    console.log('CRCM: Vehicle data loaded successfully:', selectedVehicleData);
                     
                     // Update vehicle details display
                     $('.vehicle-details-container').html(response.data.details);
@@ -149,13 +171,25 @@ jQuery(document).ready(function($) {
                     calculateAdvancedPricing();
                     
                 } else {
-                    showError('Errore nel caricamento dati veicolo: ' + response.data);
+                    console.error('CRCM: Vehicle data loading failed:', response.data);
+                    showError('Error loading vehicle data: ' + response.data);
                     clearVehicleData();
                 }
             },
             error: function(xhr, status, error) {
-                console.error('AJAX Error:', error);
-                showError('Errore di connessione durante il caricamento dei dati veicolo');
+                console.error('CRCM: Vehicle data AJAX error:', {xhr, status, error});
+                console.error('CRCM: Response text:', xhr.responseText);
+                
+                let errorMessage = 'Connection error loading vehicle data.';
+                if (status === 'timeout') {
+                    errorMessage = 'Request timed out. Please try again.';
+                } else if (xhr.status === 403) {
+                    errorMessage = 'Permission denied. Please refresh the page.';
+                } else if (xhr.status === 500) {
+                    errorMessage = 'Server error. Please check server logs.';
+                }
+                
+                showError(errorMessage);
                 clearVehicleData();
             }
         });
@@ -167,10 +201,10 @@ jQuery(document).ready(function($) {
     function clearVehicleData() {
         selectedVehicleData = null;
         currentPricing = {};
-        $('.vehicle-details-container').html('<p class="description">Seleziona un veicolo per visualizzare i dettagli</p>');
-        $('.extras-container').html('<p class="description">Seleziona un veicolo per visualizzare i servizi extra</p>');
-        $('.insurance-container').html('<p class="description">Seleziona un veicolo per visualizzare le opzioni assicurative</p>');
-        $('.availability-status').html('<p class="description">Seleziona un veicolo per controllare la disponibilità</p>');
+        $('.vehicle-details-container').html('<p class="description">Select a vehicle to view details</p>');
+        $('.extras-container').html('<p class="description">Select a vehicle to view available extra services</p>');
+        $('.premium-insurance-container').html('');
+        $('.availability-status').html('<p class="description">Select a vehicle and dates to check availability</p>');
         resetPricingDisplay();
         clearCalculationLog();
     }
@@ -183,7 +217,7 @@ jQuery(document).ready(function($) {
         container.empty();
         
         if (!extras || extras.length === 0) {
-            container.html('<p class="description">Nessun servizio extra disponibile per questo veicolo</p>');
+            container.html('<p class="description">No extra services available for this vehicle</p>');
             return;
         }
         
@@ -195,7 +229,7 @@ jQuery(document).ready(function($) {
                     <label>
                         <input type="checkbox" name="selected_extras[]" value="${index}" data-rate="${extra.daily_rate}" data-name="${extra.name}">
                         <strong>${extra.name}</strong>
-                        <span class="extra-price">+€${parseFloat(extra.daily_rate).toFixed(2)}/giorno</span>
+                        <span class="extra-price">+€${parseFloat(extra.daily_rate).toFixed(2)}/day</span>
                     </label>
                 </div>
             `;
@@ -204,54 +238,37 @@ jQuery(document).ready(function($) {
         html += '</div>';
         container.html(html);
         
-        console.log('Populated extras:', extras.length, 'items');
+        console.log('CRCM: Populated extras:', extras.length, 'items');
     }
     
     /**
      * Populate insurance section with radio buttons
      */
     function populateInsuranceSection(insurance) {
-        const container = $('.insurance-container');
+        const container = $('.premium-insurance-container');
         container.empty();
-        
-        let html = '<div class="insurance-options">';
-        
-        // Basic insurance (always included)
-        html += `
-            <div class="insurance-option basic">
-                <label>
-                    <input type="radio" name="selected_insurance" value="basic" checked data-rate="0">
-                    <strong>🛡️ Assicurazione Base (Inclusa)</strong>
-                    <div class="insurance-details">
-                        <small>✅ RCA - Responsabilità Civile Auto</small>
-                    </div>
-                </label>
-            </div>
-        `;
         
         // Premium insurance (if available)
         if (insurance && insurance.premium && insurance.premium.enabled) {
             const deductible = insurance.premium.deductible || 500;
             const dailyRate = parseFloat(insurance.premium.daily_rate || 0);
             
-            html += `
-                <div class="insurance-option premium">
+            let html = `
+                <div class="insurance-option">
                     <label>
-                        <input type="radio" name="selected_insurance" value="premium" data-rate="${dailyRate}">
-                        <strong>🏆 Assicurazione Premium</strong>
-                        <span class="insurance-price">+€${dailyRate.toFixed(2)}/giorno</span>
-                        <div class="insurance-details">
-                            <small>✅ RCA + Franchigia €${deductible} + Furto e Incendio + Danni Accidentali</small>
-                        </div>
+                        <input type="radio" name="pricing_breakdown[selected_insurance]" value="premium" data-rate="${dailyRate}">
+                        <strong>Premium Insurance</strong>
+                        <span class="insurance-price">+€${dailyRate.toFixed(2)}/day</span>
+                        <br><small>RCA + €${deductible} Deductible + Theft & Fire + Accidental Damage</small>
                     </label>
                 </div>
             `;
+            
+            container.html(html);
+            console.log('CRCM: Populated premium insurance, daily rate:', dailyRate);
+        } else {
+            console.log('CRCM: No premium insurance available for this vehicle');
         }
-        
-        html += '</div>';
-        container.html(html);
-        
-        console.log('Populated insurance options, premium available:', !!(insurance && insurance.premium && insurance.premium.enabled));
     }
     
     /**
@@ -266,7 +283,9 @@ jQuery(document).ready(function($) {
             return;
         }
         
-        $('.availability-status').html('<div class="crcm-loading">🔄 Controllo disponibilità...</div>');
+        console.log('CRCM: Checking availability for vehicle:', vehicleId);
+        
+        $('.availability-status').html('<div class="crcm-loading">🔄 Checking availability...</div>');
         
         $.ajax({
             url: crcm_admin.ajax_url,
@@ -279,6 +298,8 @@ jQuery(document).ready(function($) {
                 nonce: crcm_admin.nonce
             },
             success: function(response) {
+                console.log('CRCM: Availability check response:', response);
+                
                 if (response.success) {
                     const data = response.data;
                     let html = '';
@@ -286,32 +307,32 @@ jQuery(document).ready(function($) {
                     if (data.is_available) {
                         html = `
                             <div class="availability-success">
-                                ✅ <strong>Disponibile</strong><br>
-                                ${data.available_quantity} di ${data.total_quantity} unità disponibili
+                                ✅ <strong>Available</strong><br>
+                                ${data.available_quantity} of ${data.total_quantity} units available
                             </div>
                         `;
                     } else {
                         html = `
                             <div class="availability-error">
-                                ❌ <strong>Non Disponibile</strong><br>
-                                Tutte le unità sono già prenotate per questo periodo
+                                ❌ <strong>Not Available</strong><br>
+                                All units are booked for this period
                             </div>
                         `;
                     }
                     
                     $('.availability-status').html(html);
                 } else {
-                    $('.availability-status').html('<div class="availability-error">❌ Errore nel controllo disponibilità</div>');
+                    $('.availability-status').html('<div class="availability-error">❌ Error checking availability</div>');
                 }
             },
             error: function() {
-                $('.availability-status').html('<div class="availability-error">❌ Errore di connessione</div>');
+                $('.availability-status').html('<div class="availability-error">❌ Connection error</div>');
             }
         });
     }
     
     /**
-     * ENHANCED: Calculate advanced pricing with all components
+     * Calculate advanced pricing with all components
      */
     function calculateAdvancedPricing() {
         const vehicleId = $('#vehicle_id').val();
@@ -321,7 +342,7 @@ jQuery(document).ready(function($) {
         const returnTime = $('#return_time').val();
         
         if (!vehicleId || !pickupDate || !returnDate || !selectedVehicleData) {
-            console.log('Missing data for pricing calculation');
+            console.log('CRCM: Missing data for pricing calculation');
             return;
         }
         
@@ -332,12 +353,12 @@ jQuery(document).ready(function($) {
         });
         
         // Get selected insurance
-        const selectedInsurance = $('input[name="selected_insurance"]:checked').val() || 'basic';
+        const selectedInsurance = $('input[name="pricing_breakdown[selected_insurance]"]:checked').val() || 'basic';
         
         // Get manual discount
         const manualDiscount = parseFloat($('#manual_discount').val()) || 0;
         
-        console.log('Calculating pricing with:', {
+        console.log('CRCM: Calculating pricing with:', {
             vehicleId,
             pickupDate,
             returnDate,
@@ -355,7 +376,7 @@ jQuery(document).ready(function($) {
             url: crcm_admin.ajax_url,
             type: 'POST',
             data: {
-                action: 'crcm_calculate_advanced_pricing',
+                action: 'crcm_calculate_booking_total',
                 vehicle_id: vehicleId,
                 pickup_date: pickupDate,
                 return_date: returnDate,
@@ -366,10 +387,13 @@ jQuery(document).ready(function($) {
                 manual_discount: manualDiscount,
                 nonce: crcm_admin.nonce
             },
+            timeout: 15000, // 15 second timeout
             success: function(response) {
+                console.log('CRCM: Pricing calculation response:', response);
+                
                 if (response.success) {
                     currentPricing = response.data;
-                    console.log('Pricing calculated:', currentPricing);
+                    console.log('CRCM: Pricing calculated successfully:', currentPricing);
                     
                     // Update pricing display
                     updatePricingDisplay(
@@ -389,13 +413,25 @@ jQuery(document).ready(function($) {
                     updatePricingFields(currentPricing);
                     
                 } else {
-                    showError('Errore nel calcolo prezzi: ' + response.data);
+                    console.error('CRCM: Pricing calculation failed:', response.data);
+                    showError('Error calculating prices: ' + response.data);
                     resetPricingDisplay();
                 }
             },
             error: function(xhr, status, error) {
-                console.error('Pricing calculation error:', error);
-                showError('Errore di connessione durante il calcolo prezzi');
+                console.error('CRCM: Pricing calculation AJAX error:', {xhr, status, error});
+                console.error('CRCM: Response text:', xhr.responseText);
+                
+                let errorMessage = 'Connection error during price calculation.';
+                if (status === 'timeout') {
+                    errorMessage = 'Price calculation timed out. Please try again.';
+                } else if (xhr.status === 403) {
+                    errorMessage = 'Permission denied during price calculation.';
+                } else if (xhr.status === 500) {
+                    errorMessage = 'Server error during price calculation. Check server logs.';
+                }
+                
+                showError(errorMessage);
                 resetPricingDisplay();
             }
         });
@@ -423,7 +459,7 @@ jQuery(document).ready(function($) {
         $('.late-return-row').toggle(lateReturnPenalty > 0);
         $('.discount-row').toggle(discountTotal > 0);
         
-        console.log('Updated pricing display:', {
+        console.log('CRCM: Updated pricing display:', {
             baseTotal,
             customRatesTotal,
             extrasTotal,
@@ -456,14 +492,14 @@ jQuery(document).ready(function($) {
         const logText = calculationLog.join('\n');
         logContent.html('<pre>' + logText + '</pre>');
         
-        console.log('Updated calculation log with', calculationLog.length, 'lines');
+        console.log('CRCM: Updated calculation log with', calculationLog.length, 'lines');
     }
     
     /**
      * Clear calculation log
      */
     function clearCalculationLog() {
-        $('.log-content').html('<p class="description">I calcoli dettagliati appariranno qui quando selezioni un veicolo e imposti le date</p>');
+        $('.log-content').html('<p class="description">Detailed calculations will appear here when you select a vehicle and set dates</p>');
     }
     
     /**
@@ -478,34 +514,11 @@ jQuery(document).ready(function($) {
         $('#final_total').val(pricing.final_total.toFixed(2));
         $('#rental_days').val(pricing.rental_days);
         
-        // Update selected services for saving
-        const selectedExtras = [];
-        $('input[name="selected_extras[]"]:checked').each(function() {
-            selectedExtras.push({
-                index: $(this).val(),
-                name: $(this).data('name'),
-                rate: $(this).data('rate')
-            });
-        });
-        
-        // Store selected services data
-        $('<input>').attr({
-            type: 'hidden',
-            name: 'pricing_breakdown[selected_extras]',
-            value: JSON.stringify(selectedExtras)
-        }).appendTo('#post');
-        
-        $('<input>').attr({
-            type: 'hidden',
-            name: 'pricing_breakdown[selected_insurance]',
-            value: $('input[name="selected_insurance"]:checked').val()
-        }).appendTo('#post');
-        
-        console.log('Updated pricing fields with final total:', pricing.final_total);
+        console.log('CRCM: Updated pricing fields with final total:', pricing.final_total);
     }
     
     // ===============================================
-    // CUSTOMER SEARCH FUNCTIONALITY (UNCHANGED)
+    // CUSTOMER SEARCH FUNCTIONALITY
     // ===============================================
     
     /**
@@ -545,6 +558,12 @@ jQuery(document).ready(function($) {
             e.preventDefault();
             showCreateCustomerModal();
         });
+        
+        // Remove customer selection
+        $(document).on('click', '.remove-customer', function() {
+            $('#customer_id').val('');
+            selectedCustomer.hide().empty();
+        });
     }
     
     /**
@@ -552,7 +571,7 @@ jQuery(document).ready(function($) {
      */
     function searchCustomers(query) {
         const resultsContainer = $('.customer-search-results');
-        resultsContainer.html('<div class="crcm-loading">🔍 Ricerca clienti...</div>').show();
+        resultsContainer.html('<div class="crcm-loading">🔍 Searching customers...</div>').show();
         
         $.ajax({
             url: crcm_admin.ajax_url,
@@ -570,7 +589,7 @@ jQuery(document).ready(function($) {
                 }
             },
             error: function() {
-                resultsContainer.html('<div class="no-results">❌ Errore nella ricerca clienti</div>');
+                resultsContainer.html('<div class="no-results">❌ Error searching customers</div>');
             }
         });
     }
@@ -582,7 +601,7 @@ jQuery(document).ready(function($) {
         const resultsContainer = $('.customer-search-results');
         
         if (!customers.length) {
-            resultsContainer.html('<div class="no-results">👤 Nessun cliente trovato</div>');
+            resultsContainer.html('<div class="no-results">👤 No customers found</div>');
             return;
         }
         
@@ -623,11 +642,11 @@ jQuery(document).ready(function($) {
         const selectedInfo = $('.selected-customer-info');
         let html = `
             <div class="selected-customer">
-                <div class="customer-name"><strong>${name}</strong></div>
-                <div class="customer-email"><strong>Email:</strong> ${email}</div>
-                <div class="customer-role"><strong>Ruolo:</strong> Rental Customer</div>
-                ${phone ? `<div class="customer-phone"><strong>Telefono:</strong> ${phone}</div>` : ''}
-                <button type="button" class="button-link remove-customer">❌ Rimuovi selezione</button>
+                <h4>${name}</h4>
+                <p><strong>Email:</strong> ${email}</p>
+                <p><strong>Role:</strong> Rental Customer</p>
+                ${phone ? `<p><strong>Phone:</strong> ${phone}</p>` : ''}
+                <button type="button" class="button remove-customer">Remove Selection</button>
             </div>
         `;
         
@@ -636,12 +655,6 @@ jQuery(document).ready(function($) {
         // Clear search
         $('#customer_search').val('');
         $('.customer-search-results').hide();
-        
-        // Handle remove selection
-        $('.remove-customer').on('click', function() {
-            $('#customer_id').val('');
-            selectedInfo.hide().empty();
-        });
     }
     
     /**
@@ -652,11 +665,11 @@ jQuery(document).ready(function($) {
             <div id="create-customer-modal" class="crcm-modal">
                 <div class="crcm-modal-content">
                     <span class="crcm-modal-close">&times;</span>
-                    <h2>👤 Crea Nuovo Cliente</h2>
+                    <h2>👤 Create New Customer</h2>
                     <form id="create-customer-form">
                         <table class="form-table">
                             <tr>
-                                <th><label for="new_customer_name">Nome Completo *</label></th>
+                                <th><label for="new_customer_name">Full Name *</label></th>
                                 <td><input type="text" id="new_customer_name" required /></td>
                             </tr>
                             <tr>
@@ -664,13 +677,13 @@ jQuery(document).ready(function($) {
                                 <td><input type="email" id="new_customer_email" required /></td>
                             </tr>
                             <tr>
-                                <th><label for="new_customer_phone">Telefono</label></th>
+                                <th><label for="new_customer_phone">Phone</label></th>
                                 <td><input type="tel" id="new_customer_phone" /></td>
                             </tr>
                         </table>
                         <p class="submit">
-                            <button type="submit" class="button button-primary">✅ Crea Cliente</button>  
-                            <button type="button" class="button cancel-create">❌ Annulla</button>
+                            <button type="submit" class="button button-primary">✅ Create Customer</button>  
+                            <button type="button" class="button cancel-create">❌ Cancel</button>
                         </p>
                     </form>
                 </div>
@@ -701,7 +714,7 @@ jQuery(document).ready(function($) {
         const phone = $('#new_customer_phone').val().trim();
         
         if (!name || !email) {
-            showError('Nome e email sono obbligatori');
+            showError('Name and email are required');
             return;
         }
         
@@ -722,13 +735,13 @@ jQuery(document).ready(function($) {
                     const customer = response.data;
                     selectCustomer(customer.user_id, customer.name, customer.email, phone);
                     $('#create-customer-modal').remove();
-                    showSuccess('Cliente creato con successo!');
+                    showSuccess('Customer created successfully!');
                 } else {
-                    showError('Errore nella creazione cliente: ' + response.data);
+                    showError('Error creating customer: ' + response.data);
                 }
             },
             error: function() {
-                showError('Errore di connessione durante la creazione del cliente');
+                showError('Connection error during customer creation');
             },
             complete: function() {
                 $('.button').prop('disabled', false);
@@ -737,7 +750,7 @@ jQuery(document).ready(function($) {
     }
     
     // ===============================================
-    // FORM VALIDATION (ENHANCED)
+    // FORM VALIDATION
     // ===============================================
     
     /**
@@ -774,14 +787,14 @@ jQuery(document).ready(function($) {
         
         // Check customer selection
         if (!$('#customer_id').val()) {
-            errors.push('Seleziona un cliente per la prenotazione');
+            errors.push('Select a customer for the booking');
             $('#customer_search').addClass('error');
             isValid = false;
         }
         
         // Check vehicle selection
         if (!$('#vehicle_id').val()) {
-            errors.push('Seleziona un veicolo per la prenotazione');
+            errors.push('Select a vehicle for the booking');
             $('#vehicle_id').addClass('error');
             isValid = false;
         }
@@ -794,19 +807,19 @@ jQuery(document).ready(function($) {
         // Check availability
         const availabilityStatus = $('.availability-status .availability-error').length;
         if (availabilityStatus > 0) {
-            errors.push('Il veicolo selezionato non è disponibile per le date scelte');
+            errors.push('Selected vehicle is not available for chosen dates');
             isValid = false;
         }
         
         // Check pricing calculation
         if (!currentPricing.final_total || currentPricing.final_total <= 0) {
-            errors.push('Errore nel calcolo del prezzo totale');
+            errors.push('Error in total price calculation');
             isValid = false;
         }
         
         if (!isValid) {
             e.preventDefault();
-            showError('Errori nel form:\n• ' + errors.join('\n• '));
+            showError('Form errors:\n• ' + errors.join('\n• '));
             
             // Scroll to first error
             $('html, body').animate({
@@ -869,7 +882,7 @@ jQuery(document).ready(function($) {
     }
     
     // ===============================================
-    // UTILITY FUNCTIONS (ENHANCED)
+    // UTILITY FUNCTIONS
     // ===============================================
     
     /**
@@ -878,7 +891,7 @@ jQuery(document).ready(function($) {
     function showSuccess(message) {
         const notice = $(`
             <div class="notice notice-success is-dismissible">
-                <p><strong>✅ Successo:</strong> ${message}</p>
+                <p><strong>✅ Success:</strong> ${message}</p>
                 <button type="button" class="notice-dismiss"><span class="screen-reader-text">Dismiss</span></button>
             </div>
         `);
@@ -899,7 +912,7 @@ jQuery(document).ready(function($) {
     function showError(message) {
         const notice = $(`
             <div class="notice notice-error is-dismissible">
-                <p><strong>❌ Errore:</strong> ${message}</p>
+                <p><strong>❌ Error:</strong> ${message}</p>
                 <button type="button" class="notice-dismiss"><span class="screen-reader-text">Dismiss</span></button>
             </div>
         `);
@@ -914,13 +927,6 @@ jQuery(document).ready(function($) {
         $('html, body').animate({ scrollTop: 0 }, 300);
     }
     
-    /**
-     * Show loading state
-     */
-    function showLoading(element, message = 'Caricamento...') {
-        $(element).html(`<div class="crcm-loading">🔄 ${message}</div>`);
-    }
-    
     // ===============================================
     // INITIALIZATION
     // ===============================================
@@ -931,11 +937,11 @@ jQuery(document).ready(function($) {
     function init() {
         const currentScreen = $('body').attr('class');
         
-        console.log('Initializing CRCM Admin JS, screen:', currentScreen);
+        console.log('CRCM: Initializing, screen classes:', currentScreen);
         
         // Initialize booking manager on booking pages
         if (currentScreen && currentScreen.includes('crcm_booking')) {
-            console.log('Initializing booking manager');
+            console.log('CRCM: Initializing booking manager');
             initBookingManager();
         }
         
@@ -949,7 +955,7 @@ jQuery(document).ready(function($) {
         // Initialize general UI improvements
         initUIImprovements();
         
-        console.log('CRCM Admin JS initialized successfully');
+        console.log('CRCM: Initialization completed successfully');
     }
     
     /**
@@ -966,7 +972,7 @@ jQuery(document).ready(function($) {
             const $btn = $(this);
             if ($btn.attr('type') === 'submit') {
                 const originalText = $btn.text();
-                $btn.prop('disabled', true).text('⏳ Salvando...');
+                $btn.prop('disabled', true).text('⏳ Saving...');
                 
                 setTimeout(function() {
                     $btn.prop('disabled', false).text(originalText);
@@ -977,11 +983,6 @@ jQuery(document).ready(function($) {
         // Improve form UX
         $('input[required], select[required]').on('blur', function() {
             $(this).toggleClass('error', !$(this).val());
-        });
-        
-        // Auto-focus first input in modals
-        $(document).on('shown.bs.modal', '.crcm-modal', function() {
-            $(this).find('input:first').focus();
         });
         
         // Keyboard shortcuts
@@ -1013,9 +1014,46 @@ jQuery(document).ready(function($) {
             currentBookingDays,
             currentPricing,
             ajaxUrl: crcm_admin.ajax_url,
-            nonce: crcm_admin.nonce
+            nonce: crcm_admin.nonce,
+            adminObject: crcm_admin
         });
     };
     
     console.log('CRCM Enhanced Admin JS loaded successfully');
+    
+    // Add CSS for modal
+    $('<style>').prop('type', 'text/css').html(`
+        .crcm-modal {
+            display: none;
+            position: fixed;
+            z-index: 100000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .crcm-modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 500px;
+            border-radius: 5px;
+        }
+        .crcm-modal-close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .crcm-modal-close:hover {
+            color: black;
+        }
+        .error {
+            border-color: #dc3232 !important;
+            box-shadow: 0 0 2px rgba(204, 0, 0, 0.8);
+        }
+    `).appendTo('head');
 });
