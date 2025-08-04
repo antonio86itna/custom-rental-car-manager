@@ -611,8 +611,9 @@ add_action('plugins_loaded', 'crcm', 10);
 /**
  * MANUAL ROLE CREATION FUNCTION - For immediate testing
  * Add this to wp-admin/plugins.php?crcm_create_roles=1 for manual trigger
+ * Requires CRCM_ALLOW_ROLE_REPAIR constant set to true.
  */
-if (isset($_GET['crcm_create_roles']) && current_user_can('manage_options')) {
+if (defined('CRCM_ALLOW_ROLE_REPAIR') && CRCM_ALLOW_ROLE_REPAIR && isset($_GET['crcm_create_roles']) && current_user_can('manage_options')) {
     add_action('admin_init', function() {
         if (file_exists(CRCM_PLUGIN_PATH . 'inc/functions.php')) {
             require_once CRCM_PLUGIN_PATH . 'inc/functions.php';
@@ -626,7 +627,7 @@ if (isset($_GET['crcm_create_roles']) && current_user_can('manage_options')) {
 }
 
 // Show success message
-if (isset($_GET['crcm_roles_created'])) {
+if (defined('CRCM_ALLOW_ROLE_REPAIR') && CRCM_ALLOW_ROLE_REPAIR && isset($_GET['crcm_roles_created'])) {
     add_action('admin_notices', function() {
         echo '<div class="notice notice-success is-dismissible">';
         echo '<p><strong>Custom Rental Manager:</strong> User roles created successfully!</p>';
