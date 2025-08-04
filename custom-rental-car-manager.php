@@ -1,5 +1,22 @@
 <?php
 /**
+ * Plugin Name: Custom Rental Car Manager
+ * Plugin URI: https://totaliweb.com/plugins/custom-rental-car-manager
+ * Description: Complete rental car and scooter management system for WordPress. Perfect for rental businesses like Costabilerent in Ischia.
+ * Version: 1.0.0
+ * Author: Totaliweb
+ * Author URI: https://totaliweb.com
+ * License: GPL v2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain: custom-rental-manager
+ * Domain Path: /languages
+ * Requires at least: 5.6
+ * Tested up to: 6.8
+ * Requires PHP: 8.0
+ * Network: false
+ */
+
+/**
  * COMPLETELY FIXED Main Plugin File - SAVE POST ISSUES RESOLVED
  * 
  * CRITICAL FIXES APPLIED:
