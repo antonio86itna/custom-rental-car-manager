@@ -20,7 +20,6 @@ class CRCM_Booking_Manager {
      * Constructor
      */
     public function __construct() {
-        add_action('init', array($this, 'ensure_user_roles'));
         add_action('add_meta_boxes', array($this, 'add_meta_boxes'));
         add_action('save_post', array($this, 'save_booking_meta'));
         
@@ -42,76 +41,7 @@ class CRCM_Booking_Manager {
         // Admin styles
         add_action('admin_head', array($this, 'admin_booking_styles'));
     }
-    
-    /**
-     * Ensure custom user roles exist and are properly configured
-     */
-    public function ensure_user_roles() {
-        // Remove roles first to ensure clean setup
-        remove_role('crcm_customer');
-        remove_role('crcm_manager');
-        
-        // Create Customer role with specific capabilities
-        add_role('crcm_customer', __('Rental Customer', 'custom-rental-manager'), array(
-            'read' => true,
-            'crcm_view_own_bookings' => true,
-            'crcm_edit_own_profile' => true,
-            'crcm_cancel_bookings' => true,
-        ));
-        
-        // Create Manager role with comprehensive capabilities
-        add_role('crcm_manager', __('Rental Manager', 'custom-rental-manager'), array(
-            'read' => true,
-            'edit_posts' => true,
-            'edit_others_posts' => true,
-            'publish_posts' => true,
-            'delete_posts' => true,
-            'delete_others_posts' => true,
-            'manage_categories' => true,
-            'upload_files' => true,
-            
-            // Vehicle management
-            'crcm_manage_vehicles' => true,
-            'crcm_edit_vehicles' => true,
-            'crcm_delete_vehicles' => true,
-            'crcm_publish_vehicles' => true,
-            
-            // Booking management
-            'crcm_manage_bookings' => true,
-            'crcm_edit_bookings' => true,
-            'crcm_delete_bookings' => true,
-            'crcm_publish_bookings' => true,
-            'crcm_view_all_bookings' => true,
-            
-            // Customer management
-            'crcm_manage_customers' => true,
-            'crcm_view_customer_data' => true,
-            'crcm_edit_customer_profiles' => true,
-            
-            // Reports and analytics
-            'crcm_view_reports' => true,
-            'crcm_export_data' => true,
-        ));
-        
-        // Add capabilities to administrator
-        $admin = get_role('administrator');
-        if ($admin) {
-            $capabilities = array(
-                'crcm_manage_vehicles', 'crcm_edit_vehicles', 'crcm_delete_vehicles', 'crcm_publish_vehicles',
-                'crcm_manage_bookings', 'crcm_edit_bookings', 'crcm_delete_bookings', 'crcm_publish_bookings',
-                'crcm_view_all_bookings', 'crcm_manage_customers', 'crcm_view_customer_data',
-                'crcm_edit_customer_profiles', 'crcm_view_reports', 'crcm_export_data'
-            );
-            
-            foreach ($capabilities as $cap) {
-                $admin->add_cap($cap);
-            }
-        }
-        
-        // Ensure roles are properly registered
-        wp_roles()->reinit();
-    }
-    
+
     /**
      * Add meta boxes for booking post type
      */

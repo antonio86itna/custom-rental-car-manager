@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
 
 /**
  * Create and manage custom user roles for rental system
- * Called on plugin activation and init
+ * Called on plugin activation or via repair tool
  */
 function crcm_create_custom_user_roles() {
     // Remove existing roles to ensure clean setup
@@ -148,10 +148,7 @@ function crcm_create_custom_user_roles() {
     update_option('crcm_roles_version', '1.0.0');
 }
 
-/**
- * Hook role creation to plugin activation and init
- */
-add_action('init', 'crcm_create_custom_user_roles', 1);
+// Role creation is triggered on plugin activation or through the repair tool.
 
 /**
  * Assign default customer role to new users

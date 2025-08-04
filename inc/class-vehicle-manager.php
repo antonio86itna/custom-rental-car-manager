@@ -66,7 +66,6 @@ class CRCM_Vehicle_Manager {
      * Constructor
      */
     public function __construct() {
-        add_action('init', array($this, 'create_user_roles'));
         add_action('init', array($this, 'remove_vehicle_supports'), 20);
         add_action('add_meta_boxes', array($this, 'add_meta_boxes'));
         add_action('save_post', array($this, 'save_vehicle_meta'));
@@ -74,49 +73,11 @@ class CRCM_Vehicle_Manager {
         add_action('wp_ajax_nopriv_crcm_search_vehicles', array($this, 'ajax_search_vehicles'));
         add_filter('manage_crcm_vehicle_posts_columns', array($this, 'vehicle_columns'));
         add_action('manage_crcm_vehicle_posts_custom_column', array($this, 'vehicle_column_content'), 10, 2);
-        
+
         // AJAX handlers
         add_action('wp_ajax_crcm_get_vehicle_fields', array($this, 'ajax_get_vehicle_fields'));
     }
-    
-    /**
-     * Create custom user roles
-     */
-    public function create_user_roles() {
-        // Customer role for rental clients
-        if (!get_role('crcm_customer')) {
-            add_role('crcm_customer', __('Rental Customer', 'custom-rental-manager'), array(
-                'read' => true,
-                'crcm_view_bookings' => true,
-                'crcm_manage_profile' => true,
-            ));
-        }
-        
-        // Manager role for rental operations
-        if (!get_role('crcm_manager')) {
-            add_role('crcm_manager', __('Rental Manager', 'custom-rental-manager'), array(
-                'read' => true,
-                'edit_posts' => true,
-                'edit_others_posts' => true,
-                'publish_posts' => true,
-                'manage_categories' => true,
-                'crcm_manage_vehicles' => true,
-                'crcm_manage_bookings' => true,
-                'crcm_manage_customers' => true,
-                'crcm_view_reports' => true,
-            ));
-        }
-        
-        // Add capabilities to administrator
-        $admin = get_role('administrator');
-        if ($admin) {
-            $admin->add_cap('crcm_manage_vehicles');
-            $admin->add_cap('crcm_manage_bookings');
-            $admin->add_cap('crcm_manage_customers');
-            $admin->add_cap('crcm_view_reports');
-        }
-    }
-    
+
     /**
      * Remove editor and other supports from vehicle post type
      */
