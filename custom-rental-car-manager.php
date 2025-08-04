@@ -81,17 +81,10 @@ class CRCM_Plugin {
      * Initialize hooks
      */
     private function init_hooks() {
-        // CRITICAL: Add activation hook to create roles
-        register_activation_hook(__FILE__, array($this, 'activate'));
-        register_deactivation_hook(__FILE__, array($this, 'deactivate'));
-        
         add_action('init', array($this, 'init'), 10);
         add_action('init', array($this, 'load_textdomain'), 5);
         add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_assets'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
-        
-        // FORCE role creation check on every admin page load (for debugging)
-        add_action('admin_init', array($this, 'check_and_create_roles'));
     }
     
     /**
@@ -542,26 +535,13 @@ class CRCM_Plugin {
     }
     
     /**
-     * CRITICAL: Check and create roles if they don't exist
-     */
-    public function check_and_create_roles() {
-        $customer_role = get_role('crcm_customer');
-        $manager_role = get_role('crcm_manager');
-        
-        if (!$customer_role || !$manager_role) {
-            // Force create roles
-            if (function_exists('crcm_create_custom_user_roles')) {
-                crcm_create_custom_user_roles();
-            }
-        }
-    }
-    
-    /**
      * Plugin activation - FIXED: Now properly creates roles
      */
-    public function activate() {
+    public static function activate() {
+        $plugin = self::get_instance();
+
         // Create default settings
-        $this->create_default_settings();
+        $plugin->create_default_settings();
         
         // Load functions.php to access role creation function
         if (file_exists(CRCM_PLUGIN_PATH . 'inc/functions.php')) {
@@ -574,7 +554,7 @@ class CRCM_Plugin {
         }
         
         // Register post types before flushing
-        $this->register_post_types();
+        $plugin->register_post_types();
         
         // Flush rewrite rules
         flush_rewrite_rules();
@@ -587,7 +567,7 @@ class CRCM_Plugin {
     /**
      * Plugin deactivation
      */
-    public function deactivate() {
+    public static function deactivate() {
         wp_clear_scheduled_hook('crcm_daily_reminder_check');
         flush_rewrite_rules();
         
@@ -614,6 +594,9 @@ class CRCM_Plugin {
         update_option('crcm_settings', $settings);
     }
 }
+
+register_activation_hook(CRCM_PLUGIN_FILE, array('CRCM_Plugin', 'activate'));
+register_deactivation_hook(CRCM_PLUGIN_FILE, array('CRCM_Plugin', 'deactivate'));
 
 /**
  * Initialize the plugin
