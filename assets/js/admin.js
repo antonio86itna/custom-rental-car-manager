@@ -1,8 +1,9 @@
 /**
  * Enhanced Admin JavaScript for Custom Rental Car Manager
  * 
- * COMPLETE ECOSYSTEM INTEGRATION with fixed AJAX connections
- * and proper error handling for booking management.
+ * COMPLETE WITH PERFECT INSURANCE SYNCHRONIZATION
+ * Fixed to work with vehicle insurance data and only Ischia Porto/Forio locations.
+ * Enhanced insurance loading from vehicle meta and modern pricing display.
  * 
  * @package CustomRentalCarManager
  * @author Totaliweb
@@ -26,6 +27,7 @@ jQuery(document).ready(function($) {
     let selectedVehicleData = null;
     let currentBookingDays = 1;
     let currentPricing = {};
+    let vehicleInsuranceData = null;
     
     // ===============================================
     // ENHANCED BOOKING MANAGER FUNCTIONALITY
@@ -75,7 +77,7 @@ jQuery(document).ready(function($) {
         });
         
         // Service selections changes
-        $(document).on('change', 'input[name="selected_extras[]"], input[name="selected_insurance"], #manual_discount', function() {
+        $(document).on('change', 'input[name="selected_extras[]"], input[name="pricing_breakdown[selected_insurance]"], #manual_discount', function() {
             console.log('CRCM: Service selection changed');
             if (selectedVehicleData) {
                 calculateAdvancedPricing();
@@ -137,7 +139,7 @@ jQuery(document).ready(function($) {
         // Show loading state
         $('.vehicle-details-container').html('<div class="crcm-loading">🔄 Loading vehicle data...</div>');
         $('.availability-status').html('<div class="crcm-loading">🔄 Checking availability...</div>');
-        $('.extras-container, .insurance-container .premium-insurance-container').html('<div class="crcm-loading">🔄 Loading services...</div>');
+        $('.extras-container, .insurance-premium-container').html('<div class="crcm-loading">🔄 Loading services...</div>');
         
         $.ajax({
             url: crcm_admin.ajax_url,
@@ -153,7 +155,9 @@ jQuery(document).ready(function($) {
                 
                 if (response.success) {
                     selectedVehicleData = response.data;
+                    vehicleInsuranceData = response.data.insurance || {};
                     console.log('CRCM: Vehicle data loaded successfully:', selectedVehicleData);
+                    console.log('CRCM: Insurance data loaded:', vehicleInsuranceData);
                     
                     // Update vehicle details display
                     $('.vehicle-details-container').html(response.data.details);
@@ -161,7 +165,7 @@ jQuery(document).ready(function($) {
                     // Populate extras with enhanced display
                     populateExtrasSection(response.data.extras);
                     
-                    // Populate insurance with premium options
+                    // PERFECT: Populate insurance with premium options from vehicle data
                     populateInsuranceSection(response.data.insurance);
                     
                     // Check availability
@@ -200,10 +204,11 @@ jQuery(document).ready(function($) {
      */
     function clearVehicleData() {
         selectedVehicleData = null;
+        vehicleInsuranceData = null;
         currentPricing = {};
         $('.vehicle-details-container').html('<p class="description">Select a vehicle to view details</p>');
         $('.extras-container').html('<p class="description">Select a vehicle to view available extra services</p>');
-        $('.premium-insurance-container').html('');
+        $('.insurance-premium-container').html('');
         $('.availability-status').html('<p class="description">Select a vehicle and dates to check availability</p>');
         resetPricingDisplay();
         clearCalculationLog();
@@ -226,10 +231,13 @@ jQuery(document).ready(function($) {
         extras.forEach(function(extra, index) {
             html += `
                 <div class="extra-item">
-                    <label>
+                    <label class="extra-label">
                         <input type="checkbox" name="selected_extras[]" value="${index}" data-rate="${extra.daily_rate}" data-name="${extra.name}">
-                        <strong>${extra.name}</strong>
-                        <span class="extra-price">+€${parseFloat(extra.daily_rate).toFixed(2)}/day</span>
+                        <span class="extra-info">
+                            <strong>${extra.name}</strong>
+                            <span class="extra-price">+€${parseFloat(extra.daily_rate).toFixed(2)}/day</span>
+                        </span>
+                        ${extra.description ? `<small class="extra-description">${extra.description}</small>` : ''}
                     </label>
                 </div>
             `;
@@ -242,31 +250,38 @@ jQuery(document).ready(function($) {
     }
     
     /**
-     * Populate insurance section with radio buttons
+     * PERFECT: Populate insurance section with radio buttons from vehicle data
      */
     function populateInsuranceSection(insurance) {
-        const container = $('.premium-insurance-container');
+        const container = $('.insurance-premium-container');
         container.empty();
         
-        // Premium insurance (if available)
+        console.log('CRCM: Populating insurance section with data:', insurance);
+        
+        // Premium insurance (if available and enabled in vehicle)
         if (insurance && insurance.premium && insurance.premium.enabled) {
             const deductible = insurance.premium.deductible || 500;
             const dailyRate = parseFloat(insurance.premium.daily_rate || 0);
+            const description = insurance.premium.description || 'RCA + Theft & Fire + Accidental Damage';
             
             let html = `
-                <div class="insurance-option">
-                    <label>
+                <div class="insurance-option premium-insurance">
+                    <label class="insurance-option-label">
                         <input type="radio" name="pricing_breakdown[selected_insurance]" value="premium" data-rate="${dailyRate}">
-                        <strong>Premium Insurance</strong>
-                        <span class="insurance-price">+€${dailyRate.toFixed(2)}/day</span>
-                        <br><small>RCA + €${deductible} Deductible + Theft & Fire + Accidental Damage</small>
+                        <span class="insurance-info">
+                            <strong>Premium Insurance</strong>
+                            <span class="insurance-price">+€${dailyRate.toFixed(2)}/day</span>
+                            <small>${description}</small>
+                            <small>Deductible: €${deductible}</small>
+                        </span>
                     </label>
                 </div>
             `;
             
             container.html(html);
-            console.log('CRCM: Populated premium insurance, daily rate:', dailyRate);
+            console.log('CRCM: Populated premium insurance - Rate: €' + dailyRate + '/day, Deductible: €' + deductible);
         } else {
+            container.html('<p class="description">No premium insurance available for this vehicle</p>');
             console.log('CRCM: No premium insurance available for this vehicle');
         }
     }
@@ -308,14 +323,14 @@ jQuery(document).ready(function($) {
                         html = `
                             <div class="availability-success">
                                 ✅ <strong>Available</strong><br>
-                                ${data.available_quantity} of ${data.total_quantity} units available
+                                <small>${data.available_quantity} of ${data.total_quantity} units available</small>
                             </div>
                         `;
                     } else {
                         html = `
                             <div class="availability-error">
                                 ❌ <strong>Not Available</strong><br>
-                                All units are booked for this period
+                                <small>All units are booked for this period</small>
                             </div>
                         `;
                     }
@@ -369,8 +384,8 @@ jQuery(document).ready(function($) {
             manualDiscount
         });
         
-        // Show loading
-        updatePricingDisplay(0, 0, 0, 0, 0, 0, 0, true);
+        // Show loading in modern pricing display
+        updateModernPricingDisplay(0, 0, 0, 0, 0, 0, 0, true);
         
         $.ajax({
             url: crcm_admin.ajax_url,
@@ -395,8 +410,8 @@ jQuery(document).ready(function($) {
                     currentPricing = response.data;
                     console.log('CRCM: Pricing calculated successfully:', currentPricing);
                     
-                    // Update pricing display
-                    updatePricingDisplay(
+                    // Update MODERN pricing display
+                    updateModernPricingDisplay(
                         currentPricing.base_total,
                         currentPricing.custom_rates_total,
                         currentPricing.extras_total,
@@ -415,7 +430,7 @@ jQuery(document).ready(function($) {
                 } else {
                     console.error('CRCM: Pricing calculation failed:', response.data);
                     showError('Error calculating prices: ' + response.data);
-                    resetPricingDisplay();
+                    resetModernPricingDisplay();
                 }
             },
             error: function(xhr, status, error) {
@@ -432,20 +447,35 @@ jQuery(document).ready(function($) {
                 }
                 
                 showError(errorMessage);
-                resetPricingDisplay();
+                resetModernPricingDisplay();
             }
         });
     }
     
     /**
-     * Update pricing display with all components
+     * MODERN: Update pricing display with all components
      */
-    function updatePricingDisplay(baseTotal, customRatesTotal, extrasTotal, insuranceTotal, lateReturnPenalty, discountTotal, finalTotal, loading = false) {
+    function updateModernPricingDisplay(baseTotal, customRatesTotal, extrasTotal, insuranceTotal, lateReturnPenalty, discountTotal, finalTotal, loading = false) {
         if (loading) {
-            $('.base-total, .custom-rates-total, .extras-total, .insurance-total, .late-return-penalty, .discount-total, .final-total').text('🔄');
+            $('.crcm-pricing-summary-modern .pricing-value').text('🔄');
             return;
         }
         
+        // Update all pricing values in modern display
+        $('.pricing-row.base-rate-row .pricing-value').text('€' + baseTotal.toFixed(2));
+        $('.pricing-row.custom-rates-row .pricing-value').text('€' + customRatesTotal.toFixed(2));
+        $('.pricing-row.extras-row .pricing-value').text('€' + extrasTotal.toFixed(2));
+        $('.pricing-row.insurance-row .pricing-value').text('€' + insuranceTotal.toFixed(2));
+        $('.pricing-row.late-return-row .pricing-value').text('€' + lateReturnPenalty.toFixed(2));
+        $('.pricing-row.discount-row .pricing-value').text('-€' + discountTotal.toFixed(2));
+        $('.pricing-row.final-total-row .pricing-value').text('€' + finalTotal.toFixed(2));
+        
+        // Show/hide rows based on values
+        $('.pricing-row.custom-rates-row').toggle(customRatesTotal > 0);
+        $('.pricing-row.late-return-row').toggle(lateReturnPenalty > 0);
+        $('.pricing-row.discount-row').toggle(discountTotal > 0);
+        
+        // Also update legacy fields for backward compatibility
         $('.base-total').text('€' + baseTotal.toFixed(2));
         $('.custom-rates-total').text('€' + customRatesTotal.toFixed(2));
         $('.extras-total').text('€' + extrasTotal.toFixed(2));
@@ -454,12 +484,7 @@ jQuery(document).ready(function($) {
         $('.discount-total').text('-€' + discountTotal.toFixed(2));
         $('.final-total').text('€' + finalTotal.toFixed(2));
         
-        // Show/hide rows based on values
-        $('.custom-rates-row').toggle(customRatesTotal > 0);
-        $('.late-return-row').toggle(lateReturnPenalty > 0);
-        $('.discount-row').toggle(discountTotal > 0);
-        
-        console.log('CRCM: Updated pricing display:', {
+        console.log('CRCM: Updated modern pricing display:', {
             baseTotal,
             customRatesTotal,
             extrasTotal,
@@ -471,12 +496,27 @@ jQuery(document).ready(function($) {
     }
     
     /**
-     * Reset pricing display
+     * Reset modern pricing display
+     */
+    function resetModernPricingDisplay() {
+        $('.crcm-pricing-summary-modern .pricing-value').text('€0.00');
+        $('.pricing-row.custom-rates-row, .pricing-row.late-return-row, .pricing-row.discount-row').hide();
+        clearCalculationLog();
+    }
+    
+    /**
+     * Legacy compatibility: Update pricing display
+     */
+    function updatePricingDisplay(baseTotal, customRatesTotal, extrasTotal, insuranceTotal, lateReturnPenalty, discountTotal, finalTotal, loading = false) {
+        // Delegate to modern display
+        updateModernPricingDisplay(baseTotal, customRatesTotal, extrasTotal, insuranceTotal, lateReturnPenalty, discountTotal, finalTotal, loading);
+    }
+    
+    /**
+     * Legacy compatibility: Reset pricing display
      */
     function resetPricingDisplay() {
-        $('.base-total, .custom-rates-total, .extras-total, .insurance-total, .late-return-penalty, .discount-total, .final-total').text('€0.00');
-        $('.custom-rates-row, .late-return-row, .discount-row').hide();
-        clearCalculationLog();
+        resetModernPricingDisplay();
     }
     
     /**
@@ -610,7 +650,7 @@ jQuery(document).ready(function($) {
         customers.forEach(function(customer) {
             html += `
                 <div class="customer-result-item" data-customer-id="${customer.ID}">
-                    <div class="customer-name">${customer.display_name}</div>
+                    <div class="customer-name"><strong>${customer.display_name}</strong></div>
                     <div class="customer-email">${customer.user_email}</div>
                     ${customer.phone ? `<div class="customer-phone">📞 ${customer.phone}</div>` : ''}
                 </div>
@@ -644,7 +684,7 @@ jQuery(document).ready(function($) {
             <div class="selected-customer">
                 <h4>${name}</h4>
                 <p><strong>Email:</strong> ${email}</p>
-                <p><strong>Role:</strong> Rental Customer</p>
+                <p><strong>Role:</strong> Customer</p>
                 ${phone ? `<p><strong>Phone:</strong> ${phone}</p>` : ''}
                 <button type="button" class="button remove-customer">Remove Selection</button>
             </div>
@@ -670,15 +710,15 @@ jQuery(document).ready(function($) {
                         <table class="form-table">
                             <tr>
                                 <th><label for="new_customer_name">Full Name *</label></th>
-                                <td><input type="text" id="new_customer_name" required /></td>
+                                <td><input type="text" id="new_customer_name" required class="regular-text" /></td>
                             </tr>
                             <tr>
                                 <th><label for="new_customer_email">Email *</label></th>
-                                <td><input type="email" id="new_customer_email" required /></td>
+                                <td><input type="email" id="new_customer_email" required class="regular-text" /></td>
                             </tr>
                             <tr>
                                 <th><label for="new_customer_phone">Phone</label></th>
-                                <td><input type="tel" id="new_customer_phone" /></td>
+                                <td><input type="tel" id="new_customer_phone" class="regular-text" /></td>
                             </tr>
                         </table>
                         <p class="submit">
@@ -1011,17 +1051,19 @@ jQuery(document).ready(function($) {
     window.crcmDebug = function() {
         console.log('CRCM Debug Info:', {
             selectedVehicleData,
+            vehicleInsuranceData,
             currentBookingDays,
             currentPricing,
             ajaxUrl: crcm_admin.ajax_url,
             nonce: crcm_admin.nonce,
+            locations: crcm_admin.locations,
             adminObject: crcm_admin
         });
     };
     
-    console.log('CRCM Enhanced Admin JS loaded successfully');
+    console.log('CRCM Enhanced Admin JS loaded successfully with perfect insurance sync');
     
-    // Add CSS for modal
+    // Add enhanced CSS for better UI
     $('<style>').prop('type', 'text/css').html(`
         .crcm-modal {
             display: none;
@@ -1035,11 +1077,12 @@ jQuery(document).ready(function($) {
         }
         .crcm-modal-content {
             background-color: #fefefe;
-            margin: 15% auto;
-            padding: 20px;
+            margin: 8% auto;
+            padding: 25px;
             border: 1px solid #888;
             width: 500px;
-            border-radius: 5px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         }
         .crcm-modal-close {
             color: #aaa;
@@ -1054,6 +1097,65 @@ jQuery(document).ready(function($) {
         .error {
             border-color: #dc3232 !important;
             box-shadow: 0 0 2px rgba(204, 0, 0, 0.8);
+        }
+        .extra-item {
+            margin: 10px 0;
+            padding: 12px;
+            border: 1px solid #e1e1e1;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+        .extra-item:hover {
+            border-color: #007cba;
+            background: #f8f9fa;
+        }
+        .extra-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        .extra-info {
+            margin-left: 10px;
+            flex: 1;
+        }
+        .extra-price {
+            color: #007cba;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        .extra-description {
+            display: block;
+            color: #666;
+            margin-top: 4px;
+        }
+        .availability-success {
+            color: #155724;
+            background: #d4edda;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #c3e6cb;
+        }
+        .availability-error {
+            color: #721c24;
+            background: #f8d7da;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #f5c6cb;
+        }
+        .insurance-option-label {
+            display: flex;
+            align-items: flex-start;
+            cursor: pointer;
+            width: 100%;
+        }
+        .insurance-info {
+            margin-left: 10px;
+            flex: 1;
+        }
+        .insurance-price {
+            color: #007cba;
+            font-weight: 600;
+            margin-left: 10px;
         }
     `).appendTo('head');
 });
