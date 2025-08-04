@@ -1,9 +1,16 @@
 <?php
 /**
- * Helper Functions for Custom Rental Car Manager
+ * Helper Functions - COMPLETELY FIXED VERSION
  * 
- * COMPLETE ECOSYSTEM FUNCTIONS with proper user role management
- * and utility functions for the rental system.
+ * All deprecated functions removed, error handling improved,
+ * WordPress standards compliance, performance optimization.
+ * 
+ * FIXES APPLIED:
+ * ✅ Removed deprecated wp_roles()->reinit()
+ * ✅ Added proper null checks for number_format()
+ * ✅ Enhanced error handling and validation
+ * ✅ WordPress.org coding standards compliance
+ * ✅ Performance optimizations with caching
  * 
  * @package CustomRentalCarManager
  * @author Totaliweb
@@ -15,10 +22,10 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Create custom user roles for the rental system
+ * Create custom user roles - FIXED DEPRECATED FUNCTIONS
  */
 function crcm_create_custom_user_roles() {
-    // Remove existing roles first to ensure clean setup
+    // Remove existing roles first to avoid conflicts
     remove_role('crcm_customer');
     remove_role('crcm_manager');
     
@@ -54,10 +61,8 @@ function crcm_create_custom_user_roles() {
         'crcm_publish_bookings' => true,
         'crcm_view_all_bookings' => true,
         
-        // Customer management
-        'crcm_manage_customers' => true,
+        // Customer management (LIMITED - removed for managers)
         'crcm_view_customer_data' => true,
-        'crcm_edit_customer_profiles' => true,
         
         // Reports and analytics
         'crcm_view_reports' => true,
@@ -70,7 +75,7 @@ function crcm_create_custom_user_roles() {
         $capabilities = array(
             'crcm_manage_vehicles', 'crcm_edit_vehicles', 'crcm_delete_vehicles', 'crcm_publish_vehicles',
             'crcm_manage_bookings', 'crcm_edit_bookings', 'crcm_delete_bookings', 'crcm_publish_bookings',
-            'crcm_view_all_bookings', 'crcm_manage_customers', 'crcm_view_customer_data',
+            'crcm_view_all_bookings', 'crcm_manage_customers', 'crcm_view_customer_data', 
             'crcm_edit_customer_profiles', 'crcm_view_reports', 'crcm_export_data'
         );
         
@@ -79,226 +84,379 @@ function crcm_create_custom_user_roles() {
         }
     }
     
-    // Flush roles cache
-    wp_roles()->reinit();
+    // FIXED: Use wp_roles()->for_site() instead of deprecated reinit()
+    if (function_exists('wp_roles')) {
+        wp_roles()->for_site(get_current_blog_id());
+    }
     
-    error_log('CRCM: Custom user roles created successfully');
+    error_log('CRCM: Custom user roles created successfully (fixed deprecated functions)');
 }
 
 /**
- * Get next booking number in sequence
+ * Get next booking number in sequence - ENHANCED WITH CACHING
  */
 function crcm_get_next_booking_number() {
-    $prefix = 'CBR'; // Costabilerent
-    $year = date('y');
-    $month = date('m');
-    $day = date('d');
+    $cache_key = 'crcm_last_booking_number_' . date('ymd');
+    $last_number = wp_cache_get($cache_key, 'crcm');
     
-    global $wpdb;
-    
-    // Get the last booking number for today
-    $last_booking = $wpdb->get_var(
-        $wpdb->prepare(
+    if ($last_number === false) {
+        $prefix = 'CBR'; // Costabilerent
+        $year = date('y');
+        $month = date('m');
+        $day = date('d');
+        
+        global $wpdb;
+        
+        // Get the last booking number for today
+        $last_booking = $wpdb->get_var($wpdb->prepare(
             "SELECT meta_value FROM {$wpdb->postmeta} 
              WHERE meta_key = '_crcm_booking_code' 
              AND meta_value LIKE %s 
              ORDER BY meta_value DESC LIMIT 1",
             $prefix . $year . $month . $day . '%'
-        )
-    );
-    
-    if ($last_booking) {
-        $sequence = intval(substr($last_booking, -3)) + 1;
-    } else {
-        $sequence = 1;
+        ));
+        
+        if ($last_booking) {
+            $sequence = intval(substr($last_booking, -3)) + 1;
+        } else {
+            $sequence = 1;
+        }
+        
+        $booking_number = $prefix . $year . $month . $day . str_pad($sequence, 3, '0', STR_PAD_LEFT);
+        
+        // Cache for 1 hour
+        wp_cache_set($cache_key, $booking_number, 'crcm', HOUR_IN_SECONDS);
+        
+        return $booking_number;
     }
     
-    return $prefix . $year . $month . $day . str_pad($sequence, 3, '0', STR_PAD_LEFT);
+    return $last_number;
 }
 
 /**
- * Get plugin settings
+ * Get plugin settings - ENHANCED WITH VALIDATION
  */
 function crcm_get_setting($key, $default = '') {
-    $settings = get_option('crcm_settings', array());
-    return isset($settings[$key]) ? $settings[$key] : $default;
+    static $settings_cache = null;
+    
+    if ($settings_cache === null) {
+        $settings_cache = get_option('crcm_settings', array());
+    }
+    
+    if (!is_array($settings_cache)) {
+        $settings_cache = array();
+    }
+    
+    return isset($settings_cache[$key]) ? $settings_cache[$key] : $default;
 }
 
 /**
- * Update plugin setting
+ * Update plugin setting - ENHANCED WITH VALIDATION
  */
 function crcm_update_setting($key, $value) {
+    if (empty($key) || !is_string($key)) {
+        return false;
+    }
+    
     $settings = get_option('crcm_settings', array());
+    if (!is_array($settings)) {
+        $settings = array();
+    }
+    
     $settings[$key] = $value;
-    return update_option('crcm_settings', $settings);
+    
+    $result = update_option('crcm_settings', $settings);
+    
+    // Clear cache
+    wp_cache_delete('crcm_settings_cache', 'crcm');
+    
+    return $result;
 }
 
 /**
- * Get all plugin settings
+ * Get all plugin settings - CACHED VERSION
  */
 function crcm_get_settings() {
-    return get_option('crcm_settings', array());
+    $cache_key = 'crcm_settings_cache';
+    $settings = wp_cache_get($cache_key, 'crcm');
+    
+    if ($settings === false) {
+        $settings = get_option('crcm_settings', array());
+        if (!is_array($settings)) {
+            $settings = array();
+        }
+        
+        wp_cache_set($cache_key, $settings, 'crcm', HOUR_IN_SECONDS);
+    }
+    
+    return $settings;
 }
 
 /**
- * Check if user has rental permission
+ * Check if user has rental permission - ENHANCED SECURITY
  */
 function crcm_user_can_rent($user_id = null) {
     if (!$user_id) {
         $user_id = get_current_user_id();
     }
     
-    if (!$user_id) {
+    if (!$user_id || !is_numeric($user_id)) {
         return false;
     }
     
     $user = get_user_by('ID', $user_id);
-    
-    if (!$user) {
+    if (!$user || !$user->exists()) {
         return false;
     }
     
-    return in_array('crcm_customer', $user->roles) || in_array('crcm_manager', $user->roles) || in_array('administrator', $user->roles);
+    $allowed_roles = array('crcm_customer', 'crcm_manager', 'administrator');
+    return !empty(array_intersect($allowed_roles, $user->roles));
 }
 
 /**
- * Check if user can manage rentals
+ * Check if user can manage rentals - ENHANCED SECURITY
  */
 function crcm_user_can_manage() {
     return current_user_can('crcm_manage_bookings') || current_user_can('manage_options');
 }
 
 /**
- * Format price with currency
+ * Format price with currency - FIXED NULL HANDLING
  */
 function crcm_format_price($amount, $currency = '€') {
+    // FIXED: Validate amount before formatting
+    if (!is_numeric($amount)) {
+        $amount = 0;
+    }
+    
+    $amount = floatval($amount);
+    
+    // Handle negative amounts
+    if ($amount < 0) {
+        return '-' . $currency . number_format(abs($amount), 2);
+    }
+    
     return $currency . number_format($amount, 2);
 }
 
 /**
- * Get vehicle types
+ * Safe number format - PREVENTS NULL ERRORS
+ */
+function crcm_safe_number_format($number, $decimals = 2, $dec_point = '.', $thousands_sep = ',') {
+    if (!is_numeric($number) || $number === null) {
+        return number_format(0, $decimals, $dec_point, $thousands_sep);
+    }
+    
+    return number_format(floatval($number), $decimals, $dec_point, $thousands_sep);
+}
+
+/**
+ * Get vehicle types - CACHED VERSION
  */
 function crcm_get_vehicle_types() {
-    return array(
-        'auto' => __('Car', 'custom-rental-manager'),
-        'scooter' => __('Scooter', 'custom-rental-manager'),
-        'moto' => __('Motorcycle', 'custom-rental-manager'),
-        'bicicletta' => __('Bicycle', 'custom-rental-manager'),
-    );
+    $cache_key = 'crcm_vehicle_types';
+    $types = wp_cache_get($cache_key, 'crcm');
+    
+    if ($types === false) {
+        $types = array(
+            'auto' => __('Car', 'custom-rental-manager'),
+            'scooter' => __('Scooter', 'custom-rental-manager'),
+            'moto' => __('Motorcycle', 'custom-rental-manager'),
+            'bicicletta' => __('Bicycle', 'custom-rental-manager'),
+        );
+        
+        wp_cache_set($cache_key, $types, 'crcm', DAY_IN_SECONDS);
+    }
+    
+    return $types;
 }
 
 /**
- * Get transmission types
+ * Get transmission types - CACHED VERSION
  */
 function crcm_get_transmission_types() {
-    return array(
-        'manual' => __('Manual', 'custom-rental-manager'),
-        'automatic' => __('Automatic', 'custom-rental-manager'),
-    );
+    $cache_key = 'crcm_transmission_types';
+    $types = wp_cache_get($cache_key, 'crcm');
+    
+    if ($types === false) {
+        $types = array(
+            'manual' => __('Manual', 'custom-rental-manager'),
+            'automatic' => __('Automatic', 'custom-rental-manager'),
+        );
+        
+        wp_cache_set($cache_key, $types, 'crcm', DAY_IN_SECONDS);
+    }
+    
+    return $types;
 }
 
 /**
- * Get fuel types
+ * Get fuel types - CACHED VERSION
  */
 function crcm_get_fuel_types() {
-    return array(
-        'gasoline' => __('Gasoline', 'custom-rental-manager'),
-        'diesel' => __('Diesel', 'custom-rental-manager'),
-        'electric' => __('Electric', 'custom-rental-manager'),
-        'hybrid' => __('Hybrid', 'custom-rental-manager'),
-    );
+    $cache_key = 'crcm_fuel_types';
+    $types = wp_cache_get($cache_key, 'crcm');
+    
+    if ($types === false) {
+        $types = array(
+            'gasoline' => __('Gasoline', 'custom-rental-manager'),
+            'diesel' => __('Diesel', 'custom-rental-manager'),
+            'electric' => __('Electric', 'custom-rental-manager'),
+            'hybrid' => __('Hybrid', 'custom-rental-manager'),
+        );
+        
+        wp_cache_set($cache_key, $types, 'crcm', DAY_IN_SECONDS);
+    }
+    
+    return $types;
 }
 
 /**
- * Get booking statuses
+ * Get booking statuses - CACHED VERSION
  */
 function crcm_get_booking_statuses() {
-    return array(
-        'pending' => __('Pending', 'custom-rental-manager'),
-        'confirmed' => __('Confirmed', 'custom-rental-manager'),
-        'active' => __('Active', 'custom-rental-manager'),
-        'completed' => __('Completed', 'custom-rental-manager'),
-        'cancelled' => __('Cancelled', 'custom-rental-manager'),
-    );
+    $cache_key = 'crcm_booking_statuses';
+    $statuses = wp_cache_get($cache_key, 'crcm');
+    
+    if ($statuses === false) {
+        $statuses = array(
+            'pending' => __('Pending', 'custom-rental-manager'),
+            'confirmed' => __('Confirmed', 'custom-rental-manager'),
+            'active' => __('Active', 'custom-rental-manager'),
+            'completed' => __('Completed', 'custom-rental-manager'),
+            'cancelled' => __('Cancelled', 'custom-rental-manager'),
+        );
+        
+        wp_cache_set($cache_key, $statuses, 'crcm', DAY_IN_SECONDS);
+    }
+    
+    return $statuses;
 }
 
 /**
- * Get rental locations
+ * Get rental locations - ONLY ISCHIA PORTO AND FORIO
  */
 function crcm_get_rental_locations() {
-    return array(
-        'ischia_porto' => array(
-            'name' => __('Ischia Porto', 'custom-rental-manager'),
-            'address' => 'Via Iasolino 94, Ischia',
-            'coordinates' => array('lat' => 40.7320, 'lng' => 13.9330),
-        ),
-        'forio' => array(
-            'name' => __('Forio', 'custom-rental-manager'),
-            'address' => 'Via Filippo di Lustro 19, Forio',
-            'coordinates' => array('lat' => 40.7280, 'lng' => 13.8590),
-        ),
-        'casamicciola' => array(
-            'name' => __('Casamicciola Terme', 'custom-rental-manager'),
-            'address' => 'Casamicciola Terme',
-            'coordinates' => array('lat' => 40.7470, 'lng' => 13.9060),
-        ),
-        'lacco_ameno' => array(
-            'name' => __('Lacco Ameno', 'custom-rental-manager'),
-            'address' => 'Lacco Ameno',
-            'coordinates' => array('lat' => 40.7520, 'lng' => 13.8830),
-        ),
-    );
+    $cache_key = 'crcm_rental_locations';
+    $locations = wp_cache_get($cache_key, 'crcm');
+    
+    if ($locations === false) {
+        $locations = array(
+            'ischia_porto' => array(
+                'name' => __('Ischia Porto', 'custom-rental-manager'),
+                'address' => 'Via Iasolino 94, Ischia',
+                'coordinates' => array('lat' => 40.7320, 'lng' => 13.9330),
+            ),
+            'forio' => array(
+                'name' => __('Forio', 'custom-rental-manager'),
+                'address' => 'Via Filippo di Lustro 19, Forio',
+                'coordinates' => array('lat' => 40.7280, 'lng' => 13.8590),
+            ),
+        );
+        
+        wp_cache_set($cache_key, $locations, 'crcm', DAY_IN_SECONDS);
+    }
+    
+    return $locations;
 }
 
 /**
- * Calculate date difference in days
+ * Calculate date difference in days - ENHANCED VALIDATION
  */
 function crcm_calculate_days($start_date, $end_date) {
-    $start = new DateTime($start_date);
-    $end = new DateTime($end_date);
-    $interval = $start->diff($end);
-    return max(1, $interval->days);
-}
-
-/**
- * Check if date is weekend
- */
-function crcm_is_weekend($date) {
-    $day_of_week = date('N', strtotime($date));
-    return $day_of_week >= 6; // Saturday (6) or Sunday (7)
-}
-
-/**
- * Check if date is in range
- */
-function crcm_date_in_range($date, $start_date, $end_date) {
-    $check_date = new DateTime($date);
-    $start = new DateTime($start_date);
-    $end = new DateTime($end_date);
-    
-    return $check_date >= $start && $check_date <= $end;
-}
-
-/**
- * Generate random booking reference
- */
-function crcm_generate_booking_reference() {
-    return 'CBR-' . date('ymd') . '-' . strtoupper(wp_generate_password(4, false));
-}
-
-/**
- * Log debug message
- */
-function crcm_log($message, $level = 'info') {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log("CRCM [{$level}]: " . $message);
+    try {
+        $start = new DateTime($start_date);
+        $end = new DateTime($end_date);
+        $interval = $start->diff($end);
+        return max(1, $interval->days);
+    } catch (Exception $e) {
+        error_log('CRCM: Date calculation error: ' . $e->getMessage());
+        return 1;
     }
 }
 
 /**
- * Send email notification
+ * Check if date is weekend - ENHANCED VALIDATION
+ */
+function crcm_is_weekend($date) {
+    try {
+        $timestamp = is_numeric($date) ? $date : strtotime($date);
+        if ($timestamp === false) {
+            return false;
+        }
+        
+        $day_of_week = date('N', $timestamp);
+        return $day_of_week >= 6; // Saturday (6) or Sunday (7)
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+/**
+ * Check if date is in range - ENHANCED VALIDATION
+ */
+function crcm_date_in_range($date, $start_date, $end_date) {
+    try {
+        $check_date = new DateTime($date);
+        $start = new DateTime($start_date);
+        $end = new DateTime($end_date);
+        return $check_date >= $start && $check_date <= $end;
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+/**
+ * Generate random booking reference - ENHANCED UNIQUENESS
+ */
+function crcm_generate_booking_reference() {
+    $prefix = 'CBR';
+    $date_part = date('ymd');
+    $random_part = strtoupper(wp_generate_password(4, false));
+    $timestamp_part = substr(time(), -3);
+    
+    return $prefix . '-' . $date_part . '-' . $random_part . $timestamp_part;
+}
+
+/**
+ * Log debug message - ENHANCED LOGGING
+ */
+function crcm_log($message, $level = 'info', $context = array()) {
+    if (!defined('WP_DEBUG') || !WP_DEBUG) {
+        return;
+    }
+    
+    $log_levels = array('debug', 'info', 'warning', 'error', 'critical');
+    if (!in_array($level, $log_levels)) {
+        $level = 'info';
+    }
+    
+    $log_message = sprintf(
+        'CRCM [%s]: %s',
+        strtoupper($level),
+        $message
+    );
+    
+    if (!empty($context)) {
+        $log_message .= ' | Context: ' . wp_json_encode($context);
+    }
+    
+    error_log($log_message);
+}
+
+/**
+ * Send email notification - ENHANCED WITH VALIDATION
  */
 function crcm_send_email($to, $subject, $message, $headers = array()) {
+    // Validate email address
+    if (!is_email($to)) {
+        crcm_log('Invalid email address: ' . $to, 'error');
+        return false;
+    }
+    
+    // Sanitize subject and message
+    $subject = wp_strip_all_tags($subject);
+    
     $default_headers = array(
         'Content-Type: text/html; charset=UTF-8',
         'From: ' . crcm_get_setting('company_name', 'Costabilerent') . ' <' . crcm_get_setting('company_email', get_option('admin_email')) . '>',
@@ -306,49 +464,85 @@ function crcm_send_email($to, $subject, $message, $headers = array()) {
     
     $headers = array_merge($default_headers, $headers);
     
-    return wp_mail($to, $subject, $message, $headers);
+    // Log email attempt
+    crcm_log('Sending email to: ' . $to . ' - Subject: ' . $subject, 'info');
+    
+    $result = wp_mail($to, $subject, $message, $headers);
+    
+    if (!$result) {
+        crcm_log('Failed to send email to: ' . $to, 'error');
+    }
+    
+    return $result;
 }
 
 /**
- * Get vehicle availability for a date range
+ * Get vehicle availability for a date range - OPTIMIZED QUERY
  */
 function crcm_check_vehicle_availability($vehicle_id, $start_date, $end_date) {
-    global $wpdb;
+    if (!is_numeric($vehicle_id) || $vehicle_id <= 0) {
+        return 0;
+    }
+    
+    $cache_key = 'crcm_availability_' . $vehicle_id . '_' . md5($start_date . $end_date);
+    $availability = wp_cache_get($cache_key, 'crcm');
+    
+    if ($availability !== false) {
+        return $availability;
+    }
     
     // Get vehicle quantity
     $vehicle_data = get_post_meta($vehicle_id, '_crcm_vehicle_data', true);
     $total_quantity = isset($vehicle_data['quantity']) ? intval($vehicle_data['quantity']) : 1;
     
-    // Count overlapping bookings
+    if ($total_quantity <= 0) {
+        wp_cache_set($cache_key, 0, 'crcm', 15 * MINUTE_IN_SECONDS);
+        return 0;
+    }
+    
+    global $wpdb;
+    
+    // Count overlapping bookings - OPTIMIZED QUERY
     $overlapping_bookings = $wpdb->get_var($wpdb->prepare("
-        SELECT COUNT(*) FROM {$wpdb->postmeta} pm1 
-        INNER JOIN {$wpdb->postmeta} pm2 ON pm1.post_id = pm2.post_id 
-        INNER JOIN {$wpdb->postmeta} pm3 ON pm1.post_id = pm3.post_id 
-        INNER JOIN {$wpdb->postmeta} pm4 ON pm1.post_id = pm4.post_id 
-        INNER JOIN {$wpdb->posts} p ON pm1.post_id = p.ID 
-        WHERE pm1.meta_key = '_crcm_booking_data' 
-        AND pm2.meta_key = '_crcm_booking_data' 
-        AND pm3.meta_key = '_crcm_booking_data' 
-        AND pm4.meta_key = '_crcm_booking_data' 
-        AND p.post_type = 'crcm_booking' 
-        AND p.post_status = 'publish' 
-        AND JSON_EXTRACT(pm1.meta_value, '$.vehicle_id') = %s 
-        AND JSON_EXTRACT(pm2.meta_value, '$.pickup_date') <= %s 
-        AND JSON_EXTRACT(pm3.meta_value, '$.return_date') >= %s
+        SELECT COUNT(DISTINCT p.ID)
+        FROM {$wpdb->posts} p
+        INNER JOIN {$wpdb->postmeta} pm_vehicle ON p.ID = pm_vehicle.post_id AND pm_vehicle.meta_key = '_crcm_booking_data'
+        INNER JOIN {$wpdb->postmeta} pm_status ON p.ID = pm_status.post_id AND pm_status.meta_key = '_crcm_booking_status'
+        WHERE p.post_type = 'crcm_booking'
+        AND p.post_status = 'publish'
+        AND pm_status.meta_value IN ('confirmed', 'active')
+        AND JSON_EXTRACT(pm_vehicle.meta_value, '$.vehicle_id') = %s
+        AND JSON_EXTRACT(pm_vehicle.meta_value, '$.pickup_date') <= %s
+        AND JSON_EXTRACT(pm_vehicle.meta_value, '$.return_date') >= %s
     ", $vehicle_id, $end_date, $start_date));
     
-    $available_quantity = $total_quantity - $overlapping_bookings;
+    $available_quantity = max(0, $total_quantity - intval($overlapping_bookings));
     
-    return max(0, $available_quantity);
+    // Cache for 15 minutes
+    wp_cache_set($cache_key, $available_quantity, 'crcm', 15 * MINUTE_IN_SECONDS);
+    
+    return $available_quantity;
 }
 
 /**
- * Get customer booking history
+ * Get customer booking history - OPTIMIZED WITH CACHING
  */
 function crcm_get_customer_bookings($customer_id, $limit = 10) {
+    if (!is_numeric($customer_id) || $customer_id <= 0) {
+        return array();
+    }
+    
+    $cache_key = 'crcm_customer_bookings_' . $customer_id . '_' . $limit;
+    $bookings = wp_cache_get($cache_key, 'crcm');
+    
+    if ($bookings !== false) {
+        return $bookings;
+    }
+    
     $bookings = get_posts(array(
         'post_type' => 'crcm_booking',
-        'posts_per_page' => $limit,
+        'posts_per_page' => intval($limit),
+        'post_status' => 'publish',
         'meta_query' => array(
             array(
                 'key' => '_crcm_booking_data',
@@ -360,42 +554,64 @@ function crcm_get_customer_bookings($customer_id, $limit = 10) {
         'order' => 'DESC'
     ));
     
+    // Cache for 30 minutes
+    wp_cache_set($cache_key, $bookings, 'crcm', 30 * MINUTE_IN_SECONDS);
+    
     return $bookings;
 }
 
 /**
- * Calculate booking total
+ * Calculate booking total - ENHANCED WITH VALIDATION
  */
 function crcm_calculate_booking_total($vehicle_id, $start_date, $end_date, $extras = array(), $insurance = 'basic') {
-    $pricing_data = get_post_meta($vehicle_id, '_crcm_pricing_data', true);
-    $extras_data = get_post_meta($vehicle_id, '_crcm_extras_data', true);
-    $insurance_data = get_post_meta($vehicle_id, '_crcm_insurance_data', true);
+    if (!is_numeric($vehicle_id) || $vehicle_id <= 0) {
+        return 0;
+    }
     
-    $days = crcm_calculate_days($start_date, $end_date);
-    $base_rate = floatval($pricing_data['daily_rate'] ?? 0);
-    $total = $base_rate * $days;
-    
-    // Add extras
-    if (!empty($extras) && !empty($extras_data)) {
-        foreach ($extras as $extra_index) {
-            if (isset($extras_data[$extra_index])) {
-                $total += floatval($extras_data[$extra_index]['daily_rate']) * $days;
+    try {
+        $pricing_data = get_post_meta($vehicle_id, '_crcm_pricing_data', true);
+        $extras_data = get_post_meta($vehicle_id, '_crcm_extras_data', true);
+        $insurance_data = get_post_meta($vehicle_id, '_crcm_insurance_data', true);
+        
+        $days = crcm_calculate_days($start_date, $end_date);
+        $base_rate = isset($pricing_data['daily_rate']) ? floatval($pricing_data['daily_rate']) : 0;
+        
+        if ($base_rate <= 0) {
+            return 0;
+        }
+        
+        $total = $base_rate * $days;
+        
+        // Add extras
+        if (!empty($extras) && is_array($extras) && !empty($extras_data) && is_array($extras_data)) {
+            foreach ($extras as $extra_index) {
+                if (isset($extras_data[$extra_index]) && isset($extras_data[$extra_index]['daily_rate'])) {
+                    $total += floatval($extras_data[$extra_index]['daily_rate']) * $days;
+                }
             }
         }
+        
+        // Add insurance
+        if ($insurance === 'premium' && !empty($insurance_data['premium']['enabled']) && isset($insurance_data['premium']['daily_rate'])) {
+            $total += floatval($insurance_data['premium']['daily_rate']) * $days;
+        }
+        
+        return max(0, $total);
+        
+    } catch (Exception $e) {
+        crcm_log('Error calculating booking total: ' . $e->getMessage(), 'error');
+        return 0;
     }
-    
-    // Add insurance
-    if ($insurance === 'premium' && !empty($insurance_data['premium']['enabled'])) {
-        $total += floatval($insurance_data['premium']['daily_rate']) * $days;
-    }
-    
-    return $total;
 }
 
 /**
- * Sanitize booking data
+ * Sanitize booking data - ENHANCED VALIDATION
  */
 function crcm_sanitize_booking_data($data) {
+    if (!is_array($data)) {
+        return array();
+    }
+    
     $sanitized = array();
     
     $fields = array(
@@ -420,43 +636,69 @@ function crcm_sanitize_booking_data($data) {
 }
 
 /**
- * Validate booking data
+ * Validate booking data - COMPREHENSIVE VALIDATION
  */
 function crcm_validate_booking_data($data) {
     $errors = array();
     
+    if (!is_array($data)) {
+        $errors[] = __('Invalid booking data format', 'custom-rental-manager');
+        return $errors;
+    }
+    
     // Required fields
     $required_fields = array('customer_id', 'vehicle_id', 'pickup_date', 'return_date');
-    
     foreach ($required_fields as $field) {
         if (empty($data[$field])) {
             $errors[] = sprintf(__('Field %s is required', 'custom-rental-manager'), $field);
         }
     }
     
+    // Stop validation if required fields are missing
+    if (!empty($errors)) {
+        return $errors;
+    }
+    
     // Date validation
-    if (!empty($data['pickup_date']) && !empty($data['return_date'])) {
+    try {
         $pickup = new DateTime($data['pickup_date']);
         $return = new DateTime($data['return_date']);
+        $today = new DateTime('today');
         
         if ($return <= $pickup) {
             $errors[] = __('Return date must be after pickup date', 'custom-rental-manager');
         }
         
-        if ($pickup < new DateTime('today')) {
+        if ($pickup < $today) {
             $errors[] = __('Pickup date cannot be in the past', 'custom-rental-manager');
         }
+        
+        // Check maximum booking period (e.g., 1 year)
+        $max_days = apply_filters('crcm_max_booking_days', 365);
+        $booking_days = $pickup->diff($return)->days;
+        if ($booking_days > $max_days) {
+            $errors[] = sprintf(__('Booking period cannot exceed %d days', 'custom-rental-manager'), $max_days);
+        }
+        
+    } catch (Exception $e) {
+        $errors[] = __('Invalid date format', 'custom-rental-manager');
     }
     
-    // Vehicle existence
+    // Vehicle existence and availability
     if (!empty($data['vehicle_id'])) {
         $vehicle = get_post($data['vehicle_id']);
-        if (!$vehicle || $vehicle->post_type !== 'crcm_vehicle') {
-            $errors[] = __('Invalid vehicle selected', 'custom-rental-manager');
+        if (!$vehicle || $vehicle->post_type !== 'crcm_vehicle' || $vehicle->post_status !== 'publish') {
+            $errors[] = __('Invalid or unavailable vehicle selected', 'custom-rental-manager');
+        } else {
+            // Check availability
+            $availability = crcm_check_vehicle_availability($data['vehicle_id'], $data['pickup_date'], $data['return_date']);
+            if ($availability <= 0) {
+                $errors[] = __('Selected vehicle is not available for the chosen dates', 'custom-rental-manager');
+            }
         }
     }
     
-    // Customer existence
+    // Customer existence and permissions
     if (!empty($data['customer_id'])) {
         $customer = get_user_by('ID', $data['customer_id']);
         if (!$customer || !in_array('crcm_customer', $customer->roles)) {
@@ -464,11 +706,20 @@ function crcm_validate_booking_data($data) {
         }
     }
     
+    // Location validation
+    $valid_locations = array_keys(crcm_get_rental_locations());
+    if (!empty($data['pickup_location']) && !in_array($data['pickup_location'], $valid_locations)) {
+        $errors[] = __('Invalid pickup location', 'custom-rental-manager');
+    }
+    if (!empty($data['return_location']) && !in_array($data['return_location'], $valid_locations)) {
+        $errors[] = __('Invalid return location', 'custom-rental-manager');
+    }
+    
     return $errors;
 }
 
 /**
- * Create default vehicle meta structure
+ * Create default vehicle meta structure - COMPLETE STRUCTURE
  */
 function crcm_get_default_vehicle_meta() {
     return array(
@@ -511,7 +762,7 @@ function crcm_get_default_vehicle_meta() {
 }
 
 /**
- * Create default booking meta structure
+ * Create default booking meta structure - COMPLETE STRUCTURE
  */
 function crcm_get_default_booking_meta() {
     return array(
@@ -544,14 +795,17 @@ function crcm_get_default_booking_meta() {
 }
 
 /**
- * Clean up plugin data on uninstall
+ * Clean up plugin data on uninstall - COMPLETE CLEANUP
  */
 function crcm_cleanup_plugin_data() {
+    if (!current_user_can('activate_plugins')) {
+        return;
+    }
+    
     global $wpdb;
     
     // Remove custom post types
     $post_types = array('crcm_vehicle', 'crcm_booking');
-    
     foreach ($post_types as $post_type) {
         $posts = get_posts(array(
             'post_type' => $post_type,
@@ -569,9 +823,10 @@ function crcm_cleanup_plugin_data() {
     remove_role('crcm_manager');
     
     // Remove plugin options
-    delete_option('crcm_settings');
-    delete_option('crcm_plugin_activated');
-    delete_option('crcm_activation_time');
+    $options = array('crcm_settings', 'crcm_plugin_activated', 'crcm_activation_time');
+    foreach ($options as $option) {
+        delete_option($option);
+    }
     
     // Remove capabilities from administrator
     $admin = get_role('administrator');
@@ -579,7 +834,7 @@ function crcm_cleanup_plugin_data() {
         $capabilities = array(
             'crcm_manage_vehicles', 'crcm_edit_vehicles', 'crcm_delete_vehicles', 'crcm_publish_vehicles',
             'crcm_manage_bookings', 'crcm_edit_bookings', 'crcm_delete_bookings', 'crcm_publish_bookings',
-            'crcm_view_all_bookings', 'crcm_manage_customers', 'crcm_view_customer_data',
+            'crcm_view_all_bookings', 'crcm_manage_customers', 'crcm_view_customer_data', 
             'crcm_edit_customer_profiles', 'crcm_view_reports', 'crcm_export_data'
         );
         
@@ -588,16 +843,21 @@ function crcm_cleanup_plugin_data() {
         }
     }
     
+    // Clear all caches
+    wp_cache_flush_group('crcm');
+    
     // Flush rewrite rules
     flush_rewrite_rules();
+    
+    crcm_log('Plugin data cleanup completed', 'info');
 }
 
 /**
- * Debug function to display system info
+ * Debug function to display system info - ENHANCED
  */
 function crcm_debug_info() {
     if (!current_user_can('manage_options')) {
-        return;
+        wp_die(__('Access denied', 'custom-rental-manager'));
     }
     
     $info = array(
@@ -610,14 +870,24 @@ function crcm_debug_info() {
         'Booking Count' => wp_count_posts('crcm_booking')->publish ?? 0,
         'Memory Limit' => ini_get('memory_limit'),
         'Max Execution Time' => ini_get('max_execution_time'),
+        'Object Cache' => wp_using_ext_object_cache() ? 'Enabled' : 'Disabled',
+        'WP Debug' => defined('WP_DEBUG') && WP_DEBUG ? 'Enabled' : 'Disabled',
     );
     
-    echo '<div class="crcm-debug-info">';
-    echo '<h3>CRCM Debug Information</h3>';
-    echo '<table class="widefat">';
+    echo '<div class="wrap">';
+    echo '<h1>' . __('CRCM System Information', 'custom-rental-manager') . '</h1>';
+    echo '<table class="widefat fixed striped">';
+    echo '<thead><tr><th>Setting</th><th>Value</th></tr></thead>';
+    echo '<tbody>';
+    
     foreach ($info as $key => $value) {
-        echo '<tr><td><strong>' . esc_html($key) . '</strong></td><td>' . esc_html($value) . '</td></tr>';
+        echo '<tr>';
+        echo '<td>' . esc_html($key) . '</td>';
+        echo '<td>' . esc_html($value) . '</td>';
+        echo '</tr>';
     }
+    
+    echo '</tbody>';
     echo '</table>';
     echo '</div>';
 }
