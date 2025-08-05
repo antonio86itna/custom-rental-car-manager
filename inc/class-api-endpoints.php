@@ -17,46 +17,53 @@ if (!defined('ABSPATH')) {
 class CRCM_API_Endpoints {
 
     /**
+     * Constructor.
+     */
+    public function __construct() {
+        add_action( 'rest_api_init', array( $this, 'register_routes' ) );
+    }
+
+    /**
      * Register REST API routes
      */
     public function register_routes() {
-        register_rest_route('crcm/v1', '/vehicles', array(
-            'methods' => 'GET',
-            'callback' => array($this, 'get_vehicles'),
+        register_rest_route( 'crcm/v1', '/vehicles', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_vehicles' ),
             'permission_callback' => '__return_true',
-            'args' => array(
+            'args'                => array(
                 'pickup_date' => array(
                     'required' => false,
-                    'type' => 'string',
-                    'format' => 'date',
+                    'type'     => 'string',
+                    'format'   => 'date',
                 ),
                 'return_date' => array(
                     'required' => false,
-                    'type' => 'string',
-                    'format' => 'date',
+                    'type'     => 'string',
+                    'format'   => 'date',
                 ),
                 'vehicle_type' => array(
                     'required' => false,
-                    'type' => 'string',
+                    'type'     => 'string',
                 ),
                 'location' => array(
                     'required' => false,
-                    'type' => 'integer',
+                    'type'     => 'integer',
                 ),
             ),
-        ));
+        ) );
 
-        register_rest_route('crcm/v1', '/vehicles/(?P<id>\d+)', array(
-            'methods' => 'GET',
-            'callback' => array($this, 'get_vehicle'),
+        register_rest_route( 'crcm/v1', '/vehicles/(?P<id>\d+)', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_vehicle' ),
             'permission_callback' => '__return_true',
-            'args' => array(
+            'args'                => array(
                 'id' => array(
                     'required' => true,
-                    'type' => 'integer',
+                    'type'     => 'integer',
                 ),
             ),
-        ));
+        ) );
 
         register_rest_route('crcm/v1', '/bookings', array(
             array(
