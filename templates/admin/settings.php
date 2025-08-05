@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Handle form submission
-if (isset($_POST['submit']) && wp_verify_nonce($_POST['crcm_settings_nonce'], 'crcm_save_settings')) {
+if (isset($_POST['submit']) && wp_verify_nonce($_POST['crcm_settings_nonce'] ?? '', 'crcm_save_settings')) {
     $settings = array();
     
     // Company settings

@@ -1478,7 +1478,7 @@ class CRCM_Vehicle_Manager {
     public function ajax_get_vehicle_fields() {
         check_ajax_referer('crcm_admin_nonce', 'nonce');
         
-        $vehicle_type = sanitize_text_field($_POST['vehicle_type']);
+        $vehicle_type = sanitize_text_field($_POST['vehicle_type'] ?? '');
         $vehicle_data = array(); // Default empty data
         
         ob_start();
@@ -1494,7 +1494,7 @@ class CRCM_Vehicle_Manager {
     public function ajax_get_vehicle_features() {
         check_ajax_referer('crcm_admin_nonce', 'nonce');
         
-        $vehicle_type = sanitize_text_field($_POST['vehicle_type']);
+        $vehicle_type = sanitize_text_field($_POST['vehicle_type'] ?? '');
         $available_features = $this->vehicle_types[$vehicle_type]['features'];
         
         ob_start();
@@ -1518,7 +1518,8 @@ class CRCM_Vehicle_Manager {
      */
     public function save_vehicle_meta($post_id) {
         // Verify nonce
-        if (!isset($_POST['crcm_vehicle_meta_nonce_field']) || !wp_verify_nonce($_POST['crcm_vehicle_meta_nonce_field'], 'crcm_vehicle_meta_nonce')) {
+        $nonce = $_POST['crcm_vehicle_meta_nonce_field'] ?? '';
+        if (!$nonce || !wp_verify_nonce($nonce, 'crcm_vehicle_meta_nonce')) {
             return;
         }
         
@@ -1549,7 +1550,7 @@ class CRCM_Vehicle_Manager {
         // Save pricing data
         if (isset($_POST['pricing_data'])) {
             $pricing_data = array();
-            $pricing_data['daily_rate'] = floatval($_POST['pricing_data']['daily_rate']);
+            $pricing_data['daily_rate'] = floatval($_POST['pricing_data']['daily_rate'] ?? 0);
             
             // Save custom rates
             if (isset($_POST['pricing_data']['custom_rates'])) {
@@ -1561,7 +1562,7 @@ class CRCM_Vehicle_Manager {
                             'type' => sanitize_text_field($rate['type']),
                             'start_date' => sanitize_text_field($rate['start_date'] ?? ''),
                             'end_date' => sanitize_text_field($rate['end_date'] ?? ''),
-                            'extra_rate' => floatval($rate['extra_rate']),
+                            'extra_rate' => floatval($rate['extra_rate'] ?? 0),
                         );
                     }
                 }
@@ -1580,7 +1581,7 @@ class CRCM_Vehicle_Manager {
                         'name' => sanitize_text_field($rule['name']),
                         'start_date' => sanitize_text_field($rule['start_date']),
                         'end_date' => sanitize_text_field($rule['end_date']),
-                        'quantity_to_remove' => sanitize_text_field($rule['quantity_to_remove']),
+                        'quantity_to_remove' => intval($rule['quantity_to_remove'] ?? 0),
                     );
                 }
             }
@@ -1602,7 +1603,7 @@ class CRCM_Vehicle_Manager {
                 if (!empty($service['name']) && isset($service['daily_rate'])) {
                     $extras_data[] = array(
                         'name' => sanitize_text_field($service['name']),
-                        'daily_rate' => floatval($service['daily_rate']),
+                        'daily_rate' => floatval($service['daily_rate'] ?? 0),
                     );
                 }
             }

@@ -31,9 +31,9 @@ class CRCM_Payment_Manager {
     public function process_payment() {
         check_ajax_referer('crcm_nonce', 'nonce');
 
-        $booking_id = intval($_POST['booking_id']);
-        $payment_method_id = sanitize_text_field($_POST['payment_method_id']);
-        $amount = floatval($_POST['amount']);
+        $booking_id = intval($_POST['booking_id'] ?? 0);
+        $payment_method_id = sanitize_text_field($_POST['payment_method_id'] ?? '');
+        $amount = floatval($_POST['amount'] ?? 0);
 
         if (!$booking_id || !$payment_method_id || $amount <= 0) {
             wp_send_json_error(__('Invalid payment data', 'custom-rental-manager'));
@@ -83,9 +83,9 @@ class CRCM_Payment_Manager {
             wp_send_json_error(__('Permission denied', 'custom-rental-manager'));
         }
 
-        $booking_id = intval($_POST['booking_id']);
-        $refund_amount = floatval($_POST['refund_amount']);
-        $refund_reason = sanitize_textarea_field($_POST['refund_reason']);
+        $booking_id = intval($_POST['booking_id'] ?? 0);
+        $refund_amount = floatval($_POST['refund_amount'] ?? 0);
+        $refund_reason = sanitize_textarea_field($_POST['refund_reason'] ?? '');
 
         $payment_data = get_post_meta($booking_id, '_crcm_payment_data', true);
 
