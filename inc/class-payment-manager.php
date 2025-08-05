@@ -125,7 +125,7 @@ class CRCM_Payment_Manager {
      * Calculate total booking cost
      */
     public function calculate_total_cost($booking_data) {
-        $booking_manager = new CRCM_Booking_Manager();
+        $booking_manager = crcm()->booking_manager;
         return $booking_manager->calculate_booking_pricing($booking_data);
     }
 
