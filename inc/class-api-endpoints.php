@@ -153,7 +153,7 @@ class CRCM_API_Endpoints {
      * Get vehicles endpoint
      */
     public function get_vehicles($request) {
-        $vehicle_manager = new CRCM_Vehicle_Manager();
+        $vehicle_manager = crcm()->vehicle_manager;
 
         $pickup_date = $request->get_param('pickup_date');
         $return_date = $request->get_param('return_date');
@@ -201,7 +201,7 @@ class CRCM_API_Endpoints {
      */
     public function get_vehicle($request) {
         $vehicle_id = $request->get_param('id');
-        $vehicle_manager = new CRCM_Vehicle_Manager();
+        $vehicle_manager = crcm()->vehicle_manager;
 
         $vehicle = $vehicle_manager->get_vehicle($vehicle_id);
 
@@ -237,7 +237,7 @@ class CRCM_API_Endpoints {
         $bookings = array();
 
         foreach ($posts as $post) {
-            $booking_manager = new CRCM_Booking_Manager();
+            $booking_manager = crcm()->booking_manager;
             $bookings[] = $booking_manager->get_booking($post->ID);
         }
 
@@ -264,7 +264,7 @@ class CRCM_API_Endpoints {
             'notes' => $request->get_param('notes') ?: '',
         );
 
-        $booking_manager = new CRCM_Booking_Manager();
+        $booking_manager = crcm()->booking_manager;
         $result = $booking_manager->create_booking($booking_data);
 
         if (is_wp_error($result)) {
@@ -282,7 +282,7 @@ class CRCM_API_Endpoints {
      */
     public function get_booking($request) {
         $booking_id = $request->get_param('id');
-        $booking_manager = new CRCM_Booking_Manager();
+        $booking_manager = crcm()->booking_manager;
 
         $booking = $booking_manager->get_booking($booking_id);
 
@@ -301,7 +301,7 @@ class CRCM_API_Endpoints {
         $start_date = $request->get_param('start_date');
         $end_date = $request->get_param('end_date');
 
-        $vehicle_manager = new CRCM_Vehicle_Manager();
+        $vehicle_manager = crcm()->vehicle_manager;
         $availability = $vehicle_manager->check_availability($vehicle_id, $start_date, $end_date);
 
         return new WP_REST_Response(array(

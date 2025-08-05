@@ -130,7 +130,7 @@ class CRCM_Customer_Portal {
         ));
 
         $bookings = array();
-        $booking_manager = new CRCM_Booking_Manager();
+        $booking_manager = crcm()->booking_manager;
 
         foreach ($booking_ids as $booking_id) {
             $booking = $booking_manager->get_booking($booking_id);
