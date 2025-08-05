@@ -347,7 +347,11 @@ add_action('edit_user_profile_update', 'crcm_save_rental_profile_fields');
  */
 function crcm_ajax_search_customers() {
     check_ajax_referer('crcm_admin_nonce', 'nonce');
-    
+
+    if (!current_user_can('crcm_manage_customers') && !current_user_can('manage_options')) {
+        wp_send_json_error(__('You are not allowed to search customers.', 'custom-rental-manager'));
+    }
+
     $query = sanitize_text_field($_POST['query']);
     
     if (strlen($query) < 2) {
