@@ -224,44 +224,56 @@ class CRCM_Booking_Manager {
         
         <script>
         jQuery(document).ready(function($) {
-            // Calculate rental days automatically
+            // Calculate rental days automatically with optional late return rule
             function calculateRentalDays() {
-                const pickupDate = new Date($('#pickup_date').val());
-                const returnDate = new Date($('#return_date').val());
-                
-                if (pickupDate && returnDate && returnDate > pickupDate) {
-                    const timeDiff = returnDate.getTime() - pickupDate.getTime();
-                    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-                    
-                    $('#rental-days-display').text('Giorni di noleggio: ' + daysDiff);
-                    $('input[name="booking_data[rental_days]"]').val(daysDiff);
-                    
-                    // Trigger pricing recalculation
-                    $(document).trigger('booking_dates_changed', [daysDiff]);
-                    
-                    return daysDiff;
+                const pickupDate = $('#pickup_date').val();
+                const returnDate = $('#return_date').val();
+                const pickupTime = $('#pickup_time').val();
+                const returnTime = $('#return_time').val();
+
+                if (pickupDate && returnDate) {
+                    const start = new Date(pickupDate + 'T' + pickupTime);
+                    const end   = new Date(returnDate + 'T' + returnTime);
+
+                    if (end > start) {
+                        let daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24));
+
+                        const misc = window.crcmVehicleMisc || {};
+                        if (misc.late_return_rule && returnTime && misc.late_return_time && returnTime > misc.late_return_time) {
+                            daysDiff++;
+                        }
+
+                        $('#rental-days-display').text('Giorni di noleggio: ' + daysDiff);
+                        $('input[name="booking_data[rental_days]"]').val(daysDiff);
+
+                        // Trigger pricing recalculation
+                        $(document).trigger('booking_dates_changed', [daysDiff]);
+
+                        return daysDiff;
+                    }
                 }
                 return 1;
             }
-            
+            window.calculateRentalDays = calculateRentalDays;
+
             // Set minimum return date based on pickup date
             $('#pickup_date').on('change', function() {
                 const pickupDate = $(this).val();
                 const nextDay = new Date(pickupDate);
                 nextDay.setDate(nextDay.getDate() + 1);
-                
+
                 $('#return_date').attr('min', nextDay.toISOString().split('T')[0]);
-                
+
                 // Auto-adjust return date if it's now invalid
                 if ($('#return_date').val() <= pickupDate) {
                     $('#return_date').val(nextDay.toISOString().split('T')[0]);
                 }
-                
+
                 calculateRentalDays();
             });
-            
-            $('#return_date').on('change', calculateRentalDays);
-            
+
+            $('#return_date, #pickup_time, #return_time').on('change', calculateRentalDays);
+
             // Initial calculation
             calculateRentalDays();
         });
@@ -803,11 +815,15 @@ class CRCM_Booking_Manager {
             // Listen for vehicle selection
             $(document).on('vehicle_selected', function(e, vehicleId, data) {
                 vehicleData = data;
+                window.crcmVehicleMisc = data.misc || {};
                 loadVehicleExtrasAndInsurance(vehicleId);
                 fetchBasePricing();
+                if (window.calculateRentalDays) {
+                    window.calculateRentalDays();
+                }
             });
-            
-            // Listen for date changes
+
+            // Listen for date/time changes
             $(document).on('booking_dates_changed', function(e, days) {
                 rentalDays = days;
                 fetchBasePricing();
@@ -862,6 +878,8 @@ class CRCM_Booking_Manager {
 
                 const pickupDate = $('#pickup_date').val();
                 const returnDate = $('#return_date').val();
+                const pickupTime = $('#pickup_time').val();
+                const returnTime = $('#return_time').val();
                 const vehicleId  = $('#vehicle_id').val();
 
                 if (!pickupDate || !returnDate || !vehicleId) return;
@@ -874,12 +892,16 @@ class CRCM_Booking_Manager {
                         vehicle_id: vehicleId,
                         pickup_date: pickupDate,
                         return_date: returnDate,
+                        pickup_time: pickupTime,
+                        return_time: returnTime,
                         nonce: '<?php echo wp_create_nonce('crcm_admin_nonce'); ?>'
                     },
                     success: function(response) {
                         if (response.success) {
                             baseTotal = parseFloat(response.data.base_total) || 0;
                             rentalDays = parseInt(response.data.rental_days) || rentalDays;
+                            $('#rental-days-display').text('Giorni di noleggio: ' + rentalDays);
+                            $('input[name="booking_data[rental_days]"]').val(rentalDays);
                             calculatePricing();
                         }
                     }
@@ -1097,6 +1119,8 @@ class CRCM_Booking_Manager {
         $vehicle_id  = intval($_POST['vehicle_id'] ?? 0);
         $pickup_date = sanitize_text_field($_POST['pickup_date'] ?? '');
         $return_date = sanitize_text_field($_POST['return_date'] ?? '');
+        $pickup_time = sanitize_text_field($_POST['pickup_time'] ?? '');
+        $return_time = sanitize_text_field($_POST['return_time'] ?? '');
 
         if (!$vehicle_id || !$pickup_date || !$return_date) {
             wp_send_json_error('Missing parameters');
@@ -1106,8 +1130,11 @@ class CRCM_Booking_Manager {
             wp_send_json_error('Pricing function not available');
         }
 
-        $base_total  = crcm_calculate_vehicle_pricing($vehicle_id, $pickup_date, $return_date);
-        $rental_days = crcm_calculate_rental_days($pickup_date, $return_date);
+        $rental_days = crcm_calculate_rental_days($pickup_date, $return_date, $pickup_time, $return_time, $vehicle_id);
+
+        $end_date = new DateTime($pickup_date);
+        $end_date->add(new DateInterval('P' . $rental_days . 'D'));
+        $base_total = crcm_calculate_vehicle_pricing($vehicle_id, $pickup_date, $end_date->format('Y-m-d'));
 
         wp_send_json_success(array(
             'base_total'  => $base_total,

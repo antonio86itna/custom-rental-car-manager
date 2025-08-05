@@ -628,14 +628,33 @@ function crcm_get_upcoming_bookings($limit = 5) {
 }
 
 /**
- * Calculate rental days between two dates
+ * Calculate rental days between two dates and times.
+ *
+ * @param string   $pickup_date  Pickup date (Y-m-d).
+ * @param string   $return_date  Return date (Y-m-d).
+ * @param string   $pickup_time  Optional pickup time (H:i).
+ * @param string   $return_time  Optional return time (H:i).
+ * @param int|null $vehicle_id   Optional vehicle ID to evaluate late return rules.
+ *
+ * @return int Number of rental days (minimum 1).
  */
-function crcm_calculate_rental_days($pickup_date, $return_date) {
-    $pickup = new DateTime($pickup_date);
-    $return = new DateTime($return_date);
+function crcm_calculate_rental_days($pickup_date, $return_date, $pickup_time = '', $return_time = '', $vehicle_id = 0) {
+    $pickup = new DateTime(trim($pickup_date . ' ' . ($pickup_time ?: '00:00')));
+    $return = new DateTime(trim($return_date . ' ' . ($return_time ?: '00:00')));
     $interval = $pickup->diff($return);
 
-    return max(1, $interval->days); // Minimum 1 day
+    $days = max(1, $interval->days); // Minimum 1 day
+
+    if ($vehicle_id) {
+        $misc_data = get_post_meta($vehicle_id, '_crcm_misc_data', true);
+        if (!empty($misc_data['late_return_rule']) && !empty($return_time) && !empty($misc_data['late_return_time'])) {
+            if (strtotime($return_time) > strtotime($misc_data['late_return_time'])) {
+                $days++;
+            }
+        }
+    }
+
+    return $days;
 }
 
 /**
