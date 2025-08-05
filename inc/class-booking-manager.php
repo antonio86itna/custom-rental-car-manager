@@ -22,6 +22,8 @@ class CRCM_Booking_Manager {
     public function __construct() {
         add_action('add_meta_boxes', array($this, 'add_meta_boxes'));
         add_action('save_post', array($this, 'save_booking_meta'));
+        add_action('trashed_post', array($this, 'handle_trash_booking'));
+        add_action('untrashed_post', array($this, 'handle_untrash_booking'));
         
         // AJAX handlers for dynamic booking creation
         add_action('wp_ajax_crcm_get_vehicle_booking_data', array($this, 'ajax_get_vehicle_booking_data'));
@@ -1206,6 +1208,37 @@ class CRCM_Booking_Manager {
                 $booking_data[$key] = sanitize_text_field($value);
             }
             update_post_meta($post_id, '_crcm_booking_data', $booking_data);
+
+            $previous_customer_id = (int) get_post_meta($post_id, '_crcm_customer_user_id', true);
+            $customer_user_id = !empty($booking_data['customer_id']) ? (int) $booking_data['customer_id'] : 0;
+            update_post_meta($post_id, '_crcm_customer_user_id', $customer_user_id);
+
+            if ($customer_user_id) {
+                $user = get_user_by('ID', $customer_user_id);
+                if ($user) {
+                    $profile_data = get_user_meta($customer_user_id, 'crcm_profile_data', true);
+                    $customer_data = array(
+                        'user_id'    => $customer_user_id,
+                        'first_name' => $profile_data['first_name'] ?? get_user_meta($customer_user_id, 'first_name', true),
+                        'last_name'  => $profile_data['last_name'] ?? get_user_meta($customer_user_id, 'last_name', true),
+                        'email'      => $user->user_email,
+                        'phone'      => $profile_data['phone'] ?? '',
+                    );
+                    update_post_meta($post_id, '_crcm_customer_data', array_map('sanitize_text_field', $customer_data));
+                }
+
+                if ($customer_user_id !== $previous_customer_id) {
+                    $total = (int) get_user_meta($customer_user_id, 'crcm_total_bookings', true);
+                    update_user_meta($customer_user_id, 'crcm_total_bookings', $total + 1);
+                    update_user_meta($customer_user_id, 'crcm_last_booking_date', current_time('mysql'));
+                }
+            }
+
+            if ($previous_customer_id && $previous_customer_id !== $customer_user_id) {
+                $prev_total = (int) get_user_meta($previous_customer_id, 'crcm_total_bookings', true);
+                $prev_total = max(0, $prev_total - 1);
+                update_user_meta($previous_customer_id, 'crcm_total_bookings', $prev_total);
+            }
         }
         
         // Save pricing breakdown
@@ -1233,6 +1266,44 @@ class CRCM_Booking_Manager {
         
         if (isset($_POST['internal_notes'])) {
             update_post_meta($post_id, '_crcm_booking_internal_notes', sanitize_textarea_field($_POST['internal_notes']));
+        }
+    }
+
+    /**
+     * Handle customer booking count when a booking is trashed.
+     *
+     * @param int $post_id Post ID being trashed.
+     * @return void
+     */
+    public function handle_trash_booking($post_id) {
+        if (get_post_type($post_id) !== 'crcm_booking') {
+            return;
+        }
+
+        $customer_user_id = (int) get_post_meta($post_id, '_crcm_customer_user_id', true);
+        if ($customer_user_id) {
+            $total = (int) get_user_meta($customer_user_id, 'crcm_total_bookings', true);
+            $total = max(0, $total - 1);
+            update_user_meta($customer_user_id, 'crcm_total_bookings', $total);
+        }
+    }
+
+    /**
+     * Restore customer booking count when a booking is untrashed.
+     *
+     * @param int $post_id Post ID being restored.
+     * @return void
+     */
+    public function handle_untrash_booking($post_id) {
+        if (get_post_type($post_id) !== 'crcm_booking') {
+            return;
+        }
+
+        $customer_user_id = (int) get_post_meta($post_id, '_crcm_customer_user_id', true);
+        if ($customer_user_id) {
+            $total = (int) get_user_meta($customer_user_id, 'crcm_total_bookings', true);
+            update_user_meta($customer_user_id, 'crcm_total_bookings', $total + 1);
+            update_user_meta($customer_user_id, 'crcm_last_booking_date', current_time('mysql'));
         }
     }
     

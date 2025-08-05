@@ -37,7 +37,7 @@ class CRCM_Customer_Portal {
         }
 
         $current_user = wp_get_current_user();
-        $bookings = $this->get_bookings_by_email($current_user->user_email);
+        $bookings = $this->get_bookings_by_user($current_user->ID);
 
         wp_send_json_success($bookings);
     }
@@ -56,8 +56,8 @@ class CRCM_Customer_Portal {
         $current_user = wp_get_current_user();
 
         // Verify this is the customer's booking
-        $customer_data = get_post_meta($booking_id, '_crcm_customer_data', true);
-        if (!$customer_data || $customer_data['email'] !== $current_user->user_email) {
+        $booking_customer_id = (int) get_post_meta($booking_id, '_crcm_customer_user_id', true);
+        if ($booking_customer_id !== (int) $current_user->ID) {
             wp_send_json_error(__('You can only cancel your own bookings', 'custom-rental-manager'));
         }
 
@@ -114,33 +114,23 @@ class CRCM_Customer_Portal {
     }
 
     /**
-     * Get bookings by customer email
+     * Get bookings by customer user ID.
+     *
+     * @param int $user_id Customer user ID.
+     * @return array
      */
-    public function get_bookings_by_email($email) {
-        global $wpdb;
-
-        $booking_ids = $wpdb->get_col($wpdb->prepare(
-            "SELECT post_id FROM {$wpdb->postmeta} pm1
-             INNER JOIN {$wpdb->postmeta} pm2 ON pm1.post_id = pm2.post_id
-             WHERE pm1.meta_key = '_crcm_customer_data'
-             AND pm1.meta_value LIKE %s
-             AND pm2.meta_key = '_crcm_booking_status'
-             ORDER BY pm1.post_id DESC",
-            '%' . $wpdb->esc_like('"email":"' . $email . '"') . '%'
-        ));
-
+    public function get_bookings_by_user($user_id) {
         $bookings = array();
         $booking_manager = crcm()->booking_manager;
+        $booking_posts   = crcm_get_customer_bookings($user_id);
 
-        foreach ($booking_ids as $booking_id) {
-            $booking = $booking_manager->get_booking($booking_id);
+        foreach ($booking_posts as $booking_post) {
+            $booking = $booking_manager->get_booking($booking_post->ID);
             if ($booking) {
-                // Add vehicle info
                 $vehicle = get_post($booking['booking_data']['vehicle_id']);
-                $booking['vehicle_name'] = $vehicle ? $vehicle->post_title : '';
+                $booking['vehicle_name']  = $vehicle ? $vehicle->post_title : '';
                 $booking['vehicle_image'] = get_the_post_thumbnail_url($booking['booking_data']['vehicle_id'], 'medium');
-
-                $bookings[] = $booking;
+                $bookings[]               = $booking;
             }
         }
 
@@ -188,21 +178,24 @@ class CRCM_Customer_Portal {
     }
 
     /**
-     * Check if user can cancel booking
+     * Check if user can cancel booking.
+     *
+     * @param int      $booking_id Booking ID.
+     * @param int|null $user_id    Optional user ID.
+     * @return bool
      */
-    public function can_cancel_booking($booking_id, $user_email = null) {
-        if (!$user_email && is_user_logged_in()) {
-            $current_user = wp_get_current_user();
-            $user_email = $current_user->user_email;
+    public function can_cancel_booking($booking_id, $user_id = null) {
+        if (!$user_id && is_user_logged_in()) {
+            $user_id = get_current_user_id();
         }
 
-        if (!$user_email) {
+        if (!$user_id) {
             return false;
         }
 
         // Check if this is the customer's booking
-        $customer_data = get_post_meta($booking_id, '_crcm_customer_data', true);
-        if (!$customer_data || $customer_data['email'] !== $user_email) {
+        $booking_customer_id = (int) get_post_meta($booking_id, '_crcm_customer_user_id', true);
+        if ($booking_customer_id !== (int) $user_id) {
             return false;
         }
 
