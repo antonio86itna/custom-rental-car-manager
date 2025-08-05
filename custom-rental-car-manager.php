@@ -167,7 +167,7 @@ class CRCM_Plugin {
             $this->payment_manager = new CRCM_Payment_Manager();
         }
         
-        if (class_exists('CRCM_API_Endpoints')) {
+        if ( class_exists( 'CRCM_API_Endpoints' ) && null === $this->api_endpoints ) {
             $this->api_endpoints = new CRCM_API_Endpoints();
         }
         
