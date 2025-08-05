@@ -928,66 +928,71 @@ function crcm_get_vehicle_availability($vehicle_id, $pickup_date, $return_date) 
 /**
  * Calculate pricing with custom rates
  */
+/**
+ * Calculate vehicle pricing including custom rates for each day.
+ *
+ * @param int    $vehicle_id  Vehicle post ID.
+ * @param string $pickup_date Rental start date (Y-m-d).
+ * @param string $return_date Rental end date (Y-m-d).
+ *
+ * @return float Total base cost including custom rate adjustments.
+ */
 function crcm_calculate_vehicle_pricing($vehicle_id, $pickup_date, $return_date) {
     $pricing_data = get_post_meta($vehicle_id, '_crcm_pricing_data', true);
-    
+
     if (empty($pricing_data) || !isset($pricing_data['daily_rate'])) {
         return 0;
     }
-    
-    $days = crcm_calculate_rental_days($pickup_date, $return_date);
-    $base_total = $pricing_data['daily_rate'] * $days;
-    $extra_total = 0;
-    
-    // Apply custom rates if available
-    if (!empty($pricing_data['custom_rates'])) {
-        foreach ($pricing_data['custom_rates'] as $rate) {
-            if (empty($rate['extra_rate'])) continue;
-            
-            $applies = false;
-            
-            switch ($rate['type']) {
-                case 'weekends':
-                    // Check if any day in the range is weekend
-                    $current_date = new DateTime($pickup_date);
-                    $end_date = new DateTime($return_date);
-                    
-                    while ($current_date < $end_date) {
+
+    $base_rate   = floatval($pricing_data['daily_rate']);
+    $base_total  = 0;
+
+    $current_date = new DateTime($pickup_date);
+    $end_date     = new DateTime($return_date);
+
+    while ($current_date < $end_date) {
+        $base_total += $base_rate;
+
+        if (!empty($pricing_data['custom_rates'])) {
+            foreach ($pricing_data['custom_rates'] as $rate) {
+                if (empty($rate['extra_rate'])) {
+                    continue;
+                }
+
+                switch ($rate['type']) {
+                    case 'weekends':
                         $day_of_week = $current_date->format('N');
-                        if ($day_of_week >= 6) { // Saturday (6) or Sunday (7)
-                            $applies = true;
-                            break;
+                        if ($day_of_week >= 6) {
+                            $base_total += floatval($rate['extra_rate']);
                         }
-                        $current_date->add(new DateInterval('P1D'));
-                    }
-                    break;
-                    
-                case 'date_range':
-                    if (!empty($rate['start_date']) && !empty($rate['end_date'])) {
-                        $rate_start = new DateTime($rate['start_date']);
-                        $rate_end = new DateTime($rate['end_date']);
-                        $pickup = new DateTime($pickup_date);
-                        $return = new DateTime($return_date);
-                        
-                        // Check if rental period overlaps with rate period
-                        if ($pickup < $rate_end && $return > $rate_start) {
-                            $applies = true;
+                        break;
+
+                    case 'date_range':
+                        if (!empty($rate['start_date']) && !empty($rate['end_date'])) {
+                            $rate_start = new DateTime($rate['start_date']);
+                            $rate_end   = new DateTime($rate['end_date']);
+                            if ($current_date >= $rate_start && $current_date <= $rate_end) {
+                                $base_total += floatval($rate['extra_rate']);
+                            }
                         }
-                    }
-                    break;
-                    
-                case 'specific_days':
-                    // Could be implemented for specific dates
-                    break;
-            }
-            
-            if ($applies) {
-                $extra_total += $rate['extra_rate'] * $days;
+                        break;
+
+                    case 'specific_days':
+                        if (!empty($rate['dates']) && is_array($rate['dates'])) {
+                            $current_str = $current_date->format('Y-m-d');
+                            if (in_array($current_str, $rate['dates'], true)) {
+                                $base_total += floatval($rate['extra_rate']);
+                            }
+                        }
+                        break;
+                }
             }
         }
+
+        $current_date->add(new DateInterval('P1D'));
     }
-    
-    return $base_total + $extra_total;
+
+    return $base_total;
 }
 
 /**

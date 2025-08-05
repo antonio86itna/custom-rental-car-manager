@@ -798,18 +798,19 @@ class CRCM_Booking_Manager {
         jQuery(document).ready(function($) {
             let vehicleData = null;
             let rentalDays = 1;
+            let baseTotal = 0;
             
             // Listen for vehicle selection
             $(document).on('vehicle_selected', function(e, vehicleId, data) {
                 vehicleData = data;
                 loadVehicleExtrasAndInsurance(vehicleId);
-                calculatePricing();
+                fetchBasePricing();
             });
             
             // Listen for date changes
             $(document).on('booking_dates_changed', function(e, days) {
                 rentalDays = days;
-                calculatePricing();
+                fetchBasePricing();
             });
             
             function loadVehicleExtrasAndInsurance(vehicleId) {
@@ -856,19 +857,45 @@ class CRCM_Booking_Manager {
                 }
             }
             
+            function fetchBasePricing() {
+                if (!vehicleData) return;
+
+                const pickupDate = $('#pickup_date').val();
+                const returnDate = $('#return_date').val();
+                const vehicleId  = $('#vehicle_id').val();
+
+                if (!pickupDate || !returnDate || !vehicleId) return;
+
+                $.ajax({
+                    url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                    type: 'POST',
+                    data: {
+                        action: 'crcm_calculate_booking_total',
+                        vehicle_id: vehicleId,
+                        pickup_date: pickupDate,
+                        return_date: returnDate,
+                        nonce: '<?php echo wp_create_nonce('crcm_admin_nonce'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            baseTotal = parseFloat(response.data.base_total) || 0;
+                            rentalDays = parseInt(response.data.rental_days) || rentalDays;
+                            calculatePricing();
+                        }
+                    }
+                });
+            }
+
             function calculatePricing() {
-                if (!vehicleData || !vehicleData.pricing) return;
-                
-                const baseRate = parseFloat(vehicleData.pricing.daily_rate) || 0;
-                const baseTotal = baseRate * rentalDays;
-                
+                if (!vehicleData) return;
+
                 // Calculate extras
                 let extrasTotal = 0;
                 $('input[name="pricing_breakdown[selected_extras][]"]:checked').each(function() {
                     const rate = parseFloat($(this).data('rate')) || 0;
                     extrasTotal += rate * rentalDays;
                 });
-                
+
                 // Calculate insurance
                 let insuranceTotal = 0;
                 const selectedInsurance = $('input[name="pricing_breakdown[selected_insurance]"]:checked');
@@ -876,26 +903,26 @@ class CRCM_Booking_Manager {
                     const rate = parseFloat(selectedInsurance.data('rate')) || 0;
                     insuranceTotal = rate * rentalDays;
                 }
-                
+
                 // Manual discount
                 const discount = parseFloat($('#manual_discount').val()) || 0;
-                
+
                 // Final total
                 const finalTotal = Math.max(0, baseTotal + extrasTotal + insuranceTotal - discount);
-                
+
                 // Update display
                 $('#base-total').text(baseTotal.toFixed(2));
                 $('#extras-total').text(extrasTotal.toFixed(2));
                 $('#insurance-total').text(insuranceTotal.toFixed(2));
                 $('#discount-total').text(discount.toFixed(2));
                 $('#final-total').text(finalTotal.toFixed(2));
-                
+
                 // Update hidden inputs
                 $('#base_total_input').val(baseTotal);
                 $('#extras_total_input').val(extrasTotal);
                 $('#insurance_total_input').val(insuranceTotal);
                 $('#final_total_input').val(finalTotal);
-                
+
                 // Show/hide rows
                 $('.extras-row').toggle(extrasTotal > 0);
                 $('.insurance-row').toggle(insuranceTotal > 0);
@@ -1058,7 +1085,36 @@ class CRCM_Booking_Manager {
             'misc' => $misc_data ?: array(),
         ));
     }
-    
+
+    /**
+     * AJAX: Calculate booking total with custom rates.
+     *
+     * @return void
+     */
+    public function ajax_calculate_booking_total() {
+        check_ajax_referer('crcm_admin_nonce', 'nonce');
+
+        $vehicle_id  = intval($_POST['vehicle_id'] ?? 0);
+        $pickup_date = sanitize_text_field($_POST['pickup_date'] ?? '');
+        $return_date = sanitize_text_field($_POST['return_date'] ?? '');
+
+        if (!$vehicle_id || !$pickup_date || !$return_date) {
+            wp_send_json_error('Missing parameters');
+        }
+
+        if (!function_exists('crcm_calculate_vehicle_pricing')) {
+            wp_send_json_error('Pricing function not available');
+        }
+
+        $base_total  = crcm_calculate_vehicle_pricing($vehicle_id, $pickup_date, $return_date);
+        $rental_days = crcm_calculate_rental_days($pickup_date, $return_date);
+
+        wp_send_json_success(array(
+            'base_total'  => $base_total,
+            'rental_days' => $rental_days,
+        ));
+    }
+
     /**
      * AJAX: Check vehicle availability
      */
