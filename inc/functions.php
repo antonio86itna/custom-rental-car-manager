@@ -150,8 +150,10 @@ function crcm_create_custom_user_roles() {
         }
     }
     
-    // Force WordPress to reinitialize roles
-    wp_roles()->reinit();
+    // Refresh roles for the current site
+    if ( method_exists( wp_roles(), 'for_site' ) ) {
+        wp_roles()->for_site();
+    }
     
     // Set option to track that roles have been created
     update_option('crcm_roles_created', true);
