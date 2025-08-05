@@ -130,9 +130,9 @@ class CRCM_Calendar_Manager {
 
         global $wpdb;
 
-        $vehicle_id = intval($_POST['vehicle_id']);
-        $date = sanitize_text_field($_POST['date']);
-        $quantity = intval($_POST['quantity']);
+        $vehicle_id = intval($_POST['vehicle_id'] ?? 0);
+        $date = sanitize_text_field($_POST['date'] ?? '');
+        $quantity = intval($_POST['quantity'] ?? 0);
         $price_override = floatval($_POST['price_override'] ?? 0);
         $notes = sanitize_textarea_field($_POST['notes'] ?? '');
 

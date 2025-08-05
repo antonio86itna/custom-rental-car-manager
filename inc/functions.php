@@ -364,7 +364,7 @@ function crcm_ajax_search_customers() {
         wp_send_json_error(__('You are not allowed to search customers.', 'custom-rental-manager'));
     }
 
-    $query = sanitize_text_field($_POST['query']);
+    $query = sanitize_text_field($_POST['query'] ?? '');
     
     if (strlen($query) < 2) {
         wp_send_json_error('Query too short');
@@ -411,9 +411,9 @@ function crcm_ajax_create_customer() {
         wp_send_json_error('Permission denied');
     }
     
-    $name = sanitize_text_field($_POST['name']);
-    $email = sanitize_email($_POST['email']);
-    $phone = sanitize_text_field($_POST['phone']);
+    $name = sanitize_text_field($_POST['name'] ?? '');
+    $email = sanitize_email($_POST['email'] ?? '');
+    $phone = sanitize_text_field($_POST['phone'] ?? '');
     
     if (!$name || !$email) {
         wp_send_json_error('Name and email are required');

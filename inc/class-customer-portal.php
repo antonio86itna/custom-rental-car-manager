@@ -52,7 +52,7 @@ class CRCM_Customer_Portal {
             wp_send_json_error(__('Please log in to cancel bookings', 'custom-rental-manager'));
         }
 
-        $booking_id = intval($_POST['booking_id']);
+        $booking_id = intval($_POST['booking_id'] ?? 0);
         $current_user = wp_get_current_user();
 
         // Verify this is the customer's booking
@@ -91,16 +91,16 @@ class CRCM_Customer_Portal {
         $current_user_id = get_current_user_id();
 
         $profile_data = array(
-            'first_name' => sanitize_text_field($_POST['first_name']),
-            'last_name' => sanitize_text_field($_POST['last_name']),
-            'phone' => sanitize_text_field($_POST['phone']),
-            'date_of_birth' => sanitize_text_field($_POST['date_of_birth']),
-            'license_number' => sanitize_text_field($_POST['license_number']),
-            'license_country' => sanitize_text_field($_POST['license_country']),
-            'address' => sanitize_text_field($_POST['address']),
-            'city' => sanitize_text_field($_POST['city']),
-            'postal_code' => sanitize_text_field($_POST['postal_code']),
-            'country' => sanitize_text_field($_POST['country']),
+            'first_name' => sanitize_text_field($_POST['first_name'] ?? ''),
+            'last_name' => sanitize_text_field($_POST['last_name'] ?? ''),
+            'phone' => sanitize_text_field($_POST['phone'] ?? ''),
+            'date_of_birth' => sanitize_text_field($_POST['date_of_birth'] ?? ''),
+            'license_number' => sanitize_text_field($_POST['license_number'] ?? ''),
+            'license_country' => sanitize_text_field($_POST['license_country'] ?? ''),
+            'address' => sanitize_text_field($_POST['address'] ?? ''),
+            'city' => sanitize_text_field($_POST['city'] ?? ''),
+            'postal_code' => sanitize_text_field($_POST['postal_code'] ?? ''),
+            'country' => sanitize_text_field($_POST['country'] ?? ''),
         );
 
         // Update WordPress user meta
