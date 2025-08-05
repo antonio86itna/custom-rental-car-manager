@@ -408,7 +408,7 @@ class CRCM_Email_Manager {
      * Get booking data for email
      */
     private function get_booking_data($booking_id) {
-        $booking_manager = new CRCM_Booking_Manager();
+        $booking_manager = crcm()->booking_manager;
         return $booking_manager->get_booking($booking_id);
     }
 

@@ -1643,5 +1643,3 @@ class CRCM_Booking_Manager {
     }
 }
 
-// Initialize booking manager
-new CRCM_Booking_Manager();
