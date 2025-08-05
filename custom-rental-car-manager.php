@@ -198,7 +198,7 @@ class CRCM_Plugin {
             'show_in_menu' => false, // Will be under main menu
         ));
         
-        // Booking post type - NO CHANGES
+        // Booking post type - with granular capabilities
         register_post_type('crcm_booking', array(
             'labels' => array(
                 'name' => __('Bookings', 'custom-rental-manager'),
@@ -210,12 +210,25 @@ class CRCM_Plugin {
             'show_ui' => true,
             'menu_icon' => 'dashicons-calendar-alt',
             'supports' => array('title'),
+            'map_meta_cap' => true,
             'capabilities' => array(
-                'create_posts' => 'manage_options',
-                'edit_posts' => 'manage_options',
-                'edit_others_posts' => 'manage_options',
-                'publish_posts' => 'manage_options',
-                'read_private_posts' => 'manage_options',
+                // Singular capabilities
+                'edit_post'              => 'crcm_edit_booking',
+                'read_post'              => 'crcm_read_booking',
+                'delete_post'            => 'crcm_delete_booking',
+
+                // Plural capabilities
+                'edit_posts'             => 'crcm_edit_bookings',
+                'edit_others_posts'      => 'crcm_edit_others_bookings',
+                'publish_posts'          => 'crcm_publish_bookings',
+                'read_private_posts'     => 'crcm_read_private_bookings',
+                'delete_posts'           => 'crcm_delete_bookings',
+                'delete_private_posts'   => 'crcm_delete_private_bookings',
+                'delete_published_posts' => 'crcm_delete_published_bookings',
+                'delete_others_posts'    => 'crcm_delete_others_bookings',
+                'edit_private_posts'     => 'crcm_edit_private_bookings',
+                'edit_published_posts'   => 'crcm_edit_published_bookings',
+                'create_posts'           => 'crcm_manage_bookings',
             ),
             'rewrite' => false,
             'show_in_menu' => false, // Will be under main menu

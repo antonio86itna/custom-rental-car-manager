@@ -69,12 +69,19 @@ function crcm_create_custom_user_roles() {
         
         // Booking Management
         'crcm_manage_bookings' => true,
+        'crcm_edit_booking' => true,
+        'crcm_read_booking' => true,
+        'crcm_delete_booking' => true,
         'crcm_edit_bookings' => true,
         'crcm_edit_others_bookings' => true,
         'crcm_publish_bookings' => true,
         'crcm_delete_bookings' => true,
         'crcm_delete_others_bookings' => true,
         'crcm_read_private_bookings' => true,
+        'crcm_edit_private_bookings' => true,
+        'crcm_edit_published_bookings' => true,
+        'crcm_delete_private_bookings' => true,
+        'crcm_delete_published_bookings' => true,
         'crcm_view_all_bookings' => true,
         'crcm_confirm_bookings' => true,
         'crcm_cancel_bookings' => true,
@@ -114,10 +121,13 @@ function crcm_create_custom_user_roles() {
             'crcm_read_private_vehicles',
             
             // Booking capabilities
-            'crcm_manage_bookings', 'crcm_edit_bookings', 'crcm_edit_others_bookings',
+            'crcm_manage_bookings', 'crcm_edit_booking', 'crcm_read_booking',
+            'crcm_delete_booking', 'crcm_edit_bookings', 'crcm_edit_others_bookings',
             'crcm_publish_bookings', 'crcm_delete_bookings', 'crcm_delete_others_bookings',
-            'crcm_read_private_bookings', 'crcm_view_all_bookings', 'crcm_confirm_bookings',
-            'crcm_cancel_bookings',
+            'crcm_read_private_bookings', 'crcm_edit_private_bookings',
+            'crcm_edit_published_bookings', 'crcm_delete_private_bookings',
+            'crcm_delete_published_bookings', 'crcm_view_all_bookings',
+            'crcm_confirm_bookings', 'crcm_cancel_bookings',
             
             // Customer capabilities
             'crcm_manage_customers', 'crcm_view_customer_data', 'crcm_edit_customer_profiles',
