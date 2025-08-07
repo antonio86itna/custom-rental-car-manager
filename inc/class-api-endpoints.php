@@ -238,7 +238,10 @@ class CRCM_API_Endpoints {
 
         foreach ($posts as $post) {
             $booking_manager = crcm()->booking_manager;
-            $bookings[] = $booking_manager->get_booking($post->ID);
+            $booking = $booking_manager->get_booking($post->ID);
+            if (!is_wp_error($booking)) {
+                $bookings[] = $booking;
+            }
         }
 
         return new WP_REST_Response($bookings, 200);
@@ -286,7 +289,7 @@ class CRCM_API_Endpoints {
 
         $booking = $booking_manager->get_booking($booking_id);
 
-        if (!$booking) {
+        if (is_wp_error($booking)) {
             return new WP_Error('booking_not_found', __('Booking not found', 'custom-rental-manager'), array('status' => 404));
         }
 

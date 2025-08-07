@@ -126,7 +126,7 @@ class CRCM_Customer_Portal {
 
         foreach ($booking_posts as $booking_post) {
             $booking = $booking_manager->get_booking($booking_post->ID);
-            if ($booking) {
+            if (!is_wp_error($booking)) {
                 $vehicle = get_post($booking['booking_data']['vehicle_id']);
                 $booking['vehicle_name']  = $vehicle ? $vehicle->post_title : '';
                 $booking['vehicle_image'] = get_the_post_thumbnail_url($booking['booking_data']['vehicle_id'], 'medium');
