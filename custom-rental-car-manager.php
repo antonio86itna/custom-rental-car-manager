@@ -37,6 +37,7 @@ define('CRCM_PLUGIN_FILE', __FILE__);
 define('CRCM_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('CRCM_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('CRCM_VERSION', '1.0.0');
+define('CRCM_DB_VERSION', '1.0.0');
 define('CRCM_BRAND_URL', 'https://totaliweb.com');
 
 /**
@@ -91,6 +92,8 @@ class CRCM_Plugin {
      * Initialize plugin
      */
     public function init() {
+        $this->maybe_upgrade_db();
+
         // Load dependencies first
         $this->load_dependencies();
         
@@ -566,7 +569,10 @@ class CRCM_Plugin {
         
         // Register post types before flushing
         $plugin->register_post_types();
-        
+
+        // Create or update required database tables
+        $plugin->maybe_upgrade_db();
+
         // Flush rewrite rules
         flush_rewrite_rules();
         
@@ -581,12 +587,60 @@ class CRCM_Plugin {
     public static function deactivate() {
         wp_clear_scheduled_hook('crcm_daily_reminder_check');
         flush_rewrite_rules();
-        
+
         // Optionally remove roles on deactivation (uncomment if needed)
         // remove_role('crcm_customer');
         // remove_role('crcm_manager');
     }
-    
+
+    /**
+     * Create or update database tables.
+     *
+     * Uses dbDelta to create the availability table and stores the schema
+     * version for future upgrades.
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    private function create_availability_table() {
+        global $wpdb;
+
+        $table_name      = $wpdb->prefix . 'crcm_availability';
+        $charset_collate = $wpdb->get_charset_collate();
+
+        $sql = "CREATE TABLE $table_name (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            vehicle_id bigint(20) unsigned NOT NULL,
+            start_date datetime NOT NULL,
+            end_date datetime NOT NULL,
+            status tinyint(1) NOT NULL DEFAULT 1,
+            created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            KEY vehicle_id (vehicle_id),
+            KEY start_date (start_date),
+            KEY end_date (end_date)
+        ) $charset_collate;";
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        dbDelta($sql);
+
+        update_option('crcm_db_version', CRCM_DB_VERSION);
+    }
+
+    /**
+     * Check database version and run upgrades when necessary.
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    private function maybe_upgrade_db() {
+        $installed_version = get_option('crcm_db_version');
+        if (CRCM_DB_VERSION !== $installed_version) {
+            $this->create_availability_table();
+        }
+    }
+
     /**
      * Create default settings
      */
