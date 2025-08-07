@@ -86,6 +86,7 @@ class CRCM_Plugin {
         add_action('init', array($this, 'load_textdomain'), 5);
         add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_assets'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
+        add_action('admin_init', array($this, 'register_settings'));
     }
     
     /**
@@ -538,6 +539,30 @@ class CRCM_Plugin {
                 )
             );
         }
+
+        if ( isset( $_GET['page'] ) && 'crcm-settings' === $_GET['page'] ) {
+            $settings_css = CRCM_PLUGIN_PATH . 'assets/css/admin-settings.css';
+            $settings_js  = CRCM_PLUGIN_PATH . 'assets/js/admin-settings.js';
+
+            if ( file_exists( $settings_css ) ) {
+                wp_enqueue_style(
+                    'crcm-admin-settings',
+                    CRCM_PLUGIN_URL . 'assets/css/admin-settings.css',
+                    array(),
+                    CRCM_VERSION
+                );
+            }
+
+            if ( file_exists( $settings_js ) ) {
+                wp_enqueue_script(
+                    'crcm-admin-settings',
+                    CRCM_PLUGIN_URL . 'assets/js/admin-settings.js',
+                    array( 'jquery' ),
+                    CRCM_VERSION,
+                    true
+                );
+            }
+        }
     }
     
     /**
@@ -641,6 +666,352 @@ class CRCM_Plugin {
         }
     }
 
+    /**
+     * Register plugin settings using the WordPress Settings API.
+     *
+     * @return void
+     */
+    public function register_settings() {
+        register_setting(
+            'crcm_settings_group',
+            'crcm_settings',
+            array(
+                'sanitize_callback' => array( $this, 'sanitize_settings' ),
+            )
+        );
+
+        add_settings_section( 'crcm_company_section', '', '__return_false', 'crcm-settings' );
+        add_settings_field(
+            'company_name',
+            __( 'Company Name', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_company_section',
+            array( 'label_for' => 'company_name', 'type' => 'text' )
+        );
+        add_settings_field(
+            'company_address',
+            __( 'Address', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_company_section',
+            array( 'label_for' => 'company_address', 'type' => 'textarea', 'rows' => 3 )
+        );
+        add_settings_field(
+            'company_phone',
+            __( 'Phone', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_company_section',
+            array( 'label_for' => 'company_phone', 'type' => 'text' )
+        );
+        add_settings_field(
+            'company_email',
+            __( 'Email', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_company_section',
+            array( 'label_for' => 'company_email', 'type' => 'email' )
+        );
+        add_settings_field(
+            'currency_symbol',
+            __( 'Currency Symbol', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_company_section',
+            array( 'label_for' => 'currency_symbol', 'type' => 'text', 'class' => 'small-text' )
+        );
+        add_settings_field(
+            'currency_position',
+            __( 'Currency Position', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_company_section',
+            array(
+                'label_for' => 'currency_position',
+                'type'      => 'select',
+                'options'   => array(
+                    'before' => __( 'Before amount', 'custom-rental-manager' ),
+                    'after'  => __( 'After amount', 'custom-rental-manager' ),
+                ),
+            )
+        );
+
+        add_settings_section( 'crcm_booking_section', '', '__return_false', 'crcm-settings' );
+        add_settings_field(
+            'booking_advance_days',
+            __( 'Booking Advance Days', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_booking_section',
+            array( 'label_for' => 'booking_advance_days', 'type' => 'number' )
+        );
+        add_settings_field(
+            'min_booking_hours',
+            __( 'Minimum Booking Hours', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_booking_section',
+            array( 'label_for' => 'min_booking_hours', 'type' => 'number' )
+        );
+        add_settings_field(
+            'cancellation_hours',
+            __( 'Free Cancellation Hours', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_booking_section',
+            array( 'label_for' => 'cancellation_hours', 'type' => 'number' )
+        );
+        add_settings_field(
+            'late_return_fee',
+            __( 'Late Return Fee', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_booking_section',
+            array( 'label_for' => 'late_return_fee', 'type' => 'number' )
+        );
+
+        add_settings_section( 'crcm_payment_section', '', '__return_false', 'crcm-settings' );
+        add_settings_field(
+            'enable_online_payment',
+            __( 'Enable Online Payment', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_payment_section',
+            array( 'label_for' => 'enable_online_payment', 'type' => 'checkbox' )
+        );
+        add_settings_field(
+            'deposit_percentage',
+            __( 'Deposit Percentage', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_payment_section',
+            array( 'label_for' => 'deposit_percentage', 'type' => 'number' )
+        );
+        add_settings_field(
+            'minimum_deposit',
+            __( 'Minimum Deposit', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_payment_section',
+            array( 'label_for' => 'minimum_deposit', 'type' => 'number' )
+        );
+
+        add_settings_section( 'crcm_email_section', '', '__return_false', 'crcm-settings' );
+        add_settings_field(
+            'email_from_name',
+            __( 'From Name', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_email_section',
+            array( 'label_for' => 'email_from_name', 'type' => 'text' )
+        );
+        add_settings_field(
+            'email_from_email',
+            __( 'From Email', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_email_section',
+            array( 'label_for' => 'email_from_email', 'type' => 'email' )
+        );
+        add_settings_field(
+            'enable_booking_confirmation',
+            __( 'Send Booking Confirmation', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_email_section',
+            array( 'label_for' => 'enable_booking_confirmation', 'type' => 'checkbox' )
+        );
+        add_settings_field(
+            'enable_pickup_reminder',
+            __( 'Send Pickup Reminder', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_email_section',
+            array( 'label_for' => 'enable_pickup_reminder', 'type' => 'checkbox' )
+        );
+        add_settings_field(
+            'enable_admin_notifications',
+            __( 'Admin Notifications', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_email_section',
+            array( 'label_for' => 'enable_admin_notifications', 'type' => 'checkbox' )
+        );
+
+        add_settings_section( 'crcm_delivery_section', '', '__return_false', 'crcm-settings' );
+        add_settings_field(
+            'enable_home_delivery',
+            __( 'Enable Home Delivery', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_delivery_section',
+            array( 'label_for' => 'enable_home_delivery', 'type' => 'checkbox' )
+        );
+        add_settings_field(
+            'home_delivery_fee',
+            __( 'Home Delivery Fee', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_delivery_section',
+            array( 'label_for' => 'home_delivery_fee', 'type' => 'number' )
+        );
+        add_settings_field(
+            'home_delivery_radius',
+            __( 'Home Delivery Radius', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_delivery_section',
+            array( 'label_for' => 'home_delivery_radius', 'type' => 'number' )
+        );
+
+        add_settings_section( 'crcm_advanced_section', '', '__return_false', 'crcm-settings' );
+        add_settings_field(
+            'show_totaliweb_credit',
+            __( 'Show "Powered by Totaliweb" credit', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_advanced_section',
+            array( 'label_for' => 'show_totaliweb_credit', 'type' => 'checkbox' )
+        );
+        add_settings_field(
+            'custom_css',
+            __( 'Custom CSS', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_advanced_section',
+            array( 'label_for' => 'custom_css', 'type' => 'textarea', 'rows' => 10 )
+        );
+    }
+
+    /**
+     * Sanitize settings input.
+     *
+     * @param array $input Raw settings.
+     *
+     * @return array Sanitized settings.
+     */
+    public function sanitize_settings( $input ) {
+        $defaults = $this->get_default_settings();
+        $input    = wp_parse_args( $input, $defaults );
+
+        $output = array();
+
+        $output['company_name']              = sanitize_text_field( $input['company_name'] );
+        $output['company_address']           = sanitize_textarea_field( $input['company_address'] );
+        $output['company_phone']             = sanitize_text_field( $input['company_phone'] );
+        $output['company_email']             = sanitize_email( $input['company_email'] );
+        $output['company_website']           = esc_url_raw( $input['company_website'] );
+        $output['currency_symbol']           = sanitize_text_field( $input['currency_symbol'] );
+        $output['currency_position']         = ( 'after' === $input['currency_position'] ) ? 'after' : 'before';
+        $output['default_tax_rate']          = floatval( $input['default_tax_rate'] );
+        $output['booking_advance_days']      = intval( $input['booking_advance_days'] );
+        $output['min_booking_hours']         = intval( $input['min_booking_hours'] );
+        $output['cancellation_hours']        = intval( $input['cancellation_hours'] );
+        $output['late_return_fee']           = floatval( $input['late_return_fee'] );
+        $output['email_from_name']           = sanitize_text_field( $input['email_from_name'] );
+        $output['email_from_email']          = sanitize_email( $input['email_from_email'] );
+        $output['enable_booking_confirmation'] = isset( $input['enable_booking_confirmation'] ) ? 1 : 0;
+        $output['enable_pickup_reminder']    = isset( $input['enable_pickup_reminder'] ) ? 1 : 0;
+        $output['enable_admin_notifications'] = isset( $input['enable_admin_notifications'] ) ? 1 : 0;
+        $output['enable_home_delivery']      = isset( $input['enable_home_delivery'] ) ? 1 : 0;
+        $output['home_delivery_fee']         = floatval( $input['home_delivery_fee'] );
+        $output['home_delivery_radius']      = intval( $input['home_delivery_radius'] );
+        $output['enable_online_payment']     = isset( $input['enable_online_payment'] ) ? 1 : 0;
+        $output['deposit_percentage']        = intval( $input['deposit_percentage'] );
+        $output['minimum_deposit']           = floatval( $input['minimum_deposit'] );
+        $output['show_totaliweb_credit']     = isset( $input['show_totaliweb_credit'] ) ? 1 : 0;
+        $output['custom_css']                = wp_kses_post( $input['custom_css'] );
+
+        return $output;
+    }
+
+    /**
+     * Render a settings field.
+     *
+     * @param array $args Field arguments.
+     *
+     * @return void
+     */
+    public function render_field( $args ) {
+        $options = get_option( 'crcm_settings', $this->get_default_settings() );
+        $id      = $args['label_for'];
+        $type    = $args['type'];
+        $value   = isset( $options[ $id ] ) ? $options[ $id ] : '';
+
+        switch ( $type ) {
+            case 'textarea':
+                printf(
+                    '<textarea id="%1$s" name="crcm_settings[%1$s]" rows="%2$d" class="large-text">%3$s</textarea>',
+                    esc_attr( $id ),
+                    isset( $args['rows'] ) ? intval( $args['rows'] ) : 5,
+                    esc_textarea( $value )
+                );
+                break;
+            case 'checkbox':
+                printf(
+                    '<input type="checkbox" id="%1$s" name="crcm_settings[%1$s]" value="1" %2$s />',
+                    esc_attr( $id ),
+                    checked( 1, $value, false )
+                );
+                break;
+            case 'select':
+                echo '<select id="' . esc_attr( $id ) . '" name="crcm_settings[' . esc_attr( $id ) . ']">';
+                foreach ( $args['options'] as $key => $label ) {
+                    printf( '<option value="%1$s" %2$s>%3$s</option>', esc_attr( $key ), selected( $value, $key, false ), esc_html( $label ) );
+                }
+                echo '</select>';
+                break;
+            default:
+                $class = isset( $args['class'] ) ? $args['class'] : 'regular-text';
+                printf(
+                    '<input type="%1$s" id="%2$s" name="crcm_settings[%2$s]" value="%3$s" class="%4$s" />',
+                    esc_attr( $type ),
+                    esc_attr( $id ),
+                    esc_attr( $value ),
+                    esc_attr( $class )
+                );
+        }
+
+        if ( ! empty( $args['description'] ) ) {
+            echo '<p class="description">' . esc_html( $args['description'] ) . '</p>';
+        }
+    }
+
+    /**
+     * Default settings values.
+     *
+     * @return array
+     */
+    private function get_default_settings() {
+        return array(
+            'company_name'              => 'Costabilerent',
+            'company_address'           => 'Ischia, Italy',
+            'company_phone'             => '+39 123 456 789',
+            'company_email'             => 'info@costabilerent.com',
+            'company_website'           => 'https://costabilerent.com',
+            'currency_symbol'           => '€',
+            'currency_position'         => 'before',
+            'default_tax_rate'          => 22,
+            'booking_advance_days'      => 365,
+            'min_booking_hours'         => 24,
+            'cancellation_hours'        => 72,
+            'late_return_fee'           => 25,
+            'email_from_name'           => 'Costabilerent',
+            'email_from_email'          => 'info@costabilerent.com',
+            'enable_booking_confirmation' => 1,
+            'enable_pickup_reminder'    => 1,
+            'enable_admin_notifications' => 1,
+            'enable_home_delivery'      => 1,
+            'home_delivery_fee'         => 25,
+            'home_delivery_radius'      => 20,
+            'enable_online_payment'     => 0,
+            'deposit_percentage'        => 30,
+            'minimum_deposit'           => 200,
+            'show_totaliweb_credit'     => 1,
+            'custom_css'                => '',
+        );
+    }
     /**
      * Create default settings
      */
