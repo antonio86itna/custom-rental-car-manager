@@ -498,16 +498,17 @@ class CRCM_Plugin {
     /**
      * Enqueue admin assets
      */
-    public function enqueue_admin_assets($hook) {
-        // Only load on plugin pages
-        if (strpos($hook, 'crcm') === false && !in_array(get_current_screen()->post_type, array('crcm_vehicle', 'crcm_booking'))) {
+    public function enqueue_admin_assets( $hook ) {
+        $screen = get_current_screen();
+
+        if ( strpos( $hook, 'crcm' ) === false && ( ! $screen || ! in_array( $screen->post_type, array( 'crcm_vehicle', 'crcm_booking' ), true ) ) ) {
             return;
         }
-        
+
         $css_path = CRCM_PLUGIN_PATH . 'assets/css/admin.css';
-        $js_path = CRCM_PLUGIN_PATH . 'assets/js/admin.js';
-        
-        if (file_exists($css_path)) {
+        $js_path  = CRCM_PLUGIN_PATH . 'assets/js/admin.js';
+
+        if ( file_exists( $css_path ) ) {
             wp_enqueue_style(
                 'crcm-admin',
                 CRCM_PLUGIN_URL . 'assets/css/admin.css',
@@ -515,27 +516,24 @@ class CRCM_Plugin {
                 CRCM_VERSION
             );
         }
-        
-        wp_enqueue_style(
-            'jquery-ui-datepicker-style',
-            'https://code.jquery.com/ui/1.13.2/themes/ui-lightness/jquery-ui.css',
-            array(),
-            '1.13.2'
-        );
-        
-        if (file_exists($js_path)) {
+
+        if ( file_exists( $js_path ) ) {
             wp_enqueue_script(
                 'crcm-admin',
                 CRCM_PLUGIN_URL . 'assets/js/admin.js',
-                array('jquery', 'jquery-ui-datepicker'),
+                array( 'jquery' ),
                 CRCM_VERSION,
                 true
             );
-            
-            wp_localize_script('crcm-admin', 'crcm_admin', array(
-                'ajax_url' => admin_url('admin-ajax.php'),
-                'nonce' => wp_create_nonce('crcm_admin_nonce'),
-            ));
+
+            wp_localize_script(
+                'crcm-admin',
+                'crcm_admin',
+                array(
+                    'ajax_url' => admin_url( 'admin-ajax.php' ),
+                    'nonce'    => wp_create_nonce( 'crcm_admin_nonce' ),
+                )
+            );
         }
     }
     
