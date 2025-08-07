@@ -38,7 +38,7 @@ class CRCM_Email_Manager {
     public function send_booking_confirmation($booking_id) {
         $booking = $this->get_booking_data($booking_id);
 
-        if (!$booking || empty($booking['customer_data']['email'])) {
+        if (is_wp_error($booking) || empty($booking['customer_data']['email'])) {
             return false;
         }
 
@@ -69,7 +69,7 @@ class CRCM_Email_Manager {
     public function send_status_change_notification($booking_id, $new_status, $old_status) {
         $booking = $this->get_booking_data($booking_id);
 
-        if (!$booking || empty($booking['customer_data']['email'])) {
+        if (is_wp_error($booking) || empty($booking['customer_data']['email'])) {
             return false;
         }
 
@@ -138,7 +138,7 @@ class CRCM_Email_Manager {
     public function send_pickup_reminder($booking_id) {
         $booking = $this->get_booking_data($booking_id);
 
-        if (!$booking || empty($booking['customer_data']['email'])) {
+        if (is_wp_error($booking) || empty($booking['customer_data']['email'])) {
             return false;
         }
 

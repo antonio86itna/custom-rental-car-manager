@@ -45,6 +45,141 @@ class CRCM_Booking_Manager {
     }
 
     /**
+     * Create a booking programmatically.
+     *
+     * @param array $data Booking data.
+     * @return array|WP_Error
+     */
+    public function create_booking($data) {
+        $vehicle_id = isset($data['vehicle_id']) ? intval($data['vehicle_id']) : 0;
+        if ($vehicle_id <= 0) {
+            return new WP_Error('invalid_vehicle', __('Invalid vehicle ID', 'custom-rental-manager'));
+        }
+
+        $pickup_date = sanitize_text_field($data['pickup_date'] ?? '');
+        $return_date = sanitize_text_field($data['return_date'] ?? '');
+        if (!$pickup_date || !$return_date || !strtotime($pickup_date) || !strtotime($return_date) || $return_date < $pickup_date) {
+            return new WP_Error('invalid_dates', __('Invalid pickup or return date', 'custom-rental-manager'));
+        }
+
+        $customer_raw = $data['customer_data'] ?? array();
+        $customer_data = array(
+            'first_name' => sanitize_text_field($customer_raw['first_name'] ?? ''),
+            'last_name'  => sanitize_text_field($customer_raw['last_name'] ?? ''),
+            'email'      => sanitize_email($customer_raw['email'] ?? ''),
+            'phone'      => sanitize_text_field($customer_raw['phone'] ?? ''),
+        );
+        if (empty($customer_data['first_name']) || empty($customer_data['last_name']) || empty($customer_data['email']) || !is_email($customer_data['email'])) {
+            return new WP_Error('invalid_customer', __('Invalid customer data', 'custom-rental-manager'));
+        }
+
+        $vehicle = get_post($vehicle_id);
+        if (!$vehicle || $vehicle->post_type !== 'crcm_vehicle') {
+            return new WP_Error('invalid_vehicle', __('Vehicle not found', 'custom-rental-manager'));
+        }
+
+        $vehicle_manager = crcm()->vehicle_manager;
+        $available = $vehicle_manager->check_availability($vehicle_id, $pickup_date, $return_date);
+        if ($available <= 0) {
+            return new WP_Error('vehicle_unavailable', __('Vehicle not available for selected dates', 'custom-rental-manager'));
+        }
+
+        $booking_post = array(
+            'post_type'   => 'crcm_booking',
+            'post_status' => 'publish',
+            'post_title'  => sprintf(__('Booking for %s %s', 'custom-rental-manager'), $customer_data['first_name'], $customer_data['last_name']),
+        );
+        $booking_id = wp_insert_post($booking_post, true);
+        if (is_wp_error($booking_id)) {
+            return $booking_id;
+        }
+
+        $booking_number = crcm_get_next_booking_number();
+        update_post_meta($booking_id, '_crcm_booking_number', $booking_number);
+
+        $booking_data = array(
+            'vehicle_id'      => $vehicle_id,
+            'pickup_date'     => $pickup_date,
+            'return_date'     => $return_date,
+            'pickup_time'     => sanitize_text_field($data['pickup_time'] ?? '09:00'),
+            'return_time'     => sanitize_text_field($data['return_time'] ?? '18:00'),
+            'pickup_location' => sanitize_text_field($data['pickup_location'] ?? ''),
+            'return_location' => sanitize_text_field($data['return_location'] ?? ''),
+            'home_delivery'   => !empty($data['home_delivery']),
+            'delivery_address'=> sanitize_text_field($data['delivery_address'] ?? ''),
+            'extras'          => array_map('sanitize_text_field', $data['extras'] ?? array()),
+            'insurance_type'  => sanitize_text_field($data['insurance_type'] ?? 'basic'),
+            'notes'           => sanitize_textarea_field($data['notes'] ?? ''),
+        );
+        update_post_meta($booking_id, '_crcm_booking_data', $booking_data);
+        update_post_meta($booking_id, '_crcm_customer_data', $customer_data);
+        update_post_meta($booking_id, '_crcm_booking_status', 'pending');
+
+        return array(
+            'booking_id'     => $booking_id,
+            'booking_number' => $booking_number,
+            'booking_data'   => $booking_data,
+            'customer_data'  => $customer_data,
+            'status'         => 'pending',
+        );
+    }
+
+    /**
+     * Retrieve a booking.
+     *
+     * @param int $booking_id Booking ID.
+     * @return array|WP_Error
+     */
+    public function get_booking($booking_id) {
+        $booking_id = intval($booking_id);
+        if ($booking_id <= 0) {
+            return new WP_Error('invalid_booking_id', __('Invalid booking ID', 'custom-rental-manager'));
+        }
+
+        $post = get_post($booking_id);
+        if (!$post || $post->post_type !== 'crcm_booking') {
+            return new WP_Error('booking_not_found', __('Booking not found', 'custom-rental-manager'));
+        }
+
+        $booking_data = get_post_meta($booking_id, '_crcm_booking_data', true);
+        if (!is_array($booking_data)) {
+            $booking_data = array();
+        }
+        $booking_data = array_map('sanitize_text_field', $booking_data);
+        if (isset($booking_data['extras']) && is_array($booking_data['extras'])) {
+            $booking_data['extras'] = array_map('sanitize_text_field', $booking_data['extras']);
+        }
+
+        $customer_data = get_post_meta($booking_id, '_crcm_customer_data', true);
+        if (!is_array($customer_data)) {
+            $customer_data = array();
+        }
+        $customer_data = array(
+            'first_name' => sanitize_text_field($customer_data['first_name'] ?? ''),
+            'last_name'  => sanitize_text_field($customer_data['last_name'] ?? ''),
+            'email'      => sanitize_email($customer_data['email'] ?? ''),
+            'phone'      => sanitize_text_field($customer_data['phone'] ?? ''),
+        );
+
+        $pricing = get_post_meta($booking_id, '_crcm_pricing_breakdown', true);
+        if (!is_array($pricing)) {
+            $pricing = array();
+        }
+
+        $status = get_post_meta($booking_id, '_crcm_booking_status', true) ?: 'pending';
+        $booking_number = get_post_meta($booking_id, '_crcm_booking_number', true);
+
+        return array(
+            'booking_id'        => $booking_id,
+            'booking_number'    => $booking_number,
+            'status'            => $status,
+            'booking_data'      => $booking_data,
+            'pricing_breakdown' => $pricing,
+            'customer_data'     => $customer_data,
+        );
+    }
+
+    /**
      * Add meta boxes for booking post type
      */
     public function add_meta_boxes() {
