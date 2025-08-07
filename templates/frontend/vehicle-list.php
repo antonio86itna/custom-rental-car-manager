@@ -17,26 +17,40 @@ $return_date = isset($_GET['return_date']) ? sanitize_text_field($_GET['return_d
 $pickup_time = isset($_GET['pickup_time']) ? sanitize_text_field($_GET['pickup_time']) : '09:00';
 $return_time = isset($_GET['return_time']) ? sanitize_text_field($_GET['return_time']) : '18:00';
 
+// Get vehicle types for filtering
+$vehicle_types = crcm_get_vehicle_types();
+
 // Get vehicles with availability check
 $args = array(
-    'post_type' => 'crcm_vehicle',
-    'post_status' => 'publish',
+    'post_type'      => 'crcm_vehicle',
+    'post_status'    => 'publish',
     'posts_per_page' => -1,
-    'orderby' => 'title',
-    'order' => 'ASC',
+    'orderby'        => 'title',
+    'order'          => 'ASC',
 );
 
+$vehicles = get_posts($args);
+
 if (!empty($atts['type'])) {
-    $args['tax_query'] = array(
-        array(
-            'taxonomy' => 'crcm_vehicle_type',
-            'field' => 'term_id',
-            'terms' => $atts['type'],
-        ),
-    );
+    $filter_type = $atts['type'];
+
+    if (is_numeric($filter_type)) {
+        foreach ($vehicle_types as $type_obj) {
+            if ((int) $type_obj->term_id === (int) $filter_type) {
+                $filter_type = $type_obj->slug;
+                break;
+            }
+        }
+    }
+
+    $vehicles = array_filter($vehicles, function ($vehicle) use ($filter_type) {
+        $vehicle_type = crcm_get_vehicle_type($vehicle->ID);
+        return $vehicle_type === $filter_type;
+    });
+
+    $vehicles = array_values($vehicles);
 }
 
-$vehicles = get_posts($args);
 $currency_symbol = crcm_get_setting('currency_symbol', '€');
 $vehicle_manager = crcm()->vehicle_manager;
 
@@ -47,9 +61,6 @@ if ($pickup_date && $return_date) {
     $return = new DateTime($return_date);
     $rental_days = max(1, $return->diff($pickup)->days);
 }
-
-// Get vehicle types for filtering
-$vehicle_types = crcm_get_vehicle_types();
 ?>
 
 <div class="crcm-vehicle-list-container">
@@ -110,13 +121,20 @@ $vehicle_types = crcm_get_vehicle_types();
     <!-- Vehicle Grid -->
     <div class="crcm-vehicles-grid" id="vehicles-grid">
         <?php if (!empty($vehicles)): ?>
-            <?php foreach ($vehicles as $vehicle): 
+            <?php foreach ($vehicles as $vehicle):
                 $vehicle_data = get_post_meta($vehicle->ID, '_crcm_vehicle_data', true);
                 $pricing_data = get_post_meta($vehicle->ID, '_crcm_pricing_data', true);
-                $daily_rate = $pricing_data['daily_rate'] ?? 0;
-                $vehicle_type = wp_get_post_terms($vehicle->ID, 'crcm_vehicle_type');
+                $daily_rate   = $pricing_data['daily_rate'] ?? 0;
+                $vehicle_type_slug = crcm_get_vehicle_type($vehicle->ID);
+                $vehicle_type_name = '';
+                foreach ($vehicle_types as $type) {
+                    if ($type->slug === $vehicle_type_slug) {
+                        $vehicle_type_name = $type->name;
+                        break;
+                    }
+                }
                 $thumbnail = get_the_post_thumbnail($vehicle->ID, 'medium');
-                $features = get_post_meta($vehicle->ID, '_crcm_vehicle_features', true) ?: array();
+                $features  = get_post_meta($vehicle->ID, '_crcm_vehicle_features', true) ?: array();
                 
                 // Check availability for selected dates
                 $available_quantity = 0;
@@ -139,7 +157,6 @@ $vehicle_types = crcm_get_vehicle_types();
                     $total_price = $total_price * (1 - $discount);
                 }
                 
-                $vehicle_type_slug = !empty($vehicle_type) ? $vehicle_type[0]->slug : '';
             ?>
                 <div class="crcm-vehicle-card <?php echo $is_available ? 'available' : 'unavailable'; ?>" 
                      data-vehicle-type="<?php echo esc_attr($vehicle_type_slug); ?>"
@@ -175,8 +192,8 @@ $vehicle_types = crcm_get_vehicle_types();
                         <div class="crcm-vehicle-header">
                             <h3 class="crcm-vehicle-title"><?php echo esc_html($vehicle->post_title); ?></h3>
                             
-                            <?php if (!empty($vehicle_type)): ?>
-                                <span class="crcm-vehicle-type"><?php echo esc_html($vehicle_type[0]->name); ?></span>
+                            <?php if (!empty($vehicle_type_name)): ?>
+                                <span class="crcm-vehicle-type"><?php echo esc_html($vehicle_type_name); ?></span>
                             <?php endif; ?>
                         </div>
                         
