@@ -844,13 +844,17 @@ class CRCM_Booking_Manager {
      */
     public function ajax_search_customers() {
         check_ajax_referer('crcm_admin_nonce', 'nonce');
-        
+
+        if ( ! current_user_can('crcm_manage_bookings') && ! current_user_can('manage_options') ) {
+            wp_send_json_error('Permission denied');
+        }
+
         $query = sanitize_text_field($_POST['query'] ?? '');
-        
+
         if (strlen($query) < 2) {
             wp_send_json_error('Query too short');
         }
-        
+
         // Search users with customer role
         $users = get_users(array(
             'role' => 'crcm_customer',
@@ -860,7 +864,7 @@ class CRCM_Booking_Manager {
             'orderby' => 'display_name',
             'order' => 'ASC'
         ));
-        
+
         $results = array();
         foreach ($users as $user) {
             $results[] = array(
@@ -870,7 +874,7 @@ class CRCM_Booking_Manager {
                 'phone' => get_user_meta($user->ID, 'phone', true),
             );
         }
-        
+
         wp_send_json_success($results);
     }
     
@@ -879,9 +883,13 @@ class CRCM_Booking_Manager {
      */
     public function ajax_get_vehicle_booking_data() {
         check_ajax_referer('crcm_admin_nonce', 'nonce');
-        
-        $vehicle_id = intval($_POST['vehicle_id'] ?? 0);
-        
+
+        if ( ! current_user_can('crcm_manage_bookings') && ! current_user_can('manage_options') ) {
+            wp_send_json_error('Permission denied');
+        }
+
+        $vehicle_id = absint($_POST['vehicle_id'] ?? 0);
+
         if (!$vehicle_id) {
             wp_send_json_error('Invalid vehicle ID');
         }
@@ -919,7 +927,11 @@ class CRCM_Booking_Manager {
     public function ajax_calculate_booking_total() {
         check_ajax_referer('crcm_admin_nonce', 'nonce');
 
-        $vehicle_id  = intval($_POST['vehicle_id'] ?? 0);
+        if ( ! current_user_can('crcm_manage_bookings') && ! current_user_can('manage_options') ) {
+            wp_send_json_error('Permission denied');
+        }
+
+        $vehicle_id  = absint($_POST['vehicle_id'] ?? 0);
         $pickup_date = sanitize_text_field($_POST['pickup_date'] ?? '');
         $return_date = sanitize_text_field($_POST['return_date'] ?? '');
         $pickup_time = sanitize_text_field($_POST['pickup_time'] ?? '');
@@ -950,11 +962,15 @@ class CRCM_Booking_Manager {
      */
     public function ajax_check_vehicle_availability() {
         check_ajax_referer('crcm_admin_nonce', 'nonce');
-        
-        $vehicle_id = intval($_POST['vehicle_id'] ?? 0);
+
+        if ( ! current_user_can('crcm_manage_bookings') && ! current_user_can('manage_options') ) {
+            wp_send_json_error('Permission denied');
+        }
+
+        $vehicle_id  = absint($_POST['vehicle_id'] ?? 0);
         $pickup_date = sanitize_text_field($_POST['pickup_date'] ?? '');
         $return_date = sanitize_text_field($_POST['return_date'] ?? '');
-        
+
         if (!$vehicle_id || !$pickup_date || !$return_date) {
             wp_send_json_error('Missing required parameters');
         }
