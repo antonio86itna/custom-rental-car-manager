@@ -42,6 +42,8 @@ class CRCM_Email_Manager {
             return false;
         }
 
+        $settings = get_option('crcm_settings', array());
+
         $subject = sprintf(__('Booking Confirmation - %s', 'custom-rental-manager'), $booking['booking_number']);
         $message = $this->get_booking_confirmation_template($booking);
 
@@ -55,6 +57,11 @@ class CRCM_Email_Manager {
             $message,
             $headers
         );
+
+        if (!empty($settings['enable_admin_notifications'])) {
+            $admin_email = !empty($settings['company_email']) ? $settings['company_email'] : get_option('admin_email');
+            wp_mail($admin_email, $subject, $message, $headers);
+        }
 
         if ($sent) {
             update_post_meta($booking_id, '_crcm_confirmation_email_sent', current_time('mysql'));
@@ -73,6 +80,8 @@ class CRCM_Email_Manager {
             return false;
         }
 
+        $settings = get_option('crcm_settings', array());
+
         // Don't send notification for initial status set
         if (empty($old_status)) {
             return false;
@@ -85,12 +94,19 @@ class CRCM_Email_Manager {
             'Content-Type: text/html; charset=UTF-8',
         );
 
-        return wp_mail(
+        $sent = wp_mail(
             $booking['customer_data']['email'],
             $subject,
             $message,
             $headers
         );
+
+        if (!empty($settings['enable_admin_notifications'])) {
+            $admin_email = !empty($settings['company_email']) ? $settings['company_email'] : get_option('admin_email');
+            wp_mail($admin_email, $subject, $message, $headers);
+        }
+
+        return $sent;
     }
 
     /**
