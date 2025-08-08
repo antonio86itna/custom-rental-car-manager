@@ -146,6 +146,7 @@ $locations = crcm_get_locations();
     <div id="crcm-results-content" class="crcm-results-content">
         <!-- Results will be loaded here via AJAX -->
     </div>
+    <div id="crcm-pagination" class="crcm-pagination"></div>
 </div>
 
 <style>
@@ -187,6 +188,25 @@ $locations = crcm_get_locations();
 
 .crcm-search-form {
     max-width: 100%;
+}
+
+.crcm-pagination {
+    text-align: center;
+    margin: 20px 0;
+}
+
+.crcm-pagination a {
+    display: inline-block;
+    padding: 8px 12px;
+    margin: 0 4px;
+    background: #667eea;
+    color: #fff;
+    border-radius: 4px;
+    text-decoration: none;
+}
+
+.crcm-pagination a.active {
+    background: #764ba2;
 }
 
 .crcm-field-row {

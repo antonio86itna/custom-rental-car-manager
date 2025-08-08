@@ -1885,91 +1885,116 @@ class CRCM_Vehicle_Manager {
      */
     public function ajax_search_vehicles() {
         check_ajax_referer('crcm_nonce', 'nonce');
-        
-        $pickup_date = sanitize_text_field($_POST['pickup_date'] ?? '');
-        $return_date = sanitize_text_field($_POST['return_date'] ?? '');
-        $vehicle_type = sanitize_text_field($_POST['vehicle_type'] ?? '');
-        
+
+        $pickup_date    = sanitize_text_field($_POST['pickup_date'] ?? '');
+        $return_date    = sanitize_text_field($_POST['return_date'] ?? '');
+        $vehicle_type   = sanitize_text_field($_POST['vehicle_type'] ?? '');
+        $posts_per_page = isset($_POST['posts_per_page']) ? absint($_POST['posts_per_page']) : 10;
+        $paged          = isset($_POST['page']) ? absint($_POST['page']) : 1;
+
         if (empty($pickup_date) || empty($return_date)) {
             wp_send_json_error(__('Please select pickup and return dates.', 'custom-rental-manager'));
         }
-        
-        $vehicles = $this->search_available_vehicles($pickup_date, $return_date, $vehicle_type);
-        
-        wp_send_json_success($vehicles);
+
+        $results = $this->search_available_vehicles($pickup_date, $return_date, $vehicle_type, $posts_per_page, $paged);
+
+        wp_send_json_success($results);
     }
-    
+
     /**
      * Search available vehicles with featured priority
+     *
+     * @param string $pickup_date    Pickup date.
+     * @param string $return_date    Return date.
+     * @param string $vehicle_type   Optional vehicle type filter.
+     * @param int    $posts_per_page Number of posts per page.
+     * @param int    $paged          Current page number.
+     *
+     * @return array
      */
-    public function search_available_vehicles($pickup_date, $return_date, $vehicle_type = '') {
+    public function search_available_vehicles($pickup_date, $return_date, $vehicle_type = '', $posts_per_page = 10, $paged = 1) {
         $args = array(
-            'post_type' => 'crcm_vehicle',
-            'post_status' => 'publish',
-            'posts_per_page' => -1,
+            'post_type'      => 'crcm_vehicle',
+            'post_status'    => 'publish',
+            'posts_per_page' => $posts_per_page,
+            'paged'          => $paged,
+            'fields'         => 'ids',
         );
-        
-        $vehicles = get_posts($args);
+
+        $query           = new WP_Query($args);
+        $vehicle_ids     = $query->posts;
         $available_vehicles = array();
-        
-        foreach ($vehicles as $vehicle) {
-            $vehicle_data = get_post_meta($vehicle->ID, '_crcm_vehicle_data', true);
-            
+
+        foreach ($vehicle_ids as $vehicle_id) {
+            $vehicle_data = get_post_meta($vehicle_id, '_crcm_vehicle_data', true);
+
             // Filter by type if specified
             if (!empty($vehicle_type) && isset($vehicle_data['vehicle_type']) && $vehicle_data['vehicle_type'] !== $vehicle_type) {
                 continue;
             }
-            
-            $available_quantity = $this->check_availability($vehicle->ID, $pickup_date, $return_date);
-            $pricing_data = get_post_meta($vehicle->ID, '_crcm_pricing_data', true);
-            $extras_data = get_post_meta($vehicle->ID, '_crcm_extras_data', true);
-            $insurance_data = get_post_meta($vehicle->ID, '_crcm_insurance_data', true);
-            $misc_data = get_post_meta($vehicle->ID, '_crcm_misc_data', true);
-            
+
+            $available_quantity = $this->check_availability($vehicle_id, $pickup_date, $return_date);
+            $pricing_data       = get_post_meta($vehicle_id, '_crcm_pricing_data', true);
+            $extras_data        = get_post_meta($vehicle_id, '_crcm_extras_data', true);
+            $insurance_data     = get_post_meta($vehicle_id, '_crcm_insurance_data', true);
+            $misc_data          = get_post_meta($vehicle_id, '_crcm_misc_data', true);
+
+            $post = get_post($vehicle_id);
+
             $available_vehicles[] = array(
-                'id' => $vehicle->ID,
-                'title' => $vehicle->post_title,
-                'permalink' => get_permalink($vehicle->ID),
-                'thumbnail' => get_the_post_thumbnail_url($vehicle->ID, 'medium'),
-                'daily_rate' => $pricing_data['daily_rate'] ?? 0,
-                'vehicle_type' => $vehicle_data['vehicle_type'] ?? 'auto',
-                'specs' => $vehicle_data,
-                'extras' => $extras_data ?: array(),
-                'insurance' => $insurance_data ?: array(),
-                'misc' => $misc_data ?: array(),
-                'available_quantity' => $available_quantity,
-                'is_available' => $available_quantity > 0,
-                'is_featured' => isset($misc_data['featured_vehicle']) && $misc_data['featured_vehicle'],
+                'id'                => $vehicle_id,
+                'title'             => $post ? $post->post_title : '',
+                'permalink'         => get_permalink($vehicle_id),
+                'thumbnail'         => get_the_post_thumbnail_url($vehicle_id, 'medium'),
+                'daily_rate'        => $pricing_data['daily_rate'] ?? 0,
+                'vehicle_type'      => $vehicle_data['vehicle_type'] ?? 'auto',
+                'specs'             => $vehicle_data,
+                'extras'            => $extras_data ?: array(),
+                'insurance'         => $insurance_data ?: array(),
+                'misc'              => $misc_data ?: array(),
+                'available_quantity'=> $available_quantity,
+                'is_available'      => $available_quantity > 0,
+                'is_featured'       => isset($misc_data['featured_vehicle']) && $misc_data['featured_vehicle'],
                 'featured_priority' => intval($misc_data['featured_priority'] ?? 0),
             );
         }
-        
+
         // Sort by featured status and priority
         usort($available_vehicles, function($a, $b) {
             // Featured vehicles first
-            if ($a['is_featured'] && !$b['is_featured']) return -1;
-            if (!$a['is_featured'] && $b['is_featured']) return 1;
-            
+            if ($a['is_featured'] && !$b['is_featured']) {
+                return -1;
+            }
+            if (!$a['is_featured'] && $b['is_featured']) {
+                return 1;
+            }
+
             // If both featured, sort by priority (higher first)
             if ($a['is_featured'] && $b['is_featured']) {
                 if ($a['featured_priority'] !== $b['featured_priority']) {
                     return $b['featured_priority'] - $a['featured_priority'];
                 }
-                
+
                 // Same priority: rotate by using current time hash
-                $time_hash = (int)(time() / 86400); // Changes daily
+                $time_hash = (int) (time() / 86400); // Changes daily
                 return ($time_hash + $a['id']) % 2 === 0 ? -1 : 1;
             }
-            
+
             // Both not featured: sort by availability then price
             if ($a['available_quantity'] !== $b['available_quantity']) {
                 return $b['available_quantity'] - $a['available_quantity'];
             }
-            
+
             return $a['daily_rate'] - $b['daily_rate'];
         });
-        
-        return $available_vehicles;
+
+        return array(
+            'vehicles'    => $available_vehicles,
+            'pagination'  => array(
+                'current' => $paged,
+                'total'   => (int) $query->max_num_pages,
+            ),
+        );
     }
 }
 
