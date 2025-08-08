@@ -449,12 +449,12 @@ function crcm_ajax_create_customer() {
         wp_send_json_error('Permission denied');
     }
     
-    $name = sanitize_text_field($_POST['name'] ?? '');
-    $email = sanitize_email($_POST['email'] ?? '');
-    $phone = sanitize_text_field($_POST['phone'] ?? '');
-    
-    if (!$name || !$email) {
-        wp_send_json_error('Name and email are required');
+    $name  = sanitize_text_field( $_POST['name'] ?? '' );
+    $email = sanitize_email( $_POST['email'] ?? '' );
+    $phone = sanitize_text_field( $_POST['phone'] ?? '' );
+
+    if ( ! $name || ! $email || ! is_email( $email ) ) {
+        wp_send_json_error( 'Name and valid email are required' );
     }
     
     // Create user

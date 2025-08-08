@@ -168,14 +168,14 @@ class CRCM_API_Endpoints {
     public function get_vehicles( $request ) {
         $vehicle_manager = crcm()->vehicle_manager;
 
-        $pickup_date = $request->get_param( 'pickup_date' );
-        $return_date = $request->get_param( 'return_date' );
+        $pickup_date = sanitize_text_field( $request->get_param( 'pickup_date' ) );
+        $return_date = sanitize_text_field( $request->get_param( 'return_date' ) );
 
         $per_page = $request->get_param( 'per_page' ) ? absint( $request->get_param( 'per_page' ) ) : 20;
         $page     = $request->get_param( 'page' ) ? absint( $request->get_param( 'page' ) ) : 1;
 
         if ( $pickup_date && $return_date ) {
-            $vehicle_type = $request->get_param( 'vehicle_type' );
+            $vehicle_type = sanitize_text_field( $request->get_param( 'vehicle_type' ) );
 
             $results = $vehicle_manager->search_available_vehicles(
                 $pickup_date,
@@ -234,10 +234,14 @@ class CRCM_API_Endpoints {
      * Get single vehicle endpoint
      */
     public function get_vehicle($request) {
-        $vehicle_id = $request->get_param('id');
+        $vehicle_id = absint( $request->get_param( 'id' ) );
+        if ( ! $vehicle_id ) {
+            return new WP_Error( 'invalid_vehicle', __( 'Invalid vehicle ID', 'custom-rental-manager' ), array( 'status' => 400 ) );
+        }
+
         $vehicle_manager = crcm()->vehicle_manager;
 
-        $vehicle = $vehicle_manager->get_vehicle($vehicle_id);
+        $vehicle = $vehicle_manager->get_vehicle( $vehicle_id );
 
         if (!$vehicle) {
             return new WP_Error('vehicle_not_found', __('Vehicle not found', 'custom-rental-manager'), array('status' => 404));
@@ -250,19 +254,22 @@ class CRCM_API_Endpoints {
      * Get bookings endpoint
      */
     public function get_bookings($request) {
+        $per_page = $request->get_param( 'per_page' ) ? absint( $request->get_param( 'per_page' ) ) : 20;
+        $page     = $request->get_param( 'page' ) ? absint( $request->get_param( 'page' ) ) : 1;
+
         $args = array(
-            'post_type' => 'crcm_booking',
-            'post_status' => array('publish', 'private'),
-            'posts_per_page' => $request->get_param('per_page') ?: 20,
-            'paged' => $request->get_param('page') ?: 1,
+            'post_type'      => 'crcm_booking',
+            'post_status'    => array( 'publish', 'private' ),
+            'posts_per_page' => $per_page,
+            'paged'          => $page,
         );
 
         // Add filters if provided
-        $status = $request->get_param('status');
-        if ($status) {
+        $status = sanitize_text_field( $request->get_param( 'status' ) );
+        if ( $status ) {
             $args['meta_query'][] = array(
-                'key' => '_crcm_booking_status',
-                'value' => $status,
+                'key'     => '_crcm_booking_status',
+                'value'   => $status,
                 'compare' => '=',
             );
         }
@@ -286,19 +293,24 @@ class CRCM_API_Endpoints {
      */
     public function create_booking($request) {
         $booking_data = array(
-            'vehicle_id' => $request->get_param('vehicle_id'),
-            'pickup_date' => $request->get_param('pickup_date'),
-            'return_date' => $request->get_param('return_date'),
-            'pickup_time' => $request->get_param('pickup_time') ?: '09:00',
-            'return_time' => $request->get_param('return_time') ?: '18:00',
-            'pickup_location' => $request->get_param('pickup_location'),
-            'return_location' => $request->get_param('return_location'),
-            'home_delivery' => $request->get_param('home_delivery') ?: false,
-            'delivery_address' => $request->get_param('delivery_address') ?: '',
-            'extras' => $request->get_param('extras') ?: array(),
-            'insurance_type' => $request->get_param('insurance_type') ?: 'basic',
-            'customer_data' => $request->get_param('customer_data'),
-            'notes' => $request->get_param('notes') ?: '',
+            'vehicle_id'      => absint( $request->get_param( 'vehicle_id' ) ),
+            'pickup_date'     => sanitize_text_field( $request->get_param( 'pickup_date' ) ),
+            'return_date'     => sanitize_text_field( $request->get_param( 'return_date' ) ),
+            'pickup_time'     => sanitize_text_field( $request->get_param( 'pickup_time' ) ?: '09:00' ),
+            'return_time'     => sanitize_text_field( $request->get_param( 'return_time' ) ?: '18:00' ),
+            'pickup_location' => sanitize_text_field( $request->get_param( 'pickup_location' ) ),
+            'return_location' => sanitize_text_field( $request->get_param( 'return_location' ) ),
+            'home_delivery'   => (bool) $request->get_param( 'home_delivery' ),
+            'delivery_address'=> sanitize_text_field( $request->get_param( 'delivery_address' ) ),
+            'extras'          => array_map( 'sanitize_text_field', (array) $request->get_param( 'extras' ) ),
+            'insurance_type'  => sanitize_text_field( $request->get_param( 'insurance_type' ) ?: 'basic' ),
+            'customer_data'   => array(
+                'first_name' => sanitize_text_field( $request->get_param( 'customer_data' )['first_name'] ?? '' ),
+                'last_name'  => sanitize_text_field( $request->get_param( 'customer_data' )['last_name'] ?? '' ),
+                'email'      => sanitize_email( $request->get_param( 'customer_data' )['email'] ?? '' ),
+                'phone'      => sanitize_text_field( $request->get_param( 'customer_data' )['phone'] ?? '' ),
+            ),
+            'notes'           => sanitize_textarea_field( $request->get_param( 'notes' ) ),
         );
 
         $booking_manager = crcm()->booking_manager;
@@ -318,10 +330,14 @@ class CRCM_API_Endpoints {
      * Get single booking endpoint
      */
     public function get_booking($request) {
-        $booking_id = $request->get_param('id');
+        $booking_id = absint( $request->get_param( 'id' ) );
+        if ( ! $booking_id ) {
+            return new WP_Error( 'invalid_booking_id', __( 'Invalid booking ID', 'custom-rental-manager' ), array( 'status' => 400 ) );
+        }
+
         $booking_manager = crcm()->booking_manager;
 
-        $booking = $booking_manager->get_booking($booking_id);
+        $booking = $booking_manager->get_booking( $booking_id );
 
         if (is_wp_error($booking)) {
             return new WP_Error('booking_not_found', __('Booking not found', 'custom-rental-manager'), array('status' => 404));
@@ -334,32 +350,35 @@ class CRCM_API_Endpoints {
      * Get availability endpoint
      */
     public function get_availability($request) {
-        $vehicle_id = $request->get_param('vehicle_id');
-        $start_date = $request->get_param('start_date');
-        $end_date = $request->get_param('end_date');
+        $vehicle_id = absint( $request->get_param( 'vehicle_id' ) );
+        $start_date = sanitize_text_field( $request->get_param( 'start_date' ) );
+        $end_date   = sanitize_text_field( $request->get_param( 'end_date' ) );
 
-        $vehicle_manager = crcm()->vehicle_manager;
-        $availability = $vehicle_manager->check_availability($vehicle_id, $start_date, $end_date);
+        $vehicle_manager   = crcm()->vehicle_manager;
+        $availability      = $vehicle_manager->check_availability( $vehicle_id, $start_date, $end_date );
 
-        return new WP_REST_Response(array(
-            'vehicle_id' => $vehicle_id,
-            'start_date' => $start_date,
-            'end_date' => $end_date,
-            'available_quantity' => $availability,
-        ), 200);
+        return new WP_REST_Response(
+            array(
+                'vehicle_id'        => $vehicle_id,
+                'start_date'        => $start_date,
+                'end_date'          => $end_date,
+                'available_quantity'=> $availability,
+            ),
+            200
+        );
     }
 
     /**
      * Get calendar endpoint
      */
     public function get_calendar($request) {
-        $month = $request->get_param('month') ?: date('Y-m');
-        $vehicle_id = $request->get_param('vehicle_id') ?: 0;
+        $month      = sanitize_text_field( $request->get_param( 'month' ) ?: date( 'Y-m' ) );
+        $vehicle_id = absint( $request->get_param( 'vehicle_id' ) ?: 0 );
 
         $calendar_manager = new CRCM_Calendar_Manager();
-        $calendar_data = $calendar_manager->get_calendar_data($month, $vehicle_id);
+        $calendar_data    = $calendar_manager->get_calendar_data( $month, $vehicle_id );
 
-        return new WP_REST_Response($calendar_data, 200);
+        return new WP_REST_Response( $calendar_data, 200 );
     }
 
     /**
@@ -406,29 +425,67 @@ class CRCM_API_Endpoints {
     /**
      * Check if user has manage permissions
      */
-    public function check_manage_permissions($request) {
-        return current_user_can('manage_options') || current_user_can('crcm_manage_bookings');
+    public function check_manage_permissions( $request ) {
+        $nonce = $request->get_header( 'X-WP-Nonce' );
+        if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+            return new WP_Error(
+                'rest_forbidden',
+                __( 'Invalid or missing nonce', 'custom-rental-manager' ),
+                array( 'status' => rest_authorization_required_code() )
+            );
+        }
+
+        if ( current_user_can( 'manage_options' ) || current_user_can( 'crcm_manage_bookings' ) ) {
+            return true;
+        }
+
+        return new WP_Error(
+            'rest_forbidden',
+            __( 'You are not allowed to access this resource.', 'custom-rental-manager' ),
+            array( 'status' => rest_authorization_required_code() )
+        );
     }
 
     /**
      * Check booking permissions (own booking or admin)
      */
-    public function check_booking_permissions($request) {
-        if (current_user_can('manage_options') || current_user_can('crcm_manage_bookings')) {
+    public function check_booking_permissions( $request ) {
+        $nonce = $request->get_header( 'X-WP-Nonce' );
+        if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+            return new WP_Error(
+                'rest_forbidden',
+                __( 'Invalid or missing nonce', 'custom-rental-manager' ),
+                array( 'status' => rest_authorization_required_code() )
+            );
+        }
+
+        if ( current_user_can( 'manage_options' ) || current_user_can( 'crcm_manage_bookings' ) ) {
             return true;
         }
 
-        $booking_id = $request->get_param('id');
+        $booking_id      = absint( $request->get_param( 'id' ) );
         $current_user_id = get_current_user_id();
 
-        if (!$current_user_id) {
-            return false;
+        if ( ! $current_user_id || ! $booking_id ) {
+            return new WP_Error(
+                'rest_forbidden',
+                __( 'Authentication required', 'custom-rental-manager' ),
+                array( 'status' => rest_authorization_required_code() )
+            );
         }
 
         // Check if this is the customer's own booking
-        $customer_data = get_post_meta($booking_id, '_crcm_customer_data', true);
-        $current_user = wp_get_current_user();
+        $customer_data = get_post_meta( $booking_id, '_crcm_customer_data', true );
+        $current_user  = wp_get_current_user();
 
-        return ($customer_data && $customer_data['email'] === $current_user->user_email);
+        if ( $customer_data && isset( $customer_data['email'] ) && $customer_data['email'] === $current_user->user_email ) {
+            return true;
+        }
+
+        return new WP_Error(
+            'rest_forbidden',
+            __( 'You are not allowed to view this booking.', 'custom-rental-manager' ),
+            array( 'status' => rest_authorization_required_code() )
+        );
     }
 }
