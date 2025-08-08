@@ -467,9 +467,9 @@ class CRCM_Plugin {
             'vehicle_id' => '',
         ), $atts);
 
-        $vehicle_id   = isset($_GET['vehicle']) ? intval($_GET['vehicle']) : intval($atts['vehicle_id']);
-        $pickup_date  = isset($_GET['pickup_date']) ? sanitize_text_field($_GET['pickup_date']) : '';
-        $return_date  = isset($_GET['return_date']) ? sanitize_text_field($_GET['return_date']) : '';
+        $vehicle_id   = ! empty( sanitize_text_field( $_GET['vehicle'] ?? '' ) ) ? intval( sanitize_text_field( $_GET['vehicle'] ) ) : intval( $atts['vehicle_id'] );
+        $pickup_date  = ! empty( sanitize_text_field( $_GET['pickup_date'] ?? '' ) ) ? sanitize_text_field( $_GET['pickup_date'] ) : '';
+        $return_date  = ! empty( sanitize_text_field( $_GET['return_date'] ?? '' ) ) ? sanitize_text_field( $_GET['return_date'] ) : '';
         $pricing_data = get_post_meta($vehicle_id, '_crcm_pricing_data', true);
         $daily_rate   = $pricing_data['daily_rate'] ?? 0;
         $rental_days  = 1;
@@ -712,7 +712,9 @@ class CRCM_Plugin {
             }
         }
 
-        if ( isset( $_GET['page'] ) && 'crcm-dashboard' === $_GET['page'] ) {
+        $current_page = sanitize_text_field( $_GET['page'] ?? '' );
+
+        if ( ! empty( $current_page ) && 'crcm-dashboard' === $current_page ) {
             $dashboard_css = CRCM_PLUGIN_PATH . 'assets/css/admin-dashboard.css';
             if ( file_exists( $dashboard_css ) ) {
                 wp_enqueue_style(
@@ -724,7 +726,7 @@ class CRCM_Plugin {
             }
         }
 
-        if ( isset( $_GET['page'] ) && 'crcm-calendar' === $_GET['page'] ) {
+        if ( ! empty( $current_page ) && 'crcm-calendar' === $current_page ) {
             $calendar_css = CRCM_PLUGIN_PATH . 'assets/css/admin-calendar.css';
             if ( file_exists( $calendar_css ) ) {
                 wp_enqueue_style(
@@ -736,7 +738,7 @@ class CRCM_Plugin {
             }
         }
 
-        if ( isset( $_GET['page'] ) && 'crcm-settings' === $_GET['page'] ) {
+        if ( ! empty( $current_page ) && 'crcm-settings' === $current_page ) {
             $settings_css = CRCM_PLUGIN_PATH . 'assets/css/admin-settings.css';
             $settings_js  = CRCM_PLUGIN_PATH . 'assets/js/admin-settings.js';
 
@@ -1245,8 +1247,13 @@ add_action('plugins_loaded', 'crcm', 10);
  * Add this to wp-admin/plugins.php?crcm_create_roles=1 for manual trigger
  * Requires CRCM_ALLOW_ROLE_REPAIR constant set to true.
  */
-if (defined('CRCM_ALLOW_ROLE_REPAIR') && CRCM_ALLOW_ROLE_REPAIR && isset($_GET['crcm_create_roles']) && current_user_can('manage_options')) {
-    add_action('admin_init', function() {
+if (
+    defined('CRCM_ALLOW_ROLE_REPAIR') &&
+    CRCM_ALLOW_ROLE_REPAIR &&
+    ! empty( sanitize_text_field( $_GET['crcm_create_roles'] ?? '' ) ) &&
+    current_user_can('manage_options')
+) {
+    add_action('admin_init', function () {
         if (file_exists(CRCM_PLUGIN_PATH . 'inc/functions.php')) {
             require_once CRCM_PLUGIN_PATH . 'inc/functions.php';
             if (function_exists('crcm_create_custom_user_roles')) {
@@ -1259,8 +1266,13 @@ if (defined('CRCM_ALLOW_ROLE_REPAIR') && CRCM_ALLOW_ROLE_REPAIR && isset($_GET['
 }
 
 // Show success message
-if (defined('CRCM_ALLOW_ROLE_REPAIR') && CRCM_ALLOW_ROLE_REPAIR && isset($_GET['crcm_roles_created'])) {
-    add_action('admin_notices', function() {
+if (
+    defined('CRCM_ALLOW_ROLE_REPAIR') &&
+    CRCM_ALLOW_ROLE_REPAIR &&
+    ! empty( sanitize_text_field( $_GET['crcm_roles_created'] ?? '' ) ) &&
+    current_user_can('manage_options')
+) {
+    add_action('admin_notices', function () {
         echo '<div class="notice notice-success is-dismissible">';
         echo '<p><strong>Custom Rental Manager:</strong> User roles created successfully!</p>';
         echo '</div>';
