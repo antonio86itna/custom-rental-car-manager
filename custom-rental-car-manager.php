@@ -820,6 +820,7 @@ class CRCM_Plugin {
      */
     public static function deactivate() {
         wp_clear_scheduled_hook('crcm_daily_reminder_check');
+        wp_clear_scheduled_hook('crcm_daily_status_check');
         flush_rewrite_rules();
 
         // Optionally remove roles on deactivation (uncomment if needed)

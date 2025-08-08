@@ -67,3 +67,15 @@ if (!function_exists('add_filter')) {
     function add_filter() {}
 }
 
+if (!function_exists('wp_next_scheduled')) {
+    function wp_next_scheduled($hook) {
+        return false;
+    }
+}
+
+if (!function_exists('wp_schedule_event')) {
+    function wp_schedule_event($timestamp, $recurrence, $hook) {
+        return true;
+    }
+}
+

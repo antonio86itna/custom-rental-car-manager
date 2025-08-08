@@ -35,11 +35,65 @@ class CRCM_Booking_Manager {
         add_action('user_register', array($this, 'assign_default_customer_role'));
         add_filter('manage_users_columns', array($this, 'add_user_role_column'));
         add_action('manage_users_custom_column', array($this, 'show_user_role_column'), 10, 3);
-        
+
         // Booking columns
         add_filter('manage_crcm_booking_posts_columns', array($this, 'booking_columns'));
         add_action('manage_crcm_booking_posts_custom_column', array($this, 'booking_column_content'), 10, 2);
-        
+
+        // Daily status check scheduler
+        add_action('crcm_daily_status_check', array($this, 'process_scheduled_statuses'));
+        if (!wp_next_scheduled('crcm_daily_status_check')) {
+            wp_schedule_event(time(), 'daily', 'crcm_daily_status_check');
+        }
+
+    }
+
+    /**
+     * Process booking status transitions on scheduled event.
+     *
+     * Activates confirmed bookings whose pickup time has passed and
+     * completes active bookings whose return time has passed.
+     *
+     * @return void
+     */
+    public function process_scheduled_statuses() {
+        $now = current_time('timestamp');
+
+        $bookings = get_posts(
+            array(
+                'post_type'      => 'crcm_booking',
+                'post_status'    => array('publish', 'private'),
+                'posts_per_page' => -1,
+                'meta_query'     => array(
+                    array(
+                        'key'     => '_crcm_booking_status',
+                        'value'   => array('confirmed', 'active'),
+                        'compare' => 'IN',
+                    ),
+                ),
+            )
+        );
+
+        foreach ($bookings as $booking) {
+            $booking_id = $booking->ID;
+            $status     = get_post_meta($booking_id, '_crcm_booking_status', true);
+            $data       = get_post_meta($booking_id, '_crcm_booking_data', true);
+
+            if (!is_array($data)) {
+                continue;
+            }
+
+            $pickup_time = strtotime(($data['pickup_date'] ?? '') . ' ' . ($data['pickup_time'] ?? ''));
+            $return_time = strtotime(($data['return_date'] ?? '') . ' ' . ($data['return_time'] ?? ''));
+
+            if ('confirmed' === $status && $pickup_time && $pickup_time <= $now) {
+                update_post_meta($booking_id, '_crcm_booking_status', 'active');
+                do_action('crcm_booking_status_changed', $booking_id, 'active', 'confirmed');
+            } elseif ('active' === $status && $return_time && $return_time <= $now) {
+                update_post_meta($booking_id, '_crcm_booking_status', 'completed');
+                do_action('crcm_booking_status_changed', $booking_id, 'completed', 'active');
+            }
+        }
     }
 
     /**
@@ -1018,6 +1072,9 @@ class CRCM_Booking_Manager {
             $new_status = sanitize_text_field($_POST['booking_status']);
             update_post_meta($post_id, '_crcm_booking_status', $new_status);
             do_action('crcm_booking_status_changed', $post_id, $new_status, $old_status);
+            if (empty($old_status) && 'pending' === $new_status) {
+                do_action('crcm_booking_created', $post_id);
+            }
         }
         
         // Save notes
