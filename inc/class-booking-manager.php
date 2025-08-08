@@ -116,10 +116,11 @@ class CRCM_Booking_Manager {
 
         $customer_raw = $data['customer_data'] ?? array();
         $customer_data = array(
-            'first_name' => sanitize_text_field($customer_raw['first_name'] ?? ''),
-            'last_name'  => sanitize_text_field($customer_raw['last_name'] ?? ''),
-            'email'      => sanitize_email($customer_raw['email'] ?? ''),
-            'phone'      => sanitize_text_field($customer_raw['phone'] ?? ''),
+            'first_name'         => sanitize_text_field($customer_raw['first_name'] ?? ''),
+            'last_name'          => sanitize_text_field($customer_raw['last_name'] ?? ''),
+            'email'              => sanitize_email($customer_raw['email'] ?? ''),
+            'phone'              => sanitize_text_field($customer_raw['phone'] ?? ''),
+            'preferred_language' => sanitize_text_field($customer_raw['preferred_language'] ?? ''),
         );
         if (empty($customer_data['first_name']) || empty($customer_data['last_name']) || empty($customer_data['email']) || !is_email($customer_data['email'])) {
             return new WP_Error('invalid_customer', __('Invalid customer data', 'custom-rental-manager'));
@@ -210,10 +211,11 @@ class CRCM_Booking_Manager {
             $customer_data = array();
         }
         $customer_data = array(
-            'first_name' => sanitize_text_field($customer_data['first_name'] ?? ''),
-            'last_name'  => sanitize_text_field($customer_data['last_name'] ?? ''),
-            'email'      => sanitize_email($customer_data['email'] ?? ''),
-            'phone'      => sanitize_text_field($customer_data['phone'] ?? ''),
+            'first_name'         => sanitize_text_field($customer_data['first_name'] ?? ''),
+            'last_name'          => sanitize_text_field($customer_data['last_name'] ?? ''),
+            'email'              => sanitize_email($customer_data['email'] ?? ''),
+            'phone'              => sanitize_text_field($customer_data['phone'] ?? ''),
+            'preferred_language' => sanitize_text_field($customer_data['preferred_language'] ?? ''),
         );
 
         $pricing = get_post_meta($booking_id, '_crcm_pricing_breakdown', true);

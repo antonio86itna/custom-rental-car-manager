@@ -103,11 +103,17 @@ class CRCM_Customer_Portal {
             'city' => sanitize_text_field($_POST['city'] ?? ''),
             'postal_code' => sanitize_text_field($_POST['postal_code'] ?? ''),
             'country' => sanitize_text_field($_POST['country'] ?? ''),
+            'preferred_language' => sanitize_text_field($_POST['preferred_language'] ?? ''),
         );
 
         // Update WordPress user meta
         update_user_meta($current_user_id, 'first_name', $profile_data['first_name']);
         update_user_meta($current_user_id, 'last_name', $profile_data['last_name']);
+
+        // Update preferred language
+        if (!empty($profile_data['preferred_language'])) {
+            update_user_meta($current_user_id, 'crcm_preferred_language', $profile_data['preferred_language']);
+        }
 
         // Update custom profile data
         update_user_meta($current_user_id, 'crcm_profile_data', $profile_data);
@@ -162,8 +168,11 @@ class CRCM_Customer_Portal {
                 'city' => '',
                 'postal_code' => '',
                 'country' => '',
+                'preferred_language' => get_user_meta($user_id, 'crcm_preferred_language', true),
             );
         }
+
+        $profile_data['preferred_language'] = get_user_meta($user_id, 'crcm_preferred_language', true);
 
         return $profile_data;
     }

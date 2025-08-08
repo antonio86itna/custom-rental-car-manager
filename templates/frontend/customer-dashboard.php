@@ -12,6 +12,7 @@ if (!defined('ABSPATH')) {
 }
 
 $current_user = wp_get_current_user();
+$preferred_language = get_user_meta($current_user->ID, 'crcm_preferred_language', true) ?: 'it';
 $user_bookings = get_posts(array(
     'post_type' => 'crcm_booking',
     'meta_query' => array(
@@ -105,6 +106,14 @@ $user_bookings = get_posts(array(
             <div class="crcm-form-group">
                 <label for="profile_email"><?php _e('Email', 'custom-rental-manager'); ?></label>
                 <input type="email" id="profile_email" name="email" value="<?php echo esc_attr($current_user->user_email); ?>" />
+            </div>
+
+            <div class="crcm-form-group">
+                <label for="profile_preferred_language"><?php _e('Preferred Language', 'custom-rental-manager'); ?></label>
+                <select id="profile_preferred_language" name="preferred_language">
+                    <option value="it" <?php selected($preferred_language, 'it'); ?>><?php _e('Italian', 'custom-rental-manager'); ?></option>
+                    <option value="en" <?php selected($preferred_language, 'en'); ?>><?php _e('English', 'custom-rental-manager'); ?></option>
+                </select>
             </div>
 
             <button type="submit" class="crcm-btn crcm-btn-primary">
