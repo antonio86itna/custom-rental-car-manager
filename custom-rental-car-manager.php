@@ -621,6 +621,38 @@ class CRCM_Plugin {
             );
         }
 
+        if ( $screen && 'crcm_vehicle' === $screen->post_type ) {
+            $vehicle_css = CRCM_PLUGIN_PATH . 'assets/css/admin-vehicle-meta.css';
+            $vehicle_js  = CRCM_PLUGIN_PATH . 'assets/js/admin-vehicle-meta.js';
+
+            if ( file_exists( $vehicle_css ) ) {
+                wp_enqueue_style(
+                    'crcm-admin-vehicle',
+                    CRCM_PLUGIN_URL . 'assets/css/admin-vehicle-meta.css',
+                    array(),
+                    CRCM_VERSION
+                );
+            }
+
+            if ( file_exists( $vehicle_js ) ) {
+                wp_enqueue_script(
+                    'crcm-admin-vehicle',
+                    CRCM_PLUGIN_URL . 'assets/js/admin-vehicle-meta.js',
+                    array( 'jquery', 'crcm-admin' ),
+                    CRCM_VERSION,
+                    true
+                );
+
+                wp_localize_script(
+                    'crcm-admin-vehicle',
+                    'crcm_vehicle_meta',
+                    array(
+                        'min_greater_max' => __( 'I giorni minimi non possono essere maggiori di quelli massimi', 'custom-rental-manager' ),
+                    )
+                );
+            }
+        }
+
         if ( isset( $_GET['page'] ) && 'crcm-dashboard' === $_GET['page'] ) {
             $dashboard_css = CRCM_PLUGIN_PATH . 'assets/css/admin-dashboard.css';
             if ( file_exists( $dashboard_css ) ) {
