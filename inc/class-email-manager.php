@@ -229,8 +229,45 @@ class CRCM_Email_Manager {
                         <p><strong><?php _e('Extras:', 'custom-rental-manager'); ?></strong> <?php echo esc_html(implode(', ', $booking['booking_data']['extras'])); ?></p>
                         <?php endif; ?>
 
+                        <?php if (!empty($booking['pricing_breakdown']['line_items'])): ?>
+                        <h4 style="margin-top:20px;"><?php _e('Price Breakdown', 'custom-rental-manager'); ?></h4>
+                        <table style="width:100%; border-collapse:collapse;">
+                            <thead>
+                                <tr>
+                                    <th align="left"><?php _e('Item', 'custom-rental-manager'); ?></th>
+                                    <th align="right"><?php _e('Qty', 'custom-rental-manager'); ?></th>
+                                    <th align="right"><?php _e('Amount', 'custom-rental-manager'); ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($booking['pricing_breakdown']['line_items'] as $item): ?>
+                                    <?php
+                                    $name   = esc_html($item['name'] ?? '');
+                                    $qty    = intval($item['qty'] ?? 0);
+                                    $amount = floatval($item['amount'] ?? 0);
+                                    $free   = !empty($item['free']);
+                                    $amount_display = $free ? __('Free', 'custom-rental-manager') : $currency_symbol . number_format($amount, 2);
+                                    ?>
+                                    <tr>
+                                        <td><?php echo $name; ?><?php if ($free) : ?> (<?php _e('Included', 'custom-rental-manager'); ?>)<?php endif; ?></td>
+                                        <td align="right"><?php echo esc_html($qty); ?></td>
+                                        <td align="right"><?php echo esc_html($amount_display); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                        <?php endif; ?>
+
+                        <?php
+                        $total_amount = 0;
+                        if (!empty($booking['pricing_breakdown']['final_total'])) {
+                            $total_amount = (float) $booking['pricing_breakdown']['final_total'];
+                        } elseif (!empty($booking['payment_data']['total_cost'])) {
+                            $total_amount = (float) $booking['payment_data']['total_cost'];
+                        }
+                        ?>
                         <p style="font-size: 18px; font-weight: bold; color: #2563eb; margin-top: 15px; padding-top: 15px; border-top: 2px solid #2563eb;">
-                            <strong><?php _e('Total Amount:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($currency_symbol . number_format($booking['payment_data']['total_cost'], 2)); ?>
+                            <strong><?php _e('Total Amount:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($currency_symbol . number_format($total_amount, 2)); ?>
                         </p>
                     </div>
 

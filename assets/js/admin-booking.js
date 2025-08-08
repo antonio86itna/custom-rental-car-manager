@@ -7,6 +7,8 @@ jQuery(document).ready(function ($) {
     const i18n    = crcm_booking.i18n;
 
     // Calculate rental days automatically with optional late return rule
+    let lateReturnApplied = false;
+
     function calculateRentalDays() {
         const pickupDate = $('#pickup_date').val();
         const returnDate = $('#return_date').val();
@@ -23,6 +25,9 @@ jQuery(document).ready(function ($) {
                 const misc = window.crcmVehicleMisc || {};
                 if (misc.late_return_rule && returnTime && misc.late_return_time && returnTime > misc.late_return_time) {
                     daysDiff++;
+                    lateReturnApplied = true;
+                } else {
+                    lateReturnApplied = false;
                 }
 
                 $('#rental-days-display').text(i18n.rental_days + ' ' + daysDiff);
@@ -351,9 +356,45 @@ jQuery(document).ready(function ($) {
         }
 
         let extrasTotal = 0;
+        let lineItems = [];
+
+        const baseDailyRate = rentalDays ? baseTotal / rentalDays : 0;
+        if (lateReturnApplied && rentalDays > 1) {
+            const baseDays = rentalDays - 1;
+            if (baseDays > 0) {
+                lineItems.push({
+                    name: i18n.base_rate,
+                    qty: baseDays,
+                    amount: baseDailyRate * baseDays,
+                    free: false
+                });
+            }
+            lineItems.push({
+                name: i18n.late_return_fee,
+                qty: 1,
+                amount: baseDailyRate,
+                free: false
+            });
+        } else {
+            lineItems.push({
+                name: i18n.base_rate,
+                qty: rentalDays,
+                amount: baseTotal,
+                free: false
+            });
+        }
+
         $('input[name="pricing_breakdown[selected_extras][]"]:checked').each(function () {
             const rate = parseFloat($(this).data('rate')) || 0;
-            extrasTotal += rate * rentalDays;
+            const name = $(this).data('name');
+            const amount = rate * rentalDays;
+            extrasTotal += amount;
+            lineItems.push({
+                name: name,
+                qty: rentalDays,
+                amount: amount,
+                free: rate === 0
+            });
         });
 
         let insuranceTotal = 0;
@@ -361,14 +402,33 @@ jQuery(document).ready(function ($) {
         if (selectedInsurance.val() === 'premium') {
             const rate = parseFloat(selectedInsurance.data('rate')) || 0;
             insuranceTotal = rate * rentalDays;
+            lineItems.push({
+                name: i18n.premium_insurance,
+                qty: rentalDays,
+                amount: insuranceTotal,
+                free: false
+            });
+        } else {
+            lineItems.push({
+                name: i18n.basic_insurance,
+                qty: rentalDays,
+                amount: 0,
+                free: true
+            });
         }
 
         const discount = parseFloat($('#manual_discount').val()) || 0;
         const finalTotal = Math.max(0, baseTotal + extrasTotal + insuranceTotal - discount);
 
-        $('#base-total').text(baseTotal.toFixed(2));
-        $('#extras-total').text(extrasTotal.toFixed(2));
-        $('#insurance-total').text(insuranceTotal.toFixed(2));
+        const $tbody = $('#pricing-breakdown-content');
+        $tbody.find('tr.line-item').remove();
+        lineItems.forEach(function (item) {
+            const freeLabel = item.free ? ' (' + i18n.included + ')' : '';
+            const amountDisplay = item.free ? '0.00' : item.amount.toFixed(2);
+            const row = `<tr class="pricing-row line-item"><td>${item.name}${freeLabel}</td><td class="price-cell">€<span>${amountDisplay}</span></td></tr>`;
+            $(row).insertBefore($tbody.find('tr.discount-row'));
+        });
+
         $('#discount-total').text(discount.toFixed(2));
         $('#final-total').text(finalTotal.toFixed(2));
 
@@ -376,9 +436,8 @@ jQuery(document).ready(function ($) {
         $('#extras_total_input').val(extrasTotal);
         $('#insurance_total_input').val(insuranceTotal);
         $('#final_total_input').val(finalTotal);
+        $('#line_items_input').val(JSON.stringify(lineItems));
 
-        $('.extras-row').toggle(extrasTotal > 0);
-        $('.insurance-row').toggle(insuranceTotal > 0);
         $('.discount-row').toggle(discount > 0);
     }
 
