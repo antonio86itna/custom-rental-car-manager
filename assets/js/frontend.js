@@ -46,7 +46,7 @@
         },
 
         // Search vehicles via AJAX
-        searchVehicles: function(page = 1) {
+        searchVehicles: function(paged = 1) {
             const $form = $('#crcm-vehicle-search');
             const $button = $form.find('.crcm-search-btn');
             const $results = $('#crcm-search-results');
@@ -60,7 +60,7 @@
                 vehicle_type: $('#vehicle_type').val(),
                 pickup_location: $('#pickup_location').val(),
                 posts_per_page: perPage,
-                page: page
+                paged: paged
             };
 
             // Validate dates
@@ -126,8 +126,8 @@
         initPagination: function() {
             $(document).on('click', '.crcm-page-link', function(e) {
                 e.preventDefault();
-                const page = $(this).data('page');
-                CRCM.searchVehicles(page);
+                const paged = $(this).data('page');
+                CRCM.searchVehicles(paged);
             });
         },
 

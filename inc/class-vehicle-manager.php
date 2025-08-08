@@ -1894,7 +1894,7 @@ class CRCM_Vehicle_Manager {
         $return_date    = sanitize_text_field($_POST['return_date'] ?? '');
         $vehicle_type   = sanitize_text_field($_POST['vehicle_type'] ?? '');
         $posts_per_page = isset($_POST['posts_per_page']) ? absint($_POST['posts_per_page']) : 10;
-        $paged          = isset($_POST['page']) ? absint($_POST['page']) : 1;
+        $paged          = isset($_POST['paged']) ? absint($_POST['paged']) : 1;
 
         if (empty($pickup_date) || empty($return_date)) {
             wp_send_json_error(__('Please select pickup and return dates.', 'custom-rental-manager'));
