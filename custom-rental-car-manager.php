@@ -653,6 +653,65 @@ class CRCM_Plugin {
             }
         }
 
+        if ( $screen && 'crcm_booking' === $screen->post_type ) {
+            $booking_css = CRCM_PLUGIN_PATH . 'assets/css/admin-booking.css';
+            $booking_js  = CRCM_PLUGIN_PATH . 'assets/js/admin-booking.js';
+
+            if ( file_exists( $booking_css ) ) {
+                wp_enqueue_style(
+                    'crcm-admin-booking',
+                    CRCM_PLUGIN_URL . 'assets/css/admin-booking.css',
+                    array(),
+                    CRCM_VERSION
+                );
+            }
+
+            if ( file_exists( $booking_js ) ) {
+                wp_enqueue_script(
+                    'crcm-admin-booking',
+                    CRCM_PLUGIN_URL . 'assets/js/admin-booking.js',
+                    array( 'jquery', 'crcm-admin' ),
+                    CRCM_VERSION,
+                    true
+                );
+
+                wp_localize_script(
+                    'crcm-admin-booking',
+                    'crcm_booking',
+                    array(
+                        'ajax_url' => admin_url( 'admin-ajax.php' ),
+                        'nonce'    => wp_create_nonce( 'crcm_admin_nonce' ),
+                        'i18n'     => array(
+                            'rental_days'        => __( 'Rental days:', 'custom-rental-manager' ),
+                            'searching'          => __( 'Searching...', 'custom-rental-manager' ),
+                            'no_results'         => __( 'No customers found', 'custom-rental-manager' ),
+                            'search_error'       => __( 'Search error', 'custom-rental-manager' ),
+                            'select'             => __( 'Select', 'custom-rental-manager' ),
+                            'change_customer'    => __( 'Change Customer', 'custom-rental-manager' ),
+                            'email_label'        => __( 'Email:', 'custom-rental-manager' ),
+                            'role_label'         => __( 'Role:', 'custom-rental-manager' ),
+                            'phone_label'        => __( 'Phone:', 'custom-rental-manager' ),
+                            'rental_customer_role' => __( 'Rental Customer', 'custom-rental-manager' ),
+                            'loading_vehicle'    => __( 'Loading vehicle details...', 'custom-rental-manager' ),
+                            'checking_availability' => __( 'Checking availability...', 'custom-rental-manager' ),
+                            'select_dates'       => __( 'Select dates to check availability', 'custom-rental-manager' ),
+                            'error_loading_details' => __( 'Error loading details', 'custom-rental-manager' ),
+                            'connection_error'   => __( 'Connection error', 'custom-rental-manager' ),
+                            'availability_error' => __( 'Error checking availability', 'custom-rental-manager' ),
+                            'available'          => __( '✅ Available', 'custom-rental-manager' ),
+                            'not_available'      => __( '❌ Not Available', 'custom-rental-manager' ),
+                            'units_available'    => __( '%1$s units available of %2$s total', 'custom-rental-manager' ),
+                            'no_units_available' => __( 'No units available for selected dates', 'custom-rental-manager' ),
+                            'included'           => __( 'Included', 'custom-rental-manager' ),
+                            'basic_insurance'    => __( 'Basic Insurance', 'custom-rental-manager' ),
+                            'premium_insurance'  => __( 'Premium Insurance', 'custom-rental-manager' ),
+                            'per_day'            => __( '/day', 'custom-rental-manager' ),
+                        ),
+                    )
+                );
+            }
+        }
+
         if ( isset( $_GET['page'] ) && 'crcm-dashboard' === $_GET['page'] ) {
             $dashboard_css = CRCM_PLUGIN_PATH . 'assets/css/admin-dashboard.css';
             if ( file_exists( $dashboard_css ) ) {
