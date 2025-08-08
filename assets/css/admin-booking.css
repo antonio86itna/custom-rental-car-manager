@@ -1,0 +1,351 @@
+/* BOOKING ADMIN STYLES */
+.post-type-crcm_booking .postbox {
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    margin-bottom: 20px;
+}
+
+.post-type-crcm_booking .postbox-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 8px 8px 0 0;
+    padding: 12px 16px;
+}
+
+.post-type-crcm_booking .postbox-header h2 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #333;
+    margin: 0;
+}
+
+/* Customer Search */
+.crcm-customer-search-container {
+    position: relative;
+}
+
+.crcm-search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.customer-result {
+    padding: 12px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.customer-result:hover {
+    background: #f8f9fa;
+}
+
+.customer-info {
+    flex: 1;
+}
+
+.customer-info strong {
+    display: block;
+    font-size: 14px;
+}
+
+.customer-email,
+.customer-phone {
+    display: block;
+    font-size: 12px;
+    color: #666;
+}
+
+.customer-card {
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 15px;
+    margin-top: 10px;
+}
+
+.customer-card h4 {
+    margin: 0 0 10px 0;
+    color: #333;
+}
+
+.customer-card p {
+    margin: 5px 0;
+    font-size: 13px;
+}
+
+/* Vehicle Details */
+.crcm-vehicle-summary {
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 15px;
+}
+
+.vehicle-basic-info h5 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    color: #333;
+}
+
+.vehicle-specs {
+    margin: 10px 0;
+}
+
+.spec-item {
+    display: inline-block;
+    background: white;
+    padding: 4px 8px;
+    margin: 2px 4px 2px 0;
+    border-radius: 12px;
+    font-size: 12px;
+    border: 1px solid #ddd;
+}
+
+.vehicle-pricing {
+    margin: 10px 0;
+    font-size: 16px;
+}
+
+.vehicle-extras h6,
+.vehicle-insurance h6,
+.vehicle-policies h6 {
+    margin: 15px 0 8px 0;
+    font-size: 14px;
+    color: #333;
+}
+
+.vehicle-extras ul,
+.vehicle-policies ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.vehicle-extras li,
+.vehicle-policies li {
+    margin: 5px 0;
+    font-size: 13px;
+}
+
+.extra-price,
+.insurance-price {
+    color: #666;
+    font-size: 12px;
+}
+
+/* Availability Status */
+.crcm-availability-status .success {
+    background: #d4edda;
+    color: #155724;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #c3e6cb;
+}
+
+.crcm-availability-status .error {
+    background: #f8d7da;
+    color: #721c24;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #f5c6cb;
+}
+
+.crcm-availability-status .warning {
+    background: #fff3cd;
+    color: #856404;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #ffeaa7;
+}
+
+/* Pricing */
+.crcm-pricing-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+}
+
+.crcm-pricing-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.crcm-pricing-table .price-cell {
+    text-align: right;
+    font-weight: 600;
+}
+
+.crcm-pricing-table .total-row td {
+    border-top: 2px solid #333;
+    font-size: 16px;
+    padding-top: 12px;
+}
+
+.crcm-pricing-table .discount {
+    color: #e74c3c;
+}
+
+/* Extra Services */
+.extra-option,
+.insurance-option {
+    display: block;
+    padding: 10px;
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin: 5px 0;
+    cursor: pointer;
+}
+
+.extra-option:hover,
+.insurance-option:hover {
+    background: #e9ecef;
+}
+
+.extra-option input,
+.insurance-option input {
+    margin-right: 8px;
+}
+
+.extra-name,
+.insurance-name {
+    font-weight: 500;
+}
+
+.extra-price,
+.insurance-price {
+    float: right;
+    color: #666;
+    font-size: 13px;
+}
+
+/* Status Badges */
+.crcm-status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.crcm-status-badge.pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.crcm-status-badge.confirmed {
+    background: #cce5ff;
+    color: #004085;
+}
+
+.crcm-status-badge.active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.crcm-status-badge.completed {
+    background: #e2e3e5;
+    color: #383d41;
+}
+
+.crcm-status-badge.cancelled {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* Role Badges */
+.crcm-role-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.crcm-role-badge.customer {
+    background: #d4edda;
+    color: #155724;
+}
+
+.crcm-role-badge.manager {
+    background: #cce5ff;
+    color: #004085;
+}
+
+.crcm-role-badge.admin {
+    background: #fff3cd;
+    color: #856404;
+}
+
+/* Loading States */
+.crcm-loading {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    font-style: italic;
+}
+
+/* Messages */
+.no-results,
+.error {
+    padding: 10px;
+    text-align: center;
+    color: #666;
+    font-style: italic;
+}
+
+.error {
+    color: #721c24;
+    background: #f8d7da;
+    border-radius: 4px;
+}
+
+/* Section Headers */
+.crcm-section-header {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.crcm-section-header h4 {
+    margin: 0 0 5px 0;
+    font-size: 16px;
+    color: #333;
+}
+
+.crcm-section-header .description {
+    margin: 0;
+    font-size: 13px;
+    color: #666;
+}
+
+/* Form Elements */
+.post-type-crcm_booking .form-table th {
+    width: 200px;
+    font-weight: 600;
+}
+
+.post-type-crcm_booking .form-table input,
+.post-type-crcm_booking .form-table select,
+.post-type-crcm_booking .form-table textarea {
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.post-type-crcm_booking .form-table input:focus,
+.post-type-crcm_booking .form-table select:focus,
+.post-type-crcm_booking .form-table textarea:focus {
+    border-color: #007cba;
+    box-shadow: 0 0 0 1px #007cba;
+}
