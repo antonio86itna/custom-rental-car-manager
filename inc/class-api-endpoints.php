@@ -50,11 +50,11 @@ class CRCM_API_Endpoints {
                     'required' => false,
                     'type'     => 'integer',
                 ),
-                'posts_per_page' => array(
+                'per_page' => array(
                     'required' => false,
                     'type'     => 'integer',
                 ),
-                'paged' => array(
+                'page' => array(
                     'required' => false,
                     'type'     => 'integer',
                 ),
@@ -158,53 +158,76 @@ class CRCM_API_Endpoints {
     }
 
     /**
-     * Get vehicles endpoint
+     * Get vehicles endpoint.
+     *
+     * Retrieves vehicles with optional date filtering and pagination support.
+     *
+     * @param WP_REST_Request $request Request data.
+     * @return WP_REST_Response
      */
-    public function get_vehicles($request) {
+    public function get_vehicles( $request ) {
         $vehicle_manager = crcm()->vehicle_manager;
 
-        $pickup_date = $request->get_param('pickup_date');
-        $return_date = $request->get_param('return_date');
+        $pickup_date = $request->get_param( 'pickup_date' );
+        $return_date = $request->get_param( 'return_date' );
 
-        if ($pickup_date && $return_date) {
-            $vehicle_type   = $request->get_param('vehicle_type');
-            $posts_per_page = $request->get_param('posts_per_page') ? absint($request->get_param('posts_per_page')) : 10;
-            $paged          = $request->get_param('paged') ? absint($request->get_param('paged')) : 1;
+        $per_page = $request->get_param( 'per_page' ) ? absint( $request->get_param( 'per_page' ) ) : 20;
+        $page     = $request->get_param( 'page' ) ? absint( $request->get_param( 'page' ) ) : 1;
 
-            $vehicles = $vehicle_manager->search_available_vehicles(
+        if ( $pickup_date && $return_date ) {
+            $vehicle_type = $request->get_param( 'vehicle_type' );
+
+            $results = $vehicle_manager->search_available_vehicles(
                 $pickup_date,
                 $return_date,
                 $vehicle_type,
-                $posts_per_page,
-                $paged
-            );
-        } else {
-            // Get all vehicles
-            $args = array(
-                'post_type' => 'crcm_vehicle',
-                'post_status' => 'publish',
-                'posts_per_page' => -1,
+                $per_page,
+                $page
             );
 
-            $posts = get_posts($args);
+            $vehicles   = $results['vehicles'];
+            $pagination = $results['pagination'];
+        } else {
+            $args = array(
+                'post_type'      => 'crcm_vehicle',
+                'post_status'    => 'publish',
+                'posts_per_page' => $per_page,
+                'paged'          => $page,
+            );
+
+            $query    = new WP_Query( $args );
+            $posts    = $query->posts;
             $vehicles = array();
 
-            foreach ($posts as $post) {
-                $vehicle_data = get_post_meta($post->ID, '_crcm_vehicle_data', true);
-                $pricing_data = get_post_meta($post->ID, '_crcm_pricing_data', true);
+            foreach ( $posts as $post ) {
+                $vehicle_data = get_post_meta( $post->ID, '_crcm_vehicle_data', true );
+                $pricing_data = get_post_meta( $post->ID, '_crcm_pricing_data', true );
 
                 $vehicles[] = array(
-                    'id' => $post->ID,
-                    'title' => $post->post_title,
-                    'description' => $post->post_content,
-                    'vehicle_data' => $vehicle_data,
-                    'pricing_data' => $pricing_data,
-                    'featured_image' => get_the_post_thumbnail_url($post->ID, 'medium'),
+                    'id'             => $post->ID,
+                    'title'          => $post->post_title,
+                    'description'    => $post->post_content,
+                    'vehicle_data'   => $vehicle_data,
+                    'pricing_data'   => $pricing_data,
+                    'featured_image' => get_the_post_thumbnail_url( $post->ID, 'medium' ),
                 );
             }
+
+            $pagination = array(
+                'current' => $page,
+                'total'   => (int) $query->max_num_pages,
+            );
         }
 
-        return new WP_REST_Response($vehicles, 200);
+        $pagination['per_page'] = $per_page;
+
+        return new WP_REST_Response(
+            array(
+                'vehicles'   => $vehicles,
+                'pagination' => $pagination,
+            ),
+            200
+        );
     }
 
     /**
