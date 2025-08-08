@@ -66,6 +66,11 @@ $user_bookings = get_posts(array(
 
                         <?php if ($booking_status === 'pending' || $booking_status === 'confirmed'): ?>
                             <div class="crcm-booking-actions">
+                                <?php if ($booking_status === 'pending'): ?>
+                                    <a class="crcm-btn crcm-btn-primary" href="<?php echo esc_url(crcm()->payment_manager->get_checkout_url($booking->ID)); ?>">
+                                        <?php _e('Pay Now', 'custom-rental-manager'); ?>
+                                    </a>
+                                <?php endif; ?>
                                 <button class="crcm-btn crcm-btn-danger" onclick="cancelBooking('<?php echo esc_attr($booking->ID); ?>')">
                                     <?php _e('Cancel Booking', 'custom-rental-manager'); ?>
                                 </button>
