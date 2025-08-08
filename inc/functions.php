@@ -1110,61 +1110,21 @@ function crcm_get_next_booking_number() {
 // ===============================================
 
 /**
- * Add admin styles for role badges and interface
+ * Enqueue admin styles for role badges and interface.
+ *
+ * @param string $hook The current admin page hook.
  */
-function crcm_add_admin_role_styles() {
-    ?>
-    <style>
-    /* Role badge styles */
-    .crcm-role-badge {
-        display: inline-block;
-        padding: 3px 8px;
-        border-radius: 12px;
-        font-size: 11px;
-        font-weight: 600;
-        text-transform: uppercase;
-        line-height: 1.4;
+function crcm_enqueue_admin_role_styles( $hook ) {
+    // Load only on user management screens.
+    if ( ! in_array( $hook, array( 'users.php', 'user-edit.php', 'user-new.php', 'profile.php' ), true ) ) {
+        return;
     }
-    
-    .crcm-role-badge.customer-active {
-        background: #d4edda;
-        color: #155724;
-    }
-    
-    .crcm-role-badge.customer-inactive {
-        background: #f8d7da;
-        color: #721c24;
-    }
-    
-    .crcm-role-badge.manager {
-        background: #cce5ff;
-        color: #004085;
-    }
-    
-    .crcm-role-badge.admin {
-        background: #fff3cd;
-        color: #856404;
-    }
-    
-    .crcm-role-badge.other {
-        background: #e2e3e5;
-        color: #383d41;
-    }
-    
-    /* Users table improvements */
-    .users-php .column-crcm_rental_role {
-        width: 150px;
-    }
-    
-    /* User form styles */
-    #crcm-customer-fields .form-table {
-        margin-top: 0;
-    }
-    
-    #crcm-customer-fields th {
-        width: 200px;
-    }
-    </style>
-    <?php
+
+    wp_enqueue_style(
+        'crcm-admin-roles',
+        CRCM_PLUGIN_URL . 'assets/css/admin-roles.css',
+        array(),
+        CRCM_VERSION
+    );
 }
-add_action('admin_head', 'crcm_add_admin_role_styles');
+add_action( 'admin_enqueue_scripts', 'crcm_enqueue_admin_role_styles' );

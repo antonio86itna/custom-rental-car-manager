@@ -1,0 +1,49 @@
+/* Admin role badge styles */
+.crcm-role-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    line-height: 1.4;
+}
+
+.crcm-role-badge.customer-active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.crcm-role-badge.customer-inactive {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.crcm-role-badge.manager {
+    background: #cce5ff;
+    color: #004085;
+}
+
+.crcm-role-badge.admin {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.crcm-role-badge.other {
+    background: #e2e3e5;
+    color: #383d41;
+}
+
+/* Users table improvements */
+.users-php .column-crcm_rental_role {
+    width: 150px;
+}
+
+/* User form styles */
+#crcm-customer-fields .form-table {
+    margin-top: 0;
+}
+
+#crcm-customer-fields th {
+    width: 200px;
+}
