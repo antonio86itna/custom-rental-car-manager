@@ -251,17 +251,25 @@ $base_total = $daily_rate * $rental_days;
                         <div class="crcm-field-row">
                             <div class="crcm-field-group">
                                 <label for="emergency_contact"><?php _e('Contatto di emergenza', 'custom-rental-manager'); ?></label>
-                                <input type="text" id="emergency_contact" name="emergency_contact" 
+                                <input type="text" id="emergency_contact" name="emergency_contact"
                                        placeholder="<?php _e('Nome e cognome', 'custom-rental-manager'); ?>" />
                             </div>
-                            
+
                             <div class="crcm-field-group">
                                 <label for="emergency_phone"><?php _e('Telefono di emergenza', 'custom-rental-manager'); ?></label>
                                 <input type="tel" id="emergency_phone" name="emergency_phone" />
                             </div>
                         </div>
+
+                        <div class="crcm-field-group">
+                            <label for="preferred_language"><?php _e('Preferred Language', 'custom-rental-manager'); ?></label>
+                            <select id="preferred_language" name="preferred_language">
+                                <option value="it"><?php _e('Italian', 'custom-rental-manager'); ?></option>
+                                <option value="en"><?php _e('English', 'custom-rental-manager'); ?></option>
+                            </select>
+                        </div>
                     </div>
-                    
+
                     <div class="crcm-step-actions">
                         <button type="button" class="crcm-prev-btn" data-prev="1">
                             ← <?php _e('Indietro', 'custom-rental-manager'); ?>

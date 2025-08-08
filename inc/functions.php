@@ -294,6 +294,17 @@ function crcm_add_rental_fields_to_profile($user) {
                     </td>
                 </tr>
                 <tr>
+                    <th><label for="crcm_preferred_language"><?php _e('Preferred Language', 'custom-rental-manager'); ?></label></th>
+                    <td>
+                        <?php $lang = get_user_meta($user->ID, 'crcm_preferred_language', true) ?: 'it'; ?>
+                        <select id="crcm_preferred_language" name="crcm_preferred_language">
+                            <option value="it" <?php selected($lang, 'it'); ?>><?php _e('Italian', 'custom-rental-manager'); ?></option>
+                            <option value="en" <?php selected($lang, 'en'); ?>><?php _e('English', 'custom-rental-manager'); ?></option>
+                        </select>
+                        <p class="description"><?php _e('Preferred language for communications', 'custom-rental-manager'); ?></p>
+                    </td>
+                </tr>
+                <tr>
                     <th><label for="crcm_customer_status"><?php _e('Customer Status', 'custom-rental-manager'); ?></label></th>
                     <td>
                         <?php $status = get_user_meta($user->ID, 'crcm_customer_status', true) ?: 'active'; ?>
@@ -345,7 +356,7 @@ function crcm_save_rental_profile_fields($user_id) {
     
     // Save rental-specific fields
     $rental_fields = array(
-        'phone', 'address', 'license_number', 'emergency_contact', 'crcm_customer_status'
+        'phone', 'address', 'license_number', 'emergency_contact', 'crcm_customer_status', 'crcm_preferred_language'
     );
     
     foreach ($rental_fields as $field) {
@@ -914,6 +925,9 @@ function crcm_create_customer_account($customer_data) {
     }
     if (isset($customer_data['emergency_contact'])) {
         update_user_meta($user_id, 'emergency_contact', $customer_data['emergency_contact']);
+    }
+    if (isset($customer_data['preferred_language'])) {
+        update_user_meta($user_id, 'crcm_preferred_language', $customer_data['preferred_language']);
     }
 
     // Set customer status and registration data

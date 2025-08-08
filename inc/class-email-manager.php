@@ -33,6 +33,33 @@ class CRCM_Email_Manager {
     }
 
     /**
+     * Switch locale based on customer's preferred language.
+     *
+     * @param int $booking_id Booking ID.
+     * @return bool Whether locale was switched.
+     */
+    private function maybe_switch_locale($booking_id) {
+        $user_id = (int) get_post_meta($booking_id, '_crcm_customer_user_id', true);
+        $lang    = '';
+        if ($user_id) {
+            $lang = get_user_meta($user_id, 'crcm_preferred_language', true);
+        }
+        if (!$lang) {
+            $customer_data = get_post_meta($booking_id, '_crcm_customer_data', true);
+            $lang          = $customer_data['preferred_language'] ?? '';
+        }
+        if ('it' === $lang) {
+            switch_to_locale('it_IT');
+            return true;
+        }
+        if ('en' === $lang) {
+            switch_to_locale('en_US');
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * Send booking confirmation email
      */
     public function send_booking_confirmation($booking_id) {
@@ -41,6 +68,8 @@ class CRCM_Email_Manager {
         if (is_wp_error($booking) || empty($booking['customer_data']['email'])) {
             return false;
         }
+
+        $switched = $this->maybe_switch_locale($booking_id);
 
         $settings = get_option('crcm_settings', array());
 
@@ -61,6 +90,10 @@ class CRCM_Email_Manager {
         if (!empty($settings['enable_admin_notifications'])) {
             $admin_email = !empty($settings['company_email']) ? $settings['company_email'] : get_option('admin_email');
             wp_mail($admin_email, $subject, $message, $headers);
+        }
+
+        if ($switched) {
+            restore_previous_locale();
         }
 
         if ($sent) {
@@ -87,6 +120,8 @@ class CRCM_Email_Manager {
             return false;
         }
 
+        $switched = $this->maybe_switch_locale($booking_id);
+
         $subject = sprintf(__('Booking Status Update - %s', 'custom-rental-manager'), $booking['booking_number']);
         $message = $this->get_status_change_template($booking, $new_status, $old_status);
 
@@ -104,6 +139,10 @@ class CRCM_Email_Manager {
         if (!empty($settings['enable_admin_notifications'])) {
             $admin_email = !empty($settings['company_email']) ? $settings['company_email'] : get_option('admin_email');
             wp_mail($admin_email, $subject, $message, $headers);
+        }
+
+        if ($switched) {
+            restore_previous_locale();
         }
 
         return $sent;
@@ -158,6 +197,8 @@ class CRCM_Email_Manager {
             return false;
         }
 
+        $switched = $this->maybe_switch_locale($booking_id);
+
         $subject = sprintf(__('Pickup Reminder - %s', 'custom-rental-manager'), $booking['booking_number']);
         $message = $this->get_pickup_reminder_template($booking);
 
@@ -174,6 +215,10 @@ class CRCM_Email_Manager {
 
         if ($sent) {
             update_post_meta($booking_id, '_crcm_pickup_reminder_sent', current_time('mysql'));
+        }
+
+        if ($switched) {
+            restore_previous_locale();
         }
 
         return $sent;
