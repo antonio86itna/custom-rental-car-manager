@@ -467,9 +467,14 @@ class CRCM_Plugin {
             'vehicle_id' => '',
         ), $atts);
 
-        $vehicle_id   = ! empty( sanitize_text_field( $_GET['vehicle'] ?? '' ) ) ? intval( sanitize_text_field( $_GET['vehicle'] ) ) : intval( $atts['vehicle_id'] );
-        $pickup_date  = ! empty( sanitize_text_field( $_GET['pickup_date'] ?? '' ) ) ? sanitize_text_field( $_GET['pickup_date'] ) : '';
-        $return_date  = ! empty( sanitize_text_field( $_GET['return_date'] ?? '' ) ) ? sanitize_text_field( $_GET['return_date'] ) : '';
+        $vehicle_param = sanitize_text_field( $_GET['vehicle'] ?? '' );
+        $vehicle_id    = ! empty( $vehicle_param ) ? intval( $vehicle_param ) : intval( $atts['vehicle_id'] );
+
+        $pickup_param  = sanitize_text_field( $_GET['pickup_date'] ?? '' );
+        $pickup_date   = ! empty( $pickup_param ) ? $pickup_param : '';
+
+        $return_param  = sanitize_text_field( $_GET['return_date'] ?? '' );
+        $return_date   = ! empty( $return_param ) ? $return_param : '';
         $pricing_data = get_post_meta($vehicle_id, '_crcm_pricing_data', true);
         $daily_rate   = $pricing_data['daily_rate'] ?? 0;
         $rental_days  = 1;
@@ -712,7 +717,8 @@ class CRCM_Plugin {
             }
         }
 
-        $current_page = sanitize_text_field( $_GET['page'] ?? '' );
+        $page_param   = sanitize_text_field( $_GET['page'] ?? '' );
+        $current_page = ! empty( $page_param ) ? $page_param : '';
 
         if ( ! empty( $current_page ) && 'crcm-dashboard' === $current_page ) {
             $dashboard_css = CRCM_PLUGIN_PATH . 'assets/css/admin-dashboard.css';
