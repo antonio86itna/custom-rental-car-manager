@@ -30,7 +30,7 @@ class CRCM_API_Endpoints {
         register_rest_route( 'crcm/v1', '/vehicles', array(
             'methods'             => 'GET',
             'callback'            => array( $this, 'get_vehicles' ),
-            'permission_callback' => '__return_true',
+            'permission_callback' => array( $this, 'check_public_permissions' ),
             'args'                => array(
                 'pickup_date' => array(
                     'required' => false,
@@ -64,7 +64,7 @@ class CRCM_API_Endpoints {
         register_rest_route( 'crcm/v1', '/vehicles/(?P<id>\d+)', array(
             'methods'             => 'GET',
             'callback'            => array( $this, 'get_vehicle' ),
-            'permission_callback' => '__return_true',
+            'permission_callback' => array( $this, 'check_public_permissions' ),
             'args'                => array(
                 'id' => array(
                     'required' => true,
@@ -82,7 +82,7 @@ class CRCM_API_Endpoints {
             array(
                 'methods' => 'POST',
                 'callback' => array($this, 'create_booking'),
-                'permission_callback' => '__return_true',
+                'permission_callback' => array( $this, 'check_public_permissions' ),
                 'args' => array(
                     'vehicle_id' => array(
                         'required' => true,
@@ -121,7 +121,7 @@ class CRCM_API_Endpoints {
         register_rest_route('crcm/v1', '/availability', array(
             'methods' => 'GET',
             'callback' => array($this, 'get_availability'),
-            'permission_callback' => '__return_true',
+            'permission_callback' => array( $this, 'check_public_permissions' ),
             'args' => array(
                 'vehicle_id' => array(
                     'required' => true,
@@ -337,6 +337,47 @@ class CRCM_API_Endpoints {
         $calendar_data = $calendar_manager->get_calendar_data($month, $vehicle_id);
 
         return new WP_REST_Response($calendar_data, 200);
+    }
+
+    /**
+     * Basic permission check for public endpoints.
+     *
+     * Validates REST nonce when provided and applies a simple
+     * rate limiting based on the request IP to mitigate abuse.
+     *
+     * @param WP_REST_Request $request Current request.
+     * @return true|WP_Error
+     */
+    public function check_public_permissions( $request ) {
+        $ip   = $request->get_header( 'X-Forwarded-For' );
+        $ip   = $ip ? explode( ',', $ip )[0] : ( $_SERVER['REMOTE_ADDR'] ?? '' );
+        $key  = 'crcm_rate_' . md5( $ip );
+        $hits = (int) get_transient( $key );
+
+        if ( $hits >= 100 ) {
+            return new WP_Error(
+                'rest_rate_limited',
+                __( 'Too many requests', 'custom-rental-manager' ),
+                array( 'status' => 429 )
+            );
+        }
+
+        set_transient( $key, $hits + 1, MINUTE_IN_SECONDS * 10 );
+
+        $nonce = $request->get_header( 'X-WP-Nonce' );
+        if ( $nonce && wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+            return true;
+        }
+
+        if ( is_user_logged_in() ) {
+            return current_user_can( 'read' );
+        }
+
+        return new WP_Error(
+            'rest_forbidden',
+            __( 'Invalid or missing nonce', 'custom-rental-manager' ),
+            array( 'status' => rest_authorization_required_code() )
+        );
     }
 
     /**
