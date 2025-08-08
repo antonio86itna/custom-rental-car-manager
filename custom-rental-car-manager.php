@@ -1049,6 +1049,23 @@ class CRCM_Plugin {
             array( 'label_for' => 'enable_admin_notifications', 'type' => 'checkbox' )
         );
 
+        add_settings_field(
+            'booking_confirmation_template',
+            __( 'Booking Confirmation Template', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_email_section',
+            array( 'label_for' => 'booking_confirmation_template', 'type' => 'text', 'description' => __( 'Template slug for booking confirmations.', 'custom-rental-manager' ) )
+        );
+        add_settings_field(
+            'status_change_template',
+            __( 'Status Change Template', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_email_section',
+            array( 'label_for' => 'status_change_template', 'type' => 'text', 'description' => __( 'Template slug for status change emails.', 'custom-rental-manager' ) )
+        );
+
         add_settings_section( 'crcm_delivery_section', '', '__return_false', 'crcm-settings' );
         add_settings_field(
             'enable_home_delivery',
@@ -1124,6 +1141,8 @@ class CRCM_Plugin {
         $output['enable_booking_confirmation'] = isset( $input['enable_booking_confirmation'] ) ? 1 : 0;
         $output['enable_pickup_reminder']    = isset( $input['enable_pickup_reminder'] ) ? 1 : 0;
         $output['enable_admin_notifications'] = isset( $input['enable_admin_notifications'] ) ? 1 : 0;
+        $output['booking_confirmation_template'] = sanitize_text_field( $input['booking_confirmation_template'] );
+        $output['status_change_template'] = sanitize_text_field( $input['status_change_template'] );
         $output['enable_home_delivery']      = isset( $input['enable_home_delivery'] ) ? 1 : 0;
         $output['home_delivery_fee']         = floatval( $input['home_delivery_fee'] );
         $output['home_delivery_radius']      = intval( $input['home_delivery_radius'] );
@@ -1212,6 +1231,8 @@ class CRCM_Plugin {
             'enable_booking_confirmation' => 1,
             'enable_pickup_reminder'    => 1,
             'enable_admin_notifications' => 1,
+            'booking_confirmation_template' => 'booking-confirmation',
+            'status_change_template'   => 'status-change',
             'enable_home_delivery'      => 1,
             'home_delivery_fee'         => 25,
             'home_delivery_radius'      => 20,
