@@ -163,6 +163,18 @@ class CRCM_Booking_Manager {
         if (!is_array($pricing)) {
             $pricing = array();
         }
+        if (!empty($pricing['line_items']) && is_array($pricing['line_items'])) {
+            $clean_items = array();
+            foreach ($pricing['line_items'] as $item) {
+                $clean_items[] = array(
+                    'name'   => sanitize_text_field($item['name'] ?? ''),
+                    'qty'    => intval($item['qty'] ?? 0),
+                    'amount' => floatval($item['amount'] ?? 0),
+                    'free'   => !empty($item['free']),
+                );
+            }
+            $pricing['line_items'] = $clean_items;
+        }
 
         $status = get_post_meta($booking_id, '_crcm_booking_status', true) ?: 'pending';
         $booking_number = get_post_meta($booking_id, '_crcm_booking_number', true);
@@ -591,14 +603,16 @@ class CRCM_Booking_Manager {
         // Default values
         if (empty($pricing_breakdown)) {
             $pricing_breakdown = array(
-                'base_total' => 0,
-                'extras_total' => 0,
-                'insurance_total' => 0,
-                'tax_total' => 0,
-                'discount_total' => 0,
-                'final_total' => 0,
-                'selected_extras' => array(),
-                'selected_insurance' => 'basic',
+                'base_total'        => 0,
+                'extras_total'      => 0,
+                'insurance_total'   => 0,
+                'tax_total'         => 0,
+                'manual_discount'   => 0,
+                'discount_reason'   => '',
+                'final_total'       => 0,
+                'selected_extras'   => array(),
+                'selected_insurance'=> 'basic',
+                'line_items'        => array(),
             );
         }
         ?>
@@ -654,37 +668,39 @@ class CRCM_Booking_Manager {
                 <h5><?php _e('Riepilogo Prezzi', 'custom-rental-manager'); ?></h5>
                 <table class="crcm-pricing-table">
                     <tbody id="pricing-breakdown-content">
-                        <tr class="pricing-row">
-                            <td><?php _e('Tariffa base', 'custom-rental-manager'); ?></td>
-                            <td class="price-cell">€<span id="base-total">0.00</span></td>
-                        </tr>
-                        <tr class="pricing-row extras-row" style="display: none;">
-                            <td><?php _e('Servizi extra', 'custom-rental-manager'); ?></td>
-                            <td class="price-cell">€<span id="extras-total">0.00</span></td>
-                        </tr>
-                        <tr class="pricing-row insurance-row" style="display: none;">
-                            <td><?php _e('Assicurazione premium', 'custom-rental-manager'); ?></td>
-                            <td class="price-cell">€<span id="insurance-total">0.00</span></td>
-                        </tr>
-                        <tr class="pricing-row discount-row" style="display: none;">
+                        <?php if (!empty($pricing_breakdown['line_items'])) : ?>
+                            <?php foreach ($pricing_breakdown['line_items'] as $item) : ?>
+                                <tr class="pricing-row line-item">
+                                    <td>
+                                        <?php echo esc_html($item['name']); ?>
+                                        <?php if (!empty($item['free'])) : ?>
+                                            (<?php _e('Incluso', 'custom-rental-manager'); ?>)
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="price-cell">€<span><?php echo esc_html(number_format((float) ($item['amount'] ?? 0), 2)); ?></span></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                        <tr class="pricing-row discount-row" style="<?php echo (!empty($pricing_breakdown['manual_discount']) ? '' : 'display: none;'); ?>">
                             <td><?php _e('Sconto applicato', 'custom-rental-manager'); ?></td>
-                            <td class="price-cell discount">-€<span id="discount-total">0.00</span></td>
+                            <td class="price-cell discount">-€<span id="discount-total"><?php echo esc_html(number_format((float) ($pricing_breakdown['manual_discount'] ?? 0), 2)); ?></span></td>
                         </tr>
                         <tr class="pricing-row total-row">
                             <td><strong><?php _e('TOTALE', 'custom-rental-manager'); ?></strong></td>
-                            <td class="price-cell"><strong>€<span id="final-total">0.00</span></strong></td>
+                            <td class="price-cell"><strong>€<span id="final-total"><?php echo esc_html(number_format((float) ($pricing_breakdown['final_total'] ?? 0), 2)); ?></span></strong></td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-            
+
             <!-- Hidden fields for storing pricing data -->
+            <input type="hidden" name="pricing_breakdown[line_items]" id="line_items_input" value="<?php echo esc_attr(wp_json_encode($pricing_breakdown['line_items'] ?? array())); ?>" />
             <input type="hidden" name="pricing_breakdown[base_total]" id="base_total_input" value="<?php echo esc_attr($pricing_breakdown['base_total']); ?>" />
             <input type="hidden" name="pricing_breakdown[extras_total]" id="extras_total_input" value="<?php echo esc_attr($pricing_breakdown['extras_total']); ?>" />
             <input type="hidden" name="pricing_breakdown[insurance_total]" id="insurance_total_input" value="<?php echo esc_attr($pricing_breakdown['insurance_total']); ?>" />
             <input type="hidden" name="pricing_breakdown[final_total]" id="final_total_input" value="<?php echo esc_attr($pricing_breakdown['final_total']); ?>" />
         </div>
-        
+
         <?php
     }
     
@@ -971,7 +987,20 @@ class CRCM_Booking_Manager {
         if (isset($_POST['pricing_breakdown'])) {
             $pricing_breakdown = array();
             foreach ($_POST['pricing_breakdown'] as $key => $value) {
-                if (is_array($value)) {
+                if ('line_items' === $key) {
+                    $items = json_decode(wp_unslash($value), true);
+                    $pricing_breakdown['line_items'] = array();
+                    if (is_array($items)) {
+                        foreach ($items as $item) {
+                            $pricing_breakdown['line_items'][] = array(
+                                'name'   => sanitize_text_field($item['name'] ?? ''),
+                                'qty'    => intval($item['qty'] ?? 0),
+                                'amount' => floatval($item['amount'] ?? 0),
+                                'free'   => !empty($item['free']),
+                            );
+                        }
+                    }
+                } elseif (is_array($value)) {
                     $pricing_breakdown[$key] = array_map('sanitize_text_field', $value);
                 } else {
                     $pricing_breakdown[$key] = sanitize_text_field($value);

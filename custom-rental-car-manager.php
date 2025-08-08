@@ -713,6 +713,8 @@ class CRCM_Plugin {
                             'included'           => __( 'Included', 'custom-rental-manager' ),
                             'basic_insurance'    => __( 'Basic Insurance', 'custom-rental-manager' ),
                             'premium_insurance'  => __( 'Premium Insurance', 'custom-rental-manager' ),
+                            'base_rate'          => __( 'Base rate', 'custom-rental-manager' ),
+                            'late_return_fee'    => __( 'Late return fee', 'custom-rental-manager' ),
                             'per_day'            => __( '/day', 'custom-rental-manager' ),
                         ),
                     )
