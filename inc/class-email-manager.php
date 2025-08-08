@@ -74,7 +74,7 @@ class CRCM_Email_Manager {
         $settings = get_option('crcm_settings', array());
 
         $subject = sprintf(__('Booking Confirmation - %s', 'custom-rental-manager'), $booking['booking_number']);
-        $message = $this->get_booking_confirmation_template($booking);
+        $message = $this->get_booking_confirmation_template($booking, 'customer');
 
         $headers = array(
             'Content-Type: text/html; charset=UTF-8',
@@ -88,8 +88,9 @@ class CRCM_Email_Manager {
         );
 
         if (!empty($settings['enable_admin_notifications'])) {
-            $admin_email = !empty($settings['company_email']) ? $settings['company_email'] : get_option('admin_email');
-            wp_mail($admin_email, $subject, $message, $headers);
+            $admin_email   = !empty($settings['company_email']) ? $settings['company_email'] : get_option('admin_email');
+            $admin_message = $this->get_booking_confirmation_template($booking, 'admin');
+            wp_mail($admin_email, $subject, $admin_message, $headers);
         }
 
         if ($switched) {
@@ -123,7 +124,7 @@ class CRCM_Email_Manager {
         $switched = $this->maybe_switch_locale($booking_id);
 
         $subject = sprintf(__('Booking Status Update - %s', 'custom-rental-manager'), $booking['booking_number']);
-        $message = $this->get_status_change_template($booking, $new_status, $old_status);
+        $message = $this->get_status_change_template($booking, $new_status, $old_status, 'customer');
 
         $headers = array(
             'Content-Type: text/html; charset=UTF-8',
@@ -137,8 +138,9 @@ class CRCM_Email_Manager {
         );
 
         if (!empty($settings['enable_admin_notifications'])) {
-            $admin_email = !empty($settings['company_email']) ? $settings['company_email'] : get_option('admin_email');
-            wp_mail($admin_email, $subject, $message, $headers);
+            $admin_email   = !empty($settings['company_email']) ? $settings['company_email'] : get_option('admin_email');
+            $admin_message = $this->get_status_change_template($booking, $new_status, $old_status, 'admin');
+            wp_mail($admin_email, $subject, $admin_message, $headers);
         }
 
         if ($switched) {
@@ -225,9 +227,19 @@ class CRCM_Email_Manager {
     }
 
     /**
-     * Get booking confirmation email template
+     * Get booking confirmation email template.
+     *
+     * @param array  $booking   Booking data array.
+     * @param string $recipient Recipient type: customer or admin.
+     *
+     * @return string
      */
-    public function get_booking_confirmation_template($booking) {
+    public function get_booking_confirmation_template($booking, $recipient = 'customer') {
+        $settings = get_option('crcm_settings', array());
+        $template = !empty($settings['booking_confirmation_template']) ? $settings['booking_confirmation_template'] : 'booking-confirmation';
+        return $this->render_template($template, $booking, $recipient);
+
+        // Legacy HTML template below retained for reference
         $vehicle = get_post($booking['booking_data']['vehicle_id']);
         $vehicle_name = $vehicle ? $vehicle->post_title : __('Unknown Vehicle', 'custom-rental-manager');
 
@@ -503,9 +515,24 @@ class CRCM_Email_Manager {
     }
 
     /**
-     * Get status change email template
+     * Get status change email template.
+     *
+     * @param array  $booking   Booking data array.
+     * @param string $new_status New status string.
+     * @param string $old_status Previous status string.
+     * @param string $recipient Recipient type: customer or admin.
+     *
+     * @return string
      */
-    public function get_status_change_template($booking, $new_status, $old_status) {
+    public function get_status_change_template($booking, $new_status, $old_status, $recipient = 'customer') {
+        $settings = get_option('crcm_settings', array());
+        $template = !empty($settings['status_change_template']) ? $settings['status_change_template'] : 'status-change';
+        return $this->render_template($template, $booking, $recipient, array(
+            'new_status' => $new_status,
+            'old_status' => $old_status,
+        ));
+
+        // Legacy HTML template below retained for reference
         $vehicle = get_post($booking['booking_data']['vehicle_id']);
         $vehicle_name = $vehicle ? $vehicle->post_title : __('Unknown Vehicle', 'custom-rental-manager');
 
@@ -561,6 +588,45 @@ class CRCM_Email_Manager {
         </html>
         <?php
         return ob_get_clean();
+    }
+
+    /**
+     * Render an email template file.
+     *
+     * @param string $template  Template slug (without extension).
+     * @param array  $booking   Booking data array.
+     * @param string $recipient Recipient type: customer or admin.
+     * @param array  $args      Extra variables for the template.
+     *
+     * @return string
+     */
+    private function render_template($template, $booking, $recipient = 'customer', $args = array()) {
+        $language = $this->get_customer_language($booking['booking_id']);
+        $path     = CRCM_PLUGIN_PATH . 'templates/emails/' . $language . '/' . $recipient . '/' . $template . '.php';
+        if (!file_exists($path)) {
+            $path = CRCM_PLUGIN_PATH . 'templates/emails/en/' . $recipient . '/' . $template . '.php';
+        }
+
+        if (!empty($args)) {
+            extract($args, EXTR_SKIP);
+        }
+
+        ob_start();
+        include $path;
+        return ob_get_clean();
+    }
+
+    /**
+     * Get customer language based on user meta.
+     *
+     * @param int $booking_id Booking ID.
+     *
+     * @return string
+     */
+    private function get_customer_language($booking_id) {
+        $user_id  = (int) get_post_meta($booking_id, '_crcm_customer_user_id', true);
+        $language = $user_id ? get_user_meta($user_id, 'crcm_language', true) : '';
+        return $language ? $language : 'en';
     }
 
     /**
