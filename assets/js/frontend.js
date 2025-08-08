@@ -51,7 +51,7 @@
             const $button = $form.find('.crcm-search-btn');
             const $results = $('#crcm-search-results');
 
-            const perPage = 6;
+            const perPage = parseInt($form.data('per-page'), 10) || 6;
             const formData = {
                 action: 'crcm_search_vehicles',
                 nonce: crcm_ajax.nonce,

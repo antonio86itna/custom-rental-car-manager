@@ -21,7 +21,7 @@ $locations = crcm_get_locations();
             <p><?php _e('Trova il veicolo perfetto per la tua vacanza in pochi click.', 'custom-rental-manager'); ?></p>
         </div>
         
-        <form id="crcm-vehicle-search" class="crcm-search-form">
+        <form id="crcm-vehicle-search" class="crcm-search-form" data-per-page="6">
             <div class="crcm-search-fields">
                 <!-- Date Fields Row -->
                 <div class="crcm-field-row">

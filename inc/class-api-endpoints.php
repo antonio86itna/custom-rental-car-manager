@@ -50,6 +50,14 @@ class CRCM_API_Endpoints {
                     'required' => false,
                     'type'     => 'integer',
                 ),
+                'posts_per_page' => array(
+                    'required' => false,
+                    'type'     => 'integer',
+                ),
+                'page' => array(
+                    'required' => false,
+                    'type'     => 'integer',
+                ),
             ),
         ) );
 
