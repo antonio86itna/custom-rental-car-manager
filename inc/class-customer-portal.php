@@ -73,7 +73,9 @@ class CRCM_Customer_Portal {
         }
 
         // Update booking status
+        $old_status = get_post_meta($booking_id, '_crcm_booking_status', true);
         update_post_meta($booking_id, '_crcm_booking_status', 'cancelled');
+        do_action('crcm_booking_status_changed', $booking_id, 'cancelled', $old_status);
 
         wp_send_json_success(__('Booking cancelled successfully', 'custom-rental-manager'));
     }

@@ -61,7 +61,9 @@ class CRCM_Payment_Manager {
             update_post_meta($booking_id, '_crcm_payment_data', $payment_data);
 
             // Update booking status
+            $old_status = get_post_meta($booking_id, '_crcm_booking_status', true);
             update_post_meta($booking_id, '_crcm_booking_status', 'confirmed');
+            do_action('crcm_booking_status_changed', $booking_id, 'confirmed', $old_status);
 
             wp_send_json_success(array(
                 'message' => __('Payment processed successfully', 'custom-rental-manager'),
@@ -104,7 +106,9 @@ class CRCM_Payment_Manager {
 
             if ($refund_amount >= $payment_data['paid_amount']) {
                 $payment_data['payment_status'] = 'refunded';
+                $old_status = get_post_meta($booking_id, '_crcm_booking_status', true);
                 update_post_meta($booking_id, '_crcm_booking_status', 'refunded');
+                do_action('crcm_booking_status_changed', $booking_id, 'refunded', $old_status);
             } else {
                 $payment_data['payment_status'] = 'partial_refund';
             }

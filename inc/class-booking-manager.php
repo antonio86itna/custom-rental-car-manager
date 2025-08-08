@@ -111,7 +111,10 @@ class CRCM_Booking_Manager {
         );
         update_post_meta($booking_id, '_crcm_booking_data', $booking_data);
         update_post_meta($booking_id, '_crcm_customer_data', $customer_data);
+
+        $old_status = get_post_meta($booking_id, '_crcm_booking_status', true);
         update_post_meta($booking_id, '_crcm_booking_status', 'pending');
+        do_action('crcm_booking_status_changed', $booking_id, 'pending', $old_status);
 
         return array(
             'booking_id'     => $booking_id,
@@ -1011,7 +1014,10 @@ class CRCM_Booking_Manager {
         
         // Save booking status
         if (isset($_POST['booking_status'])) {
-            update_post_meta($post_id, '_crcm_booking_status', sanitize_text_field($_POST['booking_status']));
+            $old_status = get_post_meta($post_id, '_crcm_booking_status', true);
+            $new_status = sanitize_text_field($_POST['booking_status']);
+            update_post_meta($post_id, '_crcm_booking_status', $new_status);
+            do_action('crcm_booking_status_changed', $post_id, $new_status, $old_status);
         }
         
         // Save notes
