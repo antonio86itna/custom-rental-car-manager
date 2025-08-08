@@ -1545,6 +1545,10 @@ class CRCM_Vehicle_Manager {
                 $vehicle_data[$key] = sanitize_text_field($value);
             }
             update_post_meta($post_id, '_crcm_vehicle_data', $vehicle_data);
+
+            if (isset($vehicle_data['vehicle_type'])) {
+                update_post_meta($post_id, '_crcm_vehicle_type', $vehicle_data['vehicle_type']);
+            }
         }
         
         // Save pricing data
@@ -1921,17 +1925,21 @@ class CRCM_Vehicle_Manager {
             'fields'         => 'ids',
         );
 
-        $query           = new WP_Query($args);
-        $vehicle_ids     = $query->posts;
-        $available_vehicles = array();
+        if (!empty($vehicle_type)) {
+            $args['meta_query'] = array(
+                array(
+                    'key'   => '_crcm_vehicle_type',
+                    'value' => $vehicle_type,
+                ),
+            );
+        }
+
+        $query               = new WP_Query($args);
+        $vehicle_ids         = $query->posts;
+        $available_vehicles  = array();
 
         foreach ($vehicle_ids as $vehicle_id) {
             $vehicle_data = get_post_meta($vehicle_id, '_crcm_vehicle_data', true);
-
-            // Filter by type if specified
-            if (!empty($vehicle_type) && isset($vehicle_data['vehicle_type']) && $vehicle_data['vehicle_type'] !== $vehicle_type) {
-                continue;
-            }
 
             $available_quantity = $this->check_availability($vehicle_id, $pickup_date, $return_date);
             $pricing_data       = get_post_meta($vehicle_id, '_crcm_pricing_data', true);
