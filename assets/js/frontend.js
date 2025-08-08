@@ -17,6 +17,7 @@
             this.initCustomerDashboard();
             this.initDatePickers();
             this.initVehicleActions();
+            this.initPagination();
         },
 
         // Initialize search form
@@ -45,18 +46,21 @@
         },
 
         // Search vehicles via AJAX
-        searchVehicles: function() {
+        searchVehicles: function(page = 1) {
             const $form = $('#crcm-vehicle-search');
             const $button = $form.find('.crcm-search-btn');
             const $results = $('#crcm-search-results');
 
+            const perPage = 6;
             const formData = {
                 action: 'crcm_search_vehicles',
                 nonce: crcm_ajax.nonce,
                 pickup_date: $('#pickup_date').val(),
                 return_date: $('#return_date').val(),
                 vehicle_type: $('#vehicle_type').val(),
-                pickup_location: $('#pickup_location').val()
+                pickup_location: $('#pickup_location').val(),
+                posts_per_page: perPage,
+                page: page
             };
 
             // Validate dates
@@ -95,11 +99,14 @@
         },
 
         // Display search results
-        displaySearchResults: function(vehicles) {
+        displaySearchResults: function(data) {
+            const vehicles = data.vehicles || [];
+            const pagination = data.pagination || {current: 1, total: 1};
             const $container = $('#crcm-results-content');
 
-            if (!vehicles || vehicles.length === 0) {
+            if (vehicles.length === 0) {
                 $container.html('<div class="crcm-no-results"><p>No vehicles available for the selected dates.</p></div>');
+                $('#crcm-pagination').html('');
                 return;
             }
 
@@ -111,6 +118,43 @@
 
             html += '</div>';
             $container.html(html);
+
+            CRCM.renderPagination(pagination.current, pagination.total);
+        },
+
+        // Initialize pagination events
+        initPagination: function() {
+            $(document).on('click', '.crcm-page-link', function(e) {
+                e.preventDefault();
+                const page = $(this).data('page');
+                CRCM.searchVehicles(page);
+            });
+        },
+
+        // Render pagination links
+        renderPagination: function(current, total) {
+            const $pagination = $('#crcm-pagination');
+            if (total <= 1) {
+                $pagination.html('');
+                return;
+            }
+
+            let html = '';
+
+            if (current > 1) {
+                html += `<a href="#" class="crcm-page-link" data-page="${current - 1}">&laquo; Prev</a>`;
+            }
+
+            for (let i = 1; i <= total; i++) {
+                const active = i === current ? 'active' : '';
+                html += `<a href="#" class="crcm-page-link ${active}" data-page="${i}">${i}</a>`;
+            }
+
+            if (current < total) {
+                html += `<a href="#" class="crcm-page-link" data-page="${current + 1}">Next &raquo;</a>`;
+            }
+
+            $pagination.html(html);
         },
 
         // Build vehicle card HTML

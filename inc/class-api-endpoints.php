@@ -159,14 +159,17 @@ class CRCM_API_Endpoints {
         $return_date = $request->get_param('return_date');
 
         if ($pickup_date && $return_date) {
-            $search_params = array(
-                'pickup_date' => $pickup_date,
-                'return_date' => $return_date,
-                'vehicle_type' => $request->get_param('vehicle_type'),
-                'pickup_location' => $request->get_param('location'),
-            );
+            $vehicle_type   = $request->get_param('vehicle_type');
+            $posts_per_page = $request->get_param('posts_per_page') ? absint($request->get_param('posts_per_page')) : 10;
+            $paged          = $request->get_param('page') ? absint($request->get_param('page')) : 1;
 
-            $vehicles = $vehicle_manager->search_available_vehicles($search_params);
+            $vehicles = $vehicle_manager->search_available_vehicles(
+                $pickup_date,
+                $return_date,
+                $vehicle_type,
+                $posts_per_page,
+                $paged
+            );
         } else {
             // Get all vehicles
             $args = array(
