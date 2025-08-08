@@ -315,6 +315,81 @@ class CRCM_Email_Manager {
     }
 
     /**
+     * Get quote email template with payment link.
+     *
+     * @param array  $booking       Booking data array.
+     * @param string $checkout_url  Optional Stripe checkout URL.
+     * @param string $dashboard_url Optional dashboard URL.
+     * @return string
+     */
+    public function get_quote_template($booking, $checkout_url = '', $dashboard_url = '') {
+        $vehicle      = get_post($booking['booking_data']['vehicle_id']);
+        $vehicle_name = $vehicle ? $vehicle->post_title : __('Unknown Vehicle', 'custom-rental-manager');
+        $company_name = 'Costabilerent';
+
+        $button_url = $checkout_url ? $checkout_url : $dashboard_url;
+        if (empty($button_url)) {
+            $button_url = home_url('/customer-dashboard/');
+        }
+
+        $currency_symbol = '€';
+        $total_amount    = 0;
+        if (!empty($booking['pricing_breakdown']['final_total'])) {
+            $total_amount = (float) $booking['pricing_breakdown']['final_total'];
+        } elseif (!empty($booking['payment_data']['total_cost'])) {
+            $total_amount = (float) $booking['payment_data']['total_cost'];
+        }
+
+        ob_start();
+        ?>
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title><?php echo esc_html__('Booking Quote', 'custom-rental-manager'); ?></title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px;">
+            <div style="max-width: 600px; margin: 0 auto;">
+                <div style="background: #2563eb; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+                    <h1><?php echo esc_html($company_name); ?></h1>
+                    <h2><?php echo esc_html__('Booking Quote', 'custom-rental-manager'); ?></h2>
+                </div>
+
+                <div style="background: #fff; padding: 30px; border: 1px solid #e2e8f0; border-top: none;">
+                    <p><?php printf(__('Dear %s,', 'custom-rental-manager'), esc_html($booking['customer_data']['first_name'])); ?></p>
+                    <p><?php _e('Your booking is pending. Complete your payment to confirm.', 'custom-rental-manager'); ?></p>
+
+                    <p><strong><?php _e('Vehicle:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($vehicle_name); ?></p>
+                    <p><strong><?php _e('Pickup:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($booking['booking_data']['pickup_date']); ?> <?php echo esc_html($booking['booking_data']['pickup_time']); ?></p>
+                    <p><strong><?php _e('Return:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($booking['booking_data']['return_date']); ?> <?php echo esc_html($booking['booking_data']['return_time']); ?></p>
+                    <p style="font-size: 18px; font-weight: bold; color: #2563eb;">
+                        <strong><?php _e('Total Amount:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($currency_symbol . number_format($total_amount, 2)); ?>
+                    </p>
+
+                    <p style="text-align: center; margin: 30px 0;">
+                        <a href="<?php echo esc_url($button_url); ?>" style="background: #2563eb; color: #fff; padding: 12px 24px; border-radius: 4px; text-decoration: none;">
+                            <?php echo $checkout_url ? esc_html__('Pay Now', 'custom-rental-manager') : esc_html__('View Dashboard', 'custom-rental-manager'); ?>
+                        </a>
+                    </p>
+                </div>
+
+                <div style="background: #f1f5f9; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 14px; color: #64748b;">
+                    <p><strong><?php echo esc_html($company_name); ?></strong></p>
+                    <p><?php _e('Ischia, Italy', 'custom-rental-manager'); ?></p>
+                    <p><?php _e('Email:', 'custom-rental-manager'); ?> info@costabilerent.com</p>
+                    <p style="margin-top: 20px; font-size: 12px; color: #94a3b8;">
+                        <?php printf(__('Powered by %s', 'custom-rental-manager'), '<a href="https://totaliweb.com" style="color: #2563eb;">Totaliweb</a>'); ?>
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
      * Get pickup reminder email template
      */
     public function get_pickup_reminder_template($booking) {

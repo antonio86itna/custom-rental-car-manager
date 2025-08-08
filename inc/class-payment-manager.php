@@ -23,6 +23,7 @@ class CRCM_Payment_Manager {
         add_action('wp_ajax_crcm_process_payment', array($this, 'process_payment'));
         add_action('wp_ajax_nopriv_crcm_process_payment', array($this, 'process_payment'));
         add_action('wp_ajax_crcm_process_refund', array($this, 'process_refund'));
+        add_action('init', array($this, 'handle_stripe_return'));
     }
 
     /**
@@ -122,6 +123,48 @@ class CRCM_Payment_Manager {
 
         } catch (Exception $e) {
             wp_send_json_error($e->getMessage());
+        }
+    }
+
+    /**
+     * Generate Stripe checkout URL for a booking.
+     *
+     * @param int $booking_id Booking ID.
+     * @return string
+     */
+    public function get_checkout_url($booking_id) {
+        $success_url = add_query_arg(
+            array(
+                'crcm_stripe_return' => 1,
+                'booking_id'        => $booking_id,
+            ),
+            home_url('/customer-dashboard/')
+        );
+
+        $cancel_url = home_url('/customer-dashboard/');
+
+        // Normally a Stripe Checkout session would be created here.
+        return add_query_arg(
+            array(
+                'success_url' => rawurlencode($success_url),
+                'cancel_url'  => rawurlencode($cancel_url),
+            ),
+            'https://example.com/stripe-checkout'
+        );
+    }
+
+    /**
+     * Handle return from Stripe and confirm booking.
+     */
+    public function handle_stripe_return() {
+        if (isset($_GET['crcm_stripe_return'], $_GET['booking_id'])) {
+            $booking_id = intval($_GET['booking_id']);
+            $old_status = get_post_meta($booking_id, '_crcm_booking_status', true);
+            update_post_meta($booking_id, '_crcm_booking_status', 'confirmed');
+            do_action('crcm_booking_status_changed', $booking_id, 'confirmed', $old_status);
+
+            wp_safe_redirect(home_url('/customer-dashboard/'));
+            exit;
         }
     }
 

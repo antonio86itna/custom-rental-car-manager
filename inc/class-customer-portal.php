@@ -132,6 +132,9 @@ class CRCM_Customer_Portal {
                 $vehicle = get_post($booking['booking_data']['vehicle_id']);
                 $booking['vehicle_name']  = $vehicle ? $vehicle->post_title : '';
                 $booking['vehicle_image'] = get_the_post_thumbnail_url($booking['booking_data']['vehicle_id'], 'medium');
+                if ('pending' === ($booking['booking_status'] ?? '')) {
+                    $booking['payment_url'] = crcm()->payment_manager->get_checkout_url($booking_post->ID);
+                }
                 $bookings[]               = $booking;
             }
         }
