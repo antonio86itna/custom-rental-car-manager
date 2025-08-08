@@ -76,6 +76,7 @@ class CRCM_Vehicle_Manager {
 
         // AJAX handlers
         add_action('wp_ajax_crcm_get_vehicle_fields', array($this, 'ajax_get_vehicle_fields'));
+        add_action('wp_ajax_crcm_get_vehicle_features', array($this, 'ajax_get_vehicle_features'));
     }
 
     /**
@@ -1475,6 +1476,3 @@ class CRCM_Vehicle_Manager {
     }
 }
 
-// Add CSS for admin styling
-// Add AJAX handler for features
-add_action('wp_ajax_crcm_get_vehicle_features', array(crcm()->vehicle_manager, 'ajax_get_vehicle_features'));
