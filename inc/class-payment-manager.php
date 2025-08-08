@@ -17,7 +17,9 @@ if (!defined('ABSPATH')) {
 class CRCM_Payment_Manager {
 
     /**
-     * Constructor
+     * Constructor.
+     *
+     * @return void
      */
     public function __construct() {
         add_action('wp_ajax_crcm_process_payment', array($this, 'process_payment'));
@@ -27,7 +29,9 @@ class CRCM_Payment_Manager {
     }
 
     /**
-     * Process Stripe payment
+     * Process Stripe payment.
+     *
+     * @return void
      */
     public function process_payment() {
         check_ajax_referer('crcm_nonce', 'nonce');
@@ -77,7 +81,9 @@ class CRCM_Payment_Manager {
     }
 
     /**
-     * Process refund
+     * Process refund.
+     *
+     * @return void
      */
     public function process_refund() {
         check_ajax_referer('crcm_admin_nonce', 'nonce');
@@ -155,6 +161,8 @@ class CRCM_Payment_Manager {
 
     /**
      * Handle return from Stripe and confirm booking.
+     *
+     * @return void
      */
     public function handle_stripe_return() {
         if (isset($_GET['crcm_stripe_return'], $_GET['booking_id'])) {
@@ -169,7 +177,10 @@ class CRCM_Payment_Manager {
     }
 
     /**
-     * Calculate total booking cost
+     * Calculate total booking cost.
+     *
+     * @param array $booking_data Booking data.
+     * @return mixed
      */
     public function calculate_total_cost($booking_data) {
         $booking_manager = crcm()->booking_manager;
@@ -177,7 +188,9 @@ class CRCM_Payment_Manager {
     }
 
     /**
-     * Get Stripe publishable key
+     * Get Stripe publishable key.
+     *
+     * @return string
      */
     public function get_stripe_publishable_key() {
         return crcm()->get_setting('stripe_publishable_key');

@@ -163,7 +163,10 @@ function crcm_create_custom_user_roles() {
 // Role creation is triggered on plugin activation or through the repair tool.
 
 /**
- * Assign default customer role to new users
+ * Assign default customer role to new users.
+ *
+ * @param int $user_id User ID.
+ * @return void
  */
 function crcm_assign_default_customer_role($user_id) {
     $user = get_user_by('ID', $user_id);
@@ -181,7 +184,10 @@ function crcm_assign_default_customer_role($user_id) {
 add_action('user_register', 'crcm_assign_default_customer_role');
 
 /**
- * Add rental role column to users table
+ * Add rental role column to users table.
+ *
+ * @param array $columns Existing columns.
+ * @return array
  */
 function crcm_add_rental_role_column($columns) {
     $columns['crcm_rental_role'] = __('Rental Role', 'custom-rental-manager');
@@ -190,7 +196,12 @@ function crcm_add_rental_role_column($columns) {
 add_filter('manage_users_columns', 'crcm_add_rental_role_column');
 
 /**
- * Show rental role in users table
+ * Show rental role in users table.
+ *
+ * @param string $value       Current column value.
+ * @param string $column_name Column name.
+ * @param int    $user_id     User ID.
+ * @return string
  */
 function crcm_show_rental_role_column($value, $column_name, $user_id) {
     if ($column_name === 'crcm_rental_role') {
@@ -222,7 +233,10 @@ function crcm_show_rental_role_column($value, $column_name, $user_id) {
 add_action('manage_users_custom_column', 'crcm_show_rental_role_column', 10, 3);
 
 /**
- * Add role filter links to users page
+ * Add role filter links to users page.
+ *
+ * @param array $views Existing views.
+ * @return array
  */
 function crcm_add_role_filter_links($views) {
     $user_counts = count_users();
@@ -255,7 +269,10 @@ function crcm_add_role_filter_links($views) {
 add_filter('views_users', 'crcm_add_role_filter_links');
 
 /**
- * Add rental fields to user profile
+ * Add rental fields to user profile.
+ *
+ * @param WP_User $user User object.
+ * @return void
  */
 function crcm_add_rental_fields_to_profile($user) {
     $user_roles = $user->roles;
@@ -347,7 +364,10 @@ add_action('show_user_profile', 'crcm_add_rental_fields_to_profile');
 add_action('edit_user_profile', 'crcm_add_rental_fields_to_profile');
 
 /**
- * Save rental profile fields
+ * Save rental profile fields.
+ *
+ * @param int $user_id User ID.
+ * @return bool|void
  */
 function crcm_save_rental_profile_fields($user_id) {
     if (!current_user_can('edit_user', $user_id)) {
@@ -369,7 +389,9 @@ add_action('personal_options_update', 'crcm_save_rental_profile_fields');
 add_action('edit_user_profile_update', 'crcm_save_rental_profile_fields');
 
 /**
- * AJAX: Search customers with role filter
+ * AJAX: Search customers with role filter.
+ *
+ * @return void
  */
 function crcm_ajax_search_customers() {
     check_ajax_referer('crcm_admin_nonce', 'nonce');
@@ -416,7 +438,9 @@ function crcm_ajax_search_customers() {
 add_action('wp_ajax_crcm_search_customers', 'crcm_ajax_search_customers');
 
 /**
- * AJAX: Create customer account
+ * AJAX: Create customer account.
+ *
+ * @return void
  */
 function crcm_ajax_create_customer() {
     check_ajax_referer('crcm_admin_nonce', 'nonce');
@@ -471,14 +495,22 @@ add_action('wp_ajax_crcm_create_customer', 'crcm_ajax_create_customer');
 // ===============================================
 
 /**
- * Format price with currency symbol
+ * Format price with currency symbol.
+ *
+ * @param float  $amount          Amount to format.
+ * @param string $currency_symbol Currency symbol.
+ * @return string
  */
 function crcm_format_price($amount, $currency_symbol = '€') {
     return $currency_symbol . number_format($amount, 2);
 }
 
 /**
- * Format date according to settings
+ * Format date according to settings.
+ *
+ * @param string|int $date   Date string or timestamp.
+ * @param string     $format Date format.
+ * @return string
  */
 function crcm_format_date($date, $format = 'd/m/Y') {
     if (empty($date)) {
@@ -490,7 +522,10 @@ function crcm_format_date($date, $format = 'd/m/Y') {
 }
 
 /**
- * Get booking status badge HTML
+ * Get booking status badge HTML.
+ *
+ * @param string $status Booking status.
+ * @return string
  */
 function crcm_get_status_badge($status) {
     $statuses = array(
@@ -513,7 +548,9 @@ function crcm_get_status_badge($status) {
 }
 
 /**
- * OPTIMIZED: Get dashboard statistics without loading all posts
+ * Get dashboard statistics without loading all posts.
+ *
+ * @return array
  */
 function crcm_get_dashboard_stats() {
     global $wpdb;
