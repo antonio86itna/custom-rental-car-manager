@@ -12,10 +12,18 @@ if (!defined('ABSPATH')) {
 }
 
 // Get search parameters
-$pickup_date = isset($_GET['pickup_date']) ? sanitize_text_field($_GET['pickup_date']) : '';
-$return_date = isset($_GET['return_date']) ? sanitize_text_field($_GET['return_date']) : '';
-$pickup_time = isset($_GET['pickup_time']) ? sanitize_text_field($_GET['pickup_time']) : '09:00';
-$return_time = isset($_GET['return_time']) ? sanitize_text_field($_GET['return_time']) : '18:00';
+$pickup_date = ! empty( sanitize_text_field( $_GET['pickup_date'] ?? '' ) )
+    ? sanitize_text_field( $_GET['pickup_date'] )
+    : '';
+$return_date = ! empty( sanitize_text_field( $_GET['return_date'] ?? '' ) )
+    ? sanitize_text_field( $_GET['return_date'] )
+    : '';
+$pickup_time = ! empty( sanitize_text_field( $_GET['pickup_time'] ?? '' ) )
+    ? sanitize_text_field( $_GET['pickup_time'] )
+    : '09:00';
+$return_time = ! empty( sanitize_text_field( $_GET['return_time'] ?? '' ) )
+    ? sanitize_text_field( $_GET['return_time'] )
+    : '18:00';
 
 // Get vehicle types for filtering
 $vehicle_types = crcm_get_vehicle_types();

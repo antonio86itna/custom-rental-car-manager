@@ -12,11 +12,21 @@ if (!defined('ABSPATH')) {
 }
 
 // Get parameters from URL
-$vehicle_id = isset($_GET['vehicle']) ? intval($_GET['vehicle']) : ($atts['vehicle_id'] ?? '');
-$pickup_date = isset($_GET['pickup_date']) ? sanitize_text_field($_GET['pickup_date']) : '';
-$return_date = isset($_GET['return_date']) ? sanitize_text_field($_GET['return_date']) : '';
-$pickup_time = isset($_GET['pickup_time']) ? sanitize_text_field($_GET['pickup_time']) : '09:00';
-$return_time = isset($_GET['return_time']) ? sanitize_text_field($_GET['return_time']) : '18:00';
+$vehicle_id  = ! empty( sanitize_text_field( $_GET['vehicle'] ?? '' ) )
+    ? intval( sanitize_text_field( $_GET['vehicle'] ) )
+    : ( $atts['vehicle_id'] ?? '' );
+$pickup_date = ! empty( sanitize_text_field( $_GET['pickup_date'] ?? '' ) )
+    ? sanitize_text_field( $_GET['pickup_date'] )
+    : '';
+$return_date = ! empty( sanitize_text_field( $_GET['return_date'] ?? '' ) )
+    ? sanitize_text_field( $_GET['return_date'] )
+    : '';
+$pickup_time = ! empty( sanitize_text_field( $_GET['pickup_time'] ?? '' ) )
+    ? sanitize_text_field( $_GET['pickup_time'] )
+    : '09:00';
+$return_time = ! empty( sanitize_text_field( $_GET['return_time'] ?? '' ) )
+    ? sanitize_text_field( $_GET['return_time'] )
+    : '18:00';
 
 $vehicle = null;
 if ($vehicle_id) {
