@@ -399,7 +399,22 @@ class CRCM_Plugin {
         $atts = shortcode_atts(array(
             'style' => 'default',
         ), $atts);
-        
+
+        wp_enqueue_style(
+            'crcm-search-form',
+            CRCM_PLUGIN_URL . 'assets/css/frontend-search-form.css',
+            array(),
+            CRCM_VERSION
+        );
+
+        wp_enqueue_script(
+            'crcm-search-form',
+            CRCM_PLUGIN_URL . 'assets/js/frontend-search-form.js',
+            array('jquery'),
+            CRCM_VERSION,
+            true
+        );
+
         ob_start();
         $template_path = CRCM_PLUGIN_PATH . 'templates/frontend/search-form.php';
         if (file_exists($template_path)) {
@@ -418,7 +433,22 @@ class CRCM_Plugin {
             'type' => '',
             'limit' => 12,
         ), $atts);
-        
+
+        wp_enqueue_style(
+            'crcm-vehicle-list',
+            CRCM_PLUGIN_URL . 'assets/css/frontend-vehicle-list.css',
+            array(),
+            CRCM_VERSION
+        );
+
+        wp_enqueue_script(
+            'crcm-vehicle-list',
+            CRCM_PLUGIN_URL . 'assets/js/frontend-vehicle-list.js',
+            array('jquery'),
+            CRCM_VERSION,
+            true
+        );
+
         ob_start();
         $template_path = CRCM_PLUGIN_PATH . 'templates/frontend/vehicle-list.php';
         if (file_exists($template_path)) {
@@ -436,7 +466,51 @@ class CRCM_Plugin {
         $atts = shortcode_atts(array(
             'vehicle_id' => '',
         ), $atts);
-        
+
+        $vehicle_id   = isset($_GET['vehicle']) ? intval($_GET['vehicle']) : intval($atts['vehicle_id']);
+        $pickup_date  = isset($_GET['pickup_date']) ? sanitize_text_field($_GET['pickup_date']) : '';
+        $return_date  = isset($_GET['return_date']) ? sanitize_text_field($_GET['return_date']) : '';
+        $pricing_data = get_post_meta($vehicle_id, '_crcm_pricing_data', true);
+        $daily_rate   = $pricing_data['daily_rate'] ?? 0;
+        $rental_days  = 1;
+
+        if ($pickup_date && $return_date) {
+            try {
+                $pickup = new DateTime($pickup_date);
+                $return = new DateTime($return_date);
+                $rental_days = max(1, $return->diff($pickup)->days);
+            } catch (Exception $e) {
+                $rental_days = 1;
+            }
+        }
+
+        $currency_symbol = crcm_get_setting('currency_symbol', '€');
+
+        wp_enqueue_style(
+            'crcm-booking-form',
+            CRCM_PLUGIN_URL . 'assets/css/frontend-booking-form.css',
+            array(),
+            CRCM_VERSION
+        );
+
+        wp_enqueue_script(
+            'crcm-booking-form',
+            CRCM_PLUGIN_URL . 'assets/js/frontend-booking-form.js',
+            array('jquery'),
+            CRCM_VERSION,
+            true
+        );
+
+        wp_localize_script(
+            'crcm-booking-form',
+            'crcmBookingData',
+            array(
+                'daily_rate'      => $daily_rate,
+                'rental_days'     => $rental_days,
+                'currency_symbol' => $currency_symbol,
+            )
+        );
+
         ob_start();
         $template_path = CRCM_PLUGIN_PATH . 'templates/frontend/booking-form.php';
         if (file_exists($template_path)) {
@@ -446,7 +520,7 @@ class CRCM_Plugin {
         }
         return ob_get_clean();
     }
-    
+
     /**
      * Customer dashboard shortcode
      */
@@ -455,6 +529,13 @@ class CRCM_Plugin {
             return '<p>' . esc_html__('Please log in to access your dashboard.', 'custom-rental-manager') . '</p>';
         }
         
+        wp_enqueue_style(
+            'crcm-customer-dashboard',
+            CRCM_PLUGIN_URL . 'assets/css/frontend-customer-dashboard.css',
+            array(),
+            CRCM_VERSION
+        );
+
         ob_start();
         $template_path = CRCM_PLUGIN_PATH . 'templates/frontend/customer-dashboard.php';
         if (file_exists($template_path)) {
@@ -538,6 +619,30 @@ class CRCM_Plugin {
                     'nonce'    => wp_create_nonce( 'crcm_admin_nonce' ),
                 )
             );
+        }
+
+        if ( isset( $_GET['page'] ) && 'crcm-dashboard' === $_GET['page'] ) {
+            $dashboard_css = CRCM_PLUGIN_PATH . 'assets/css/admin-dashboard.css';
+            if ( file_exists( $dashboard_css ) ) {
+                wp_enqueue_style(
+                    'crcm-admin-dashboard',
+                    CRCM_PLUGIN_URL . 'assets/css/admin-dashboard.css',
+                    array(),
+                    CRCM_VERSION
+                );
+            }
+        }
+
+        if ( isset( $_GET['page'] ) && 'crcm-calendar' === $_GET['page'] ) {
+            $calendar_css = CRCM_PLUGIN_PATH . 'assets/css/admin-calendar.css';
+            if ( file_exists( $calendar_css ) ) {
+                wp_enqueue_style(
+                    'crcm-admin-calendar',
+                    CRCM_PLUGIN_URL . 'assets/css/admin-calendar.css',
+                    array(),
+                    CRCM_VERSION
+                );
+            }
         }
 
         if ( isset( $_GET['page'] ) && 'crcm-settings' === $_GET['page'] ) {
