@@ -12,8 +12,14 @@ if (!defined('ABSPATH')) {
 }
 
 // Get current month data
-$current_month = isset($_GET['month']) ? intval($_GET['month']) : date('n');
-$current_year = isset($_GET['year']) ? intval($_GET['year']) : date('Y');
+$month_param = sanitize_text_field( $_GET['month'] ?? '' );
+$year_param  = sanitize_text_field( $_GET['year'] ?? '' );
+$current_month = ( current_user_can( 'manage_options' ) && ! empty( $month_param ) )
+    ? intval( $month_param )
+    : intval( date( 'n' ) );
+$current_year  = ( current_user_can( 'manage_options' ) && ! empty( $year_param ) )
+    ? intval( $year_param )
+    : intval( date( 'Y' ) );
 
 $first_day = mktime(0, 0, 0, $current_month, 1, $current_year);
 $days_in_month = date('t', $first_day);

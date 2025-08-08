@@ -229,7 +229,10 @@ function crcm_add_role_filter_links($views) {
     $customer_count = $user_counts['avail_roles']['crcm_customer'] ?? 0;
     $manager_count = $user_counts['avail_roles']['crcm_manager'] ?? 0;
     
-    $current_role = isset($_GET['role']) ? $_GET['role'] : '';
+    $current_role = '';
+    if ( current_user_can( 'manage_options' ) && ! empty( sanitize_text_field( $_GET['role'] ?? '' ) ) ) {
+        $current_role = sanitize_text_field( $_GET['role'] );
+    }
     
     $views['crcm_customer'] = sprintf(
         '<a href="%s" class="%s">%s <span class="count">(%d)</span></a>',
