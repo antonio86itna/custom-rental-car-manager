@@ -105,9 +105,19 @@ class CRCM_Email_Manager {
     }
 
     /**
-     * Send status change notification
+     * Send booking status change notification.
+     *
+     * @param int    $booking_id  Booking ID.
+     * @param string $new_status  New booking status.
+     * @param string $old_status  Previous booking status.
+     *
+     * @return bool Whether the notification was sent.
      */
     public function send_status_change_notification($booking_id, $new_status, $old_status) {
+        if ($new_status === $old_status) {
+            return false;
+        }
+
         $booking = $this->get_booking_data($booking_id);
 
         if (is_wp_error($booking) || empty($booking['customer_data']['email'])) {
@@ -145,6 +155,18 @@ class CRCM_Email_Manager {
 
         if ($switched) {
             restore_previous_locale();
+        }
+
+        if ($sent) {
+            update_post_meta(
+                $booking_id,
+                '_crcm_last_status_email',
+                array(
+                    'old'  => $old_status,
+                    'new'  => $new_status,
+                    'time' => current_time('mysql'),
+                )
+            );
         }
 
         return $sent;
