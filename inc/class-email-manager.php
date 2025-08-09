@@ -173,6 +173,52 @@ class CRCM_Email_Manager {
     }
 
     /**
+     * Send booking updated notification highlighting changes.
+     *
+     * @param int   $booking_id Booking ID.
+     * @param array $changes    List of changed fields.
+     *
+     * @return bool Whether the notification was sent.
+     */
+    public function send_booking_update_notification($booking_id, $changes) {
+        $booking = $this->get_booking_data($booking_id);
+
+        if (is_wp_error($booking) || empty($booking['customer_data']['email'])) {
+            return false;
+        }
+
+        $settings = get_option('crcm_settings', array());
+
+        $switched = $this->maybe_switch_locale($booking_id);
+
+        $subject = sprintf(__('Booking Updated - %s', 'custom-rental-manager'), $booking['booking_number']);
+        $message = $this->get_booking_update_template($booking, $changes, 'customer');
+
+        $headers = array(
+            'Content-Type: text/html; charset=UTF-8',
+        );
+
+        $sent = wp_mail(
+            $booking['customer_data']['email'],
+            $subject,
+            $message,
+            $headers
+        );
+
+        if (!empty($settings['enable_admin_notifications'])) {
+            $admin_email   = !empty($settings['company_email']) ? $settings['company_email'] : get_option('admin_email');
+            $admin_message = $this->get_booking_update_template($booking, $changes, 'admin');
+            wp_mail($admin_email, $subject, $admin_message, $headers);
+        }
+
+        if ($switched) {
+            restore_previous_locale();
+        }
+
+        return $sent;
+    }
+
+    /**
      * Send pickup reminders (24 hours before)
      */
     public function send_pickup_reminders() {
@@ -556,6 +602,23 @@ class CRCM_Email_Manager {
         </html>
         <?php
         return ob_get_clean();
+    }
+
+    /**
+     * Get booking updated email template.
+     *
+     * @param array  $booking  Booking data array.
+     * @param array  $changes  List of changes.
+     * @param string $recipient Recipient type: customer or admin.
+     *
+     * @return string
+     */
+    public function get_booking_update_template($booking, $changes, $recipient = 'customer') {
+        $settings = get_option('crcm_settings', array());
+        $template = !empty($settings['booking_update_template']) ? $settings['booking_update_template'] : 'booking-updated';
+        return $this->render_template($template, $booking, $recipient, array(
+            'changes' => $changes,
+        ));
     }
 
     /**

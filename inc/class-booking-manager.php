@@ -1119,6 +1119,12 @@ class CRCM_Booking_Manager {
 
         foreach ($new_data as $key => $value) {
             $old_value = $old_data[$key] ?? '';
+
+            if (is_array($value)) {
+                $value     = implode(', ', $value);
+                $old_value = is_array($old_value) ? implode(', ', $old_value) : $old_value;
+            }
+
             if ($value !== $old_value) {
                 $changes[$key] = array(
                     'old' => $old_value,
@@ -1128,35 +1134,6 @@ class CRCM_Booking_Manager {
         }
 
         return $changes;
-    }
-
-    /**
-     * Send update email for pending bookings highlighting changes.
-     *
-     * @param int   $booking_id Booking ID.
-     * @param array $changes    Changed fields.
-     *
-     * @return void
-     */
-    private function send_pending_update_email($booking_id, $changes) {
-        $customer = get_post_meta($booking_id, '_crcm_customer_data', true);
-        $email    = sanitize_email($customer['email'] ?? '');
-
-        if (empty($email)) {
-            return;
-        }
-
-        $booking_number = get_post_meta($booking_id, '_crcm_booking_number', true);
-
-        $subject = sprintf(__('Booking Update - %s', 'custom-rental-manager'), $booking_number);
-        $body    = __('The following details of your booking have been updated:', 'custom-rental-manager') . "\n\n";
-
-        foreach ($changes as $field => $data) {
-            $label = ucwords(str_replace('_', ' ', $field));
-            $body .= sprintf('%s: %s → %s', $label, $data['old'], $data['new']) . "\n";
-        }
-
-        wp_mail($email, $subject, $body);
     }
 
     /**
@@ -1184,8 +1161,6 @@ class CRCM_Booking_Manager {
             return;
         }
         
-        $old_status       = get_post_meta($post_id, '_crcm_booking_status', true);
-        $posted_status    = isset($_POST['booking_status']) ? sanitize_text_field($_POST['booking_status']) : $old_status;
         $old_booking_data = get_post_meta($post_id, '_crcm_booking_data', true);
         if (!is_array($old_booking_data)) {
             $old_booking_data = array();
@@ -1200,15 +1175,12 @@ class CRCM_Booking_Manager {
 
             $booking_data = array_merge($old_booking_data, $posted_data);
 
-            if ('pending' === $old_status && 'pending' === $posted_status) {
-                update_post_meta($post_id, '_crcm_prev_booking_data', $old_booking_data);
-                $changes = $this->compare_booking_data($old_booking_data, $booking_data);
-                if (!empty($changes)) {
-                    $this->send_pending_update_email($post_id, $changes);
-                }
-            }
-
             update_post_meta($post_id, '_crcm_booking_data', $booking_data);
+
+            $changes = $this->compare_booking_data($old_booking_data, $booking_data);
+            if (!empty($changes)) {
+                crcm()->email_manager->send_booking_update_notification($post_id, $changes);
+            }
 
             $previous_customer_id = (int) get_post_meta($post_id, '_crcm_customer_user_id', true);
             $customer_user_id = !empty($booking_data['customer_id']) ? (int) $booking_data['customer_id'] : 0;
