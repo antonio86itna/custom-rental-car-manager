@@ -1,22 +1,17 @@
 <?php
 /**
- * Template email cambio stato prenotazione per clienti (IT).
+ * Template email promemoria ritiro per clienti (IT).
  *
- * @var array  $booking
- * @var array  $customer
- * @var string $new_status
+ * @var array $booking
+ * @var array $customer
  */
-$status_messages = array(
-    'confirmed' => __('La tua prenotazione è stata confermata.', 'custom-rental-manager'),
-    'active'    => __('Il tuo noleggio è attivo.', 'custom-rental-manager'),
-    'completed' => __('Il tuo noleggio è terminato.', 'custom-rental-manager'),
-    'cancelled' => __('La tua prenotazione è stata cancellata.', 'custom-rental-manager'),
-);
-$message = $status_messages[$new_status] ?? sprintf(__('Lo stato della tua prenotazione è cambiato in %s.', 'custom-rental-manager'), $new_status);
+$pickup_date = $booking['booking_data']['pickup_date'] ?? '';
+$pickup_time = $booking['booking_data']['pickup_time'] ?? '';
 ?>
 <p><?php printf(__('Caro %s,', 'custom-rental-manager'), esc_html($customer['first_name'])); ?></p>
-<p><?php echo esc_html($message); ?></p>
+<p><?php _e('Ti ricordiamo che il tuo ritiro è imminente.', 'custom-rental-manager'); ?></p>
 <p><strong><?php printf(__('Numero di prenotazione: %s', 'custom-rental-manager'), esc_html($booking['booking_number'])); ?></strong></p>
+<p><?php printf(__('Ritiro: %s alle %s', 'custom-rental-manager'), esc_html($pickup_date), esc_html($pickup_time)); ?></p>
 
 <?php if (! empty($booking['pricing_breakdown']['line_items'])) { ?>
 <table style="width:100%; border-collapse:collapse;">
