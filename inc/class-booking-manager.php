@@ -197,6 +197,7 @@ class CRCM_Booking_Manager {
             'notes'           => sanitize_textarea_field($data['notes'] ?? ''),
         );
         update_post_meta($booking_id, '_crcm_booking_data', $booking_data);
+        update_post_meta($booking_id, '_crcm_delivery_address', $booking_data['delivery_address']);
         update_post_meta($booking_id, '_crcm_customer_data', $customer_data);
 
         $this->update_booking_status($booking_id, 'pending');
@@ -232,6 +233,8 @@ class CRCM_Booking_Manager {
             $booking_data = array();
         }
         $booking_data = array_map('sanitize_text_field', $booking_data);
+        $booking_data['home_delivery']   = !empty($booking_data['home_delivery']);
+        $booking_data['delivery_address'] = sanitize_text_field($booking_data['delivery_address'] ?? get_post_meta($booking_id, '_crcm_delivery_address', true));
         if (isset($booking_data['extras']) && is_array($booking_data['extras'])) {
             $booking_data['extras'] = array_map('sanitize_text_field', $booking_data['extras']);
         }
@@ -411,8 +414,13 @@ class CRCM_Booking_Manager {
                 'pickup_location' => 'ischia_porto',
                 'return_location' => 'ischia_porto',
                 'rental_days' => 1,
+                'home_delivery' => false,
+                'delivery_address' => '',
             );
         }
+
+        $booking_data['home_delivery']   = !empty($booking_data['home_delivery']);
+        $booking_data['delivery_address'] = $booking_data['delivery_address'] ?? '';
         
         // Get available locations from vehicle manager
         if (class_exists('CRCM_Vehicle_Manager')) {
@@ -511,9 +519,41 @@ class CRCM_Booking_Manager {
                         </select>
                     </td>
                 </tr>
+
+                <tr>
+                    <th><label for="home_delivery"><?php _e('Consegna a domicilio', 'custom-rental-manager'); ?></label></th>
+                    <td>
+                        <label>
+                            <input type="checkbox" id="home_delivery" name="booking_data[home_delivery]" <?php checked(!empty($booking_data['home_delivery'])); ?> />
+                            <?php _e('Richiedi consegna a domicilio', 'custom-rental-manager'); ?>
+                        </label>
+                    </td>
+                </tr>
+                <tr id="delivery_address_row" style="<?php echo !empty($booking_data['home_delivery']) ? '' : 'display:none;'; ?>">
+                    <th><label for="delivery_address"><?php _e('Indirizzo di consegna', 'custom-rental-manager'); ?></label></th>
+                    <td>
+                        <input type="text" id="delivery_address" name="booking_data[delivery_address]" value="<?php echo esc_attr($booking_data['delivery_address'] ?? ''); ?>" class="regular-text" />
+                    </td>
+                </tr>
             </table>
         </div>
-        
+
+        <script>
+        jQuery(function($){
+            function toggleDeliveryFields(){
+                if($('#home_delivery').is(':checked')){
+                    $('#pickup_location, #return_location').prop('disabled', true);
+                    $('#delivery_address_row').show();
+                } else {
+                    $('#pickup_location, #return_location').prop('disabled', false);
+                    $('#delivery_address_row').hide();
+                }
+            }
+            $('#home_delivery').on('change', toggleDeliveryFields);
+            toggleDeliveryFields();
+        });
+        </script>
+
         <!-- Hidden field for rental days -->
         <input type="hidden" name="booking_data[rental_days]" value="<?php echo esc_attr($booking_data['rental_days'] ?? 1); ?>" />
         <?php
@@ -812,6 +852,9 @@ class CRCM_Booking_Manager {
             <!-- Pricing Breakdown -->
             <div class="crcm-pricing-breakdown">
                 <h5><?php _e('Riepilogo Prezzi', 'custom-rental-manager'); ?></h5>
+                <?php if (!empty($booking_data['home_delivery']) && !empty($booking_data['delivery_address'])) : ?>
+                    <p><strong><?php _e('Indirizzo di consegna', 'custom-rental-manager'); ?>:</strong> <?php echo esc_html($booking_data['delivery_address']); ?></p>
+                <?php endif; ?>
                 <table class="crcm-pricing-table">
                     <tbody id="pricing-breakdown-content">
                         <?php if (!empty($pricing_breakdown['line_items'])) : ?>
@@ -1169,13 +1212,22 @@ class CRCM_Booking_Manager {
         // Save booking data
         if (isset($_POST['booking_data'])) {
             $posted_data = array();
-            foreach ($_POST['booking_data'] as $key => $value) {
+            $raw_data    = $_POST['booking_data'];
+
+            $posted_data['home_delivery']   = !empty($raw_data['home_delivery']) ? '1' : '';
+            $posted_data['delivery_address'] = sanitize_text_field($raw_data['delivery_address'] ?? '');
+
+            foreach ($raw_data as $key => $value) {
+                if (in_array($key, array('home_delivery', 'delivery_address'), true)) {
+                    continue;
+                }
                 $posted_data[$key] = sanitize_text_field($value);
             }
 
             $booking_data = array_merge($old_booking_data, $posted_data);
 
             update_post_meta($post_id, '_crcm_booking_data', $booking_data);
+            update_post_meta($post_id, '_crcm_delivery_address', $posted_data['delivery_address']);
 
             $changes = $this->compare_booking_data($old_booking_data, $booking_data);
             if (!empty($changes)) {

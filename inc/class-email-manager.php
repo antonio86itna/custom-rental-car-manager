@@ -364,6 +364,10 @@ class CRCM_Email_Manager {
                         <p><strong><?php _e('Return Location:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($return_location); ?></p>
                         <?php endif; ?>
 
+                        <?php if (!empty($booking['booking_data']['home_delivery']) && !empty($booking['booking_data']['delivery_address'])) : ?>
+                        <p><strong><?php _e('Delivery Address:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($booking['booking_data']['delivery_address']); ?></p>
+                        <?php endif; ?>
+
                         <p><strong><?php _e('Insurance:', 'custom-rental-manager'); ?></strong> <?php echo esc_html(ucfirst($booking['booking_data']['insurance_type'])); ?></p>
 
                         <?php if (!empty($booking['booking_data']['extras'])): ?>
@@ -493,6 +497,9 @@ class CRCM_Email_Manager {
                     <p><strong><?php _e('Vehicle:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($vehicle_name); ?></p>
                     <p><strong><?php _e('Pickup:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($booking['booking_data']['pickup_date']); ?> <?php echo esc_html($booking['booking_data']['pickup_time']); ?></p>
                     <p><strong><?php _e('Return:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($booking['booking_data']['return_date']); ?> <?php echo esc_html($booking['booking_data']['return_time']); ?></p>
+                    <?php if (!empty($booking['booking_data']['home_delivery']) && !empty($booking['booking_data']['delivery_address'])) : ?>
+                    <p><strong><?php _e('Delivery Address:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($booking['booking_data']['delivery_address']); ?></p>
+                    <?php endif; ?>
                     <p style="font-size: 18px; font-weight: bold; color: #2563eb;">
                         <strong><?php _e('Total Amount:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($currency_symbol . number_format($total_amount, 2)); ?>
                     </p>
@@ -585,6 +592,9 @@ class CRCM_Email_Manager {
                         <p><strong><?php printf(__('Booking Number: %s', 'custom-rental-manager'), $booking['booking_number']); ?></strong></p>
                         <p><strong><?php printf(__('Vehicle: %s', 'custom-rental-manager'), $vehicle_name); ?></strong></p>
                         <p><strong><?php printf(__('Status: %s', 'custom-rental-manager'), ucfirst($new_status)); ?></strong></p>
+                        <?php if (!empty($booking['booking_data']['home_delivery']) && !empty($booking['booking_data']['delivery_address'])) : ?>
+                        <p><strong><?php _e('Delivery Address:', 'custom-rental-manager'); ?></strong> <?php echo esc_html($booking['booking_data']['delivery_address']); ?></p>
+                        <?php endif; ?>
                     </div>
 
                     <p><?php _e('If you have any questions, please do not hesitate to contact us.', 'custom-rental-manager'); ?></p>
