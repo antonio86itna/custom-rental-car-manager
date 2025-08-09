@@ -40,10 +40,10 @@ class CRCM_Booking_Manager {
         add_filter('manage_crcm_booking_posts_columns', array($this, 'booking_columns'));
         add_action('manage_crcm_booking_posts_custom_column', array($this, 'booking_column_content'), 10, 2);
 
-        // Daily status check scheduler
-        add_action('crcm_daily_status_check', array($this, 'process_scheduled_statuses'));
-        if (!wp_next_scheduled('crcm_daily_status_check')) {
-            wp_schedule_event(time(), 'daily', 'crcm_daily_status_check');
+        // Booking status scheduler
+        add_action('crcm_booking_status_check', array($this, 'process_scheduled_statuses'));
+        if (!wp_next_scheduled('crcm_booking_status_check')) {
+            wp_schedule_event(time(), 'hourly', 'crcm_booking_status_check');
         }
 
     }
@@ -67,7 +67,7 @@ class CRCM_Booking_Manager {
                 'meta_query'     => array(
                     array(
                         'key'     => '_crcm_booking_status',
-                        'value'   => array('confirmed', 'active'),
+                        'value'   => array('pending', 'confirmed', 'active'),
                         'compare' => 'IN',
                     ),
                 ),
@@ -87,13 +87,43 @@ class CRCM_Booking_Manager {
             $return_time = strtotime(($data['return_date'] ?? '') . ' ' . ($data['return_time'] ?? ''));
 
             if ('confirmed' === $status && $pickup_time && $pickup_time <= $now) {
-                update_post_meta($booking_id, '_crcm_booking_status', 'active');
-                do_action('crcm_booking_status_changed', $booking_id, 'active', 'confirmed');
+                $this->update_booking_status($booking_id, 'active');
             } elseif ('active' === $status && $return_time && $return_time <= $now) {
-                update_post_meta($booking_id, '_crcm_booking_status', 'completed');
-                do_action('crcm_booking_status_changed', $booking_id, 'completed', 'active');
+                $this->update_booking_status($booking_id, 'completed');
+            } elseif ('pending' === $status && $pickup_time && $pickup_time <= $now) {
+                $this->update_booking_status($booking_id, 'cancelled');
             }
         }
+    }
+
+    /**
+     * Update booking status and log the transition.
+     *
+     * @param int    $booking_id Booking ID.
+     * @param string $new_status New status slug.
+     *
+     * @return void
+     */
+    protected function update_booking_status($booking_id, $new_status) {
+        $old_status = get_post_meta($booking_id, '_crcm_booking_status', true);
+
+        if ($old_status === $new_status) {
+            return;
+        }
+
+        update_post_meta(
+            $booking_id,
+            '_crcm_last_status_change',
+            array(
+                'old'  => $old_status,
+                'new'  => $new_status,
+                'time' => current_time('mysql'),
+            )
+        );
+
+        update_post_meta($booking_id, '_crcm_booking_status', $new_status);
+
+        do_action('crcm_booking_status_changed', $booking_id, $new_status, $old_status);
     }
 
     /**
@@ -167,9 +197,7 @@ class CRCM_Booking_Manager {
         update_post_meta($booking_id, '_crcm_booking_data', $booking_data);
         update_post_meta($booking_id, '_crcm_customer_data', $customer_data);
 
-        $old_status = get_post_meta($booking_id, '_crcm_booking_status', true);
-        update_post_meta($booking_id, '_crcm_booking_status', 'pending');
-        do_action('crcm_booking_status_changed', $booking_id, 'pending', $old_status);
+        $this->update_booking_status($booking_id, 'pending');
 
         return array(
             'booking_id'     => $booking_id,
@@ -1086,10 +1114,9 @@ class CRCM_Booking_Manager {
         
         // Save booking status
         if (isset($_POST['booking_status'])) {
-            $old_status = get_post_meta($post_id, '_crcm_booking_status', true);
             $new_status = sanitize_text_field($_POST['booking_status']);
-            update_post_meta($post_id, '_crcm_booking_status', $new_status);
-            do_action('crcm_booking_status_changed', $post_id, $new_status, $old_status);
+            $old_status = get_post_meta($post_id, '_crcm_booking_status', true);
+            $this->update_booking_status($post_id, $new_status);
             if (empty($old_status) && 'pending' === $new_status) {
                 do_action('crcm_booking_created', $post_id);
             }
