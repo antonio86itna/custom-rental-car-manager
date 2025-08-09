@@ -51,6 +51,8 @@ $user_bookings = get_posts(array(
                     $payment_data    = get_post_meta($booking->ID, '_crcm_payment_data', true);
                     $payment_status  = $payment_data['payment_status'] ?? '';
                     $vehicle         = get_post($booking_data['vehicle_id']);
+                    $pricing_breakdown = get_post_meta($booking->ID, '_crcm_pricing_breakdown', true);
+                    $currency_symbol  = crcm_get_setting('currency_symbol', '€');
                 ?>
                     <div class="crcm-booking-item">
                         <div class="crcm-booking-header">
@@ -60,11 +62,25 @@ $user_bookings = get_posts(array(
 
                         <div class="crcm-booking-details">
                             <p><strong><?php _e('Vehicle:', 'custom-rental-manager'); ?></strong> <?php echo $vehicle ? esc_html($vehicle->post_title) : __('Unknown', 'custom-rental-manager'); ?></p>
-                            <p><strong><?php _e('Dates:', 'custom-rental-manager'); ?></strong> 
-                                <?php echo esc_html(crcm_format_date($booking_data['pickup_date'])); ?> - 
+                            <p><strong><?php _e('Dates:', 'custom-rental-manager'); ?></strong>
+                                <?php echo esc_html(crcm_format_date($booking_data['pickup_date'])); ?> -
                                 <?php echo esc_html(crcm_format_date($booking_data['return_date'])); ?>
                             </p>
                             <p><strong><?php _e('Booked:', 'custom-rental-manager'); ?></strong> <?php echo esc_html(crcm_format_date($booking->post_date)); ?></p>
+                            <?php if (!empty($pricing_breakdown['line_items'])) : ?>
+                                <ul class="crcm-price-details">
+                                    <?php foreach ($pricing_breakdown['line_items'] as $item) : ?>
+                                        <?php
+                                        $label  = crcm_format_line_item_label($item, $currency_symbol);
+                                        $amount = crcm_format_price((float) ($item['amount'] ?? 0), $currency_symbol);
+                                        ?>
+                                        <li><?php echo $label; ?> - <?php echo $amount; ?></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                                <?php if (!empty($pricing_breakdown['final_total'])) : ?>
+                                    <p><strong><?php _e('Totale:', 'custom-rental-manager'); ?></strong> <?php echo crcm_format_price((float) $pricing_breakdown['final_total'], $currency_symbol); ?></p>
+                                <?php endif; ?>
+                            <?php endif; ?>
                         </div>
 
                         <?php if ($booking_status === 'pending' || $booking_status === 'confirmed'): ?>

@@ -337,14 +337,14 @@ class CRCM_Email_Manager {
                             <tbody>
                                 <?php foreach ($booking['pricing_breakdown']['line_items'] as $item): ?>
                                     <?php
-                                    $name   = esc_html($item['name'] ?? '');
                                     $qty    = intval($item['qty'] ?? 0);
                                     $amount = floatval($item['amount'] ?? 0);
                                     $free   = !empty($item['free']);
+                                    $label  = crcm_format_line_item_label($item, $currency_symbol);
                                     $amount_display = $free ? __('Free', 'custom-rental-manager') : $currency_symbol . number_format($amount, 2);
                                     ?>
                                     <tr>
-                                        <td><?php echo $name; ?><?php if ($free) : ?> (<?php _e('Included', 'custom-rental-manager'); ?>)<?php endif; ?></td>
+                                        <td><?php echo $label; ?><?php if ($free) : ?> (<?php _e('Included', 'custom-rental-manager'); ?>)<?php endif; ?></td>
                                         <td align="right"><?php echo esc_html($qty); ?></td>
                                         <td align="right"><?php echo esc_html($amount_display); ?></td>
                                     </tr>

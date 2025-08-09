@@ -506,6 +506,44 @@ function crcm_format_price($amount, $currency_symbol = '€') {
 }
 
 /**
+ * Format a pricing line item label for display.
+ *
+ * Adds daily or flat rate indicators and separates base and extra rates.
+ *
+ * @param array  $item            Line item data.
+ * @param string $currency_symbol Currency symbol.
+ * @return string
+ */
+function crcm_format_line_item_label($item, $currency_symbol = '€') {
+    $type       = isset($item['type']) ? $item['type'] : 'flat';
+    $base_rate  = isset($item['base_rate']) ? floatval($item['base_rate']) : 0;
+    $extra_rate = isset($item['extra_rate']) ? floatval($item['extra_rate']) : 0;
+    $name       = sanitize_text_field($item['name'] ?? '');
+
+    if ($extra_rate > 0) {
+        $label  = sprintf(
+            __('Tariffa base %s/giorno', 'custom-rental-manager'),
+            crcm_format_price($base_rate, $currency_symbol)
+        );
+        $label .= '<br>' . sprintf(
+            __('Tariffa aggiuntiva %s/giorno', 'custom-rental-manager'),
+            crcm_format_price($extra_rate, $currency_symbol)
+        );
+        return $label;
+    }
+
+    if ('daily' === $type) {
+        return sprintf(
+            '%s %s/giorno',
+            esc_html($name),
+            crcm_format_price($base_rate, $currency_symbol)
+        );
+    }
+
+    return esc_html($name);
+}
+
+/**
  * Format date according to settings.
  *
  * @param string|int $date   Date string or timestamp.
