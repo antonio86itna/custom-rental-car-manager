@@ -19,15 +19,16 @@
         </tr>
     </thead>
     <tbody>
-    <?php foreach ($booking['pricing_breakdown']['line_items'] as $item) { ?>
-        <?php
-        $name          = esc_html($item['name'] ?? '');
+    <?php
+    $currency_symbol = crcm_get_setting('currency_symbol', '€');
+    foreach ($booking['pricing_breakdown']['line_items'] as $item) {
         $amount        = floatval($item['amount'] ?? 0);
         $free          = ! empty($item['free']);
-        $amount_display = $free ? __('Free', 'custom-rental-manager') : '€' . number_format($amount, 2);
+        $label         = crcm_format_line_item_label($item, $currency_symbol);
+        $amount_display = $free ? __('Free', 'custom-rental-manager') : crcm_format_price($amount, $currency_symbol);
         ?>
         <tr>
-            <td><?php echo $name; ?><?php if ($free) { ?> (<?php _e('Included', 'custom-rental-manager'); ?>)<?php } ?></td>
+            <td><?php echo $label; ?><?php if ($free) { ?> (<?php _e('Included', 'custom-rental-manager'); ?>)<?php } ?></td>
             <td align="right"><?php echo esc_html($amount_display); ?></td>
         </tr>
     <?php }
@@ -38,10 +39,11 @@
 ?>
 
 <?php
-$total_amount = $booking['pricing_breakdown']['final_total'] ?? 0;
+$total_amount   = $booking['pricing_breakdown']['final_total'] ?? 0;
+$currency_symbol = crcm_get_setting('currency_symbol', '€');
 ?>
 <p style="font-weight:bold; margin-top:15px;">
-    <?php printf(__('Total: %s', 'custom-rental-manager'), '€' . number_format((float) $total_amount, 2)); ?>
+    <?php printf(__('Total: %s', 'custom-rental-manager'), crcm_format_price((float) $total_amount, $currency_symbol)); ?>
 </p>
 
 <?php if ('pending' === $booking['status']) { ?>

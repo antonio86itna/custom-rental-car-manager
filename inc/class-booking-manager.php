@@ -254,10 +254,13 @@ class CRCM_Booking_Manager {
             $clean_items = array();
             foreach ($pricing['line_items'] as $item) {
                 $clean_items[] = array(
-                    'name'   => sanitize_text_field($item['name'] ?? ''),
-                    'qty'    => intval($item['qty'] ?? 0),
-                    'amount' => floatval($item['amount'] ?? 0),
-                    'free'   => !empty($item['free']),
+                    'name'       => sanitize_text_field($item['name'] ?? ''),
+                    'qty'        => intval($item['qty'] ?? 0),
+                    'amount'     => floatval($item['amount'] ?? 0),
+                    'free'       => !empty($item['free']),
+                    'type'       => in_array($item['type'] ?? 'flat', array('daily', 'flat'), true) ? $item['type'] : 'flat',
+                    'base_rate'  => floatval($item['base_rate'] ?? 0),
+                    'extra_rate' => floatval($item['extra_rate'] ?? 0),
                 );
             }
             $pricing['line_items'] = $clean_items;
@@ -273,6 +276,59 @@ class CRCM_Booking_Manager {
             'booking_data'      => $booking_data,
             'pricing_breakdown' => $pricing,
             'customer_data'     => $customer_data,
+        );
+    }
+
+    /**
+     * Calculate booking pricing breakdown.
+     *
+     * @param array $data Booking data.
+     * @return array
+     */
+    public function calculate_booking_pricing($data) {
+        $vehicle_id  = intval($data['vehicle_id'] ?? 0);
+        $pickup_date = sanitize_text_field($data['pickup_date'] ?? '');
+        $return_date = sanitize_text_field($data['return_date'] ?? '');
+        $pickup_time = sanitize_text_field($data['pickup_time'] ?? '');
+        $return_time = sanitize_text_field($data['return_time'] ?? '');
+
+        if (!$vehicle_id || !$pickup_date || !$return_date) {
+            return array();
+        }
+
+        $rental_days = crcm_calculate_rental_days($pickup_date, $return_date, $pickup_time, $return_time, $vehicle_id);
+
+        $pricing_data = get_post_meta($vehicle_id, '_crcm_pricing_data', true);
+        $daily_rate   = floatval($pricing_data['daily_rate'] ?? 0);
+
+        $end_date = new DateTime($pickup_date);
+        $end_date->add(new DateInterval('P' . $rental_days . 'D'));
+
+        $base_total          = crcm_calculate_vehicle_pricing($vehicle_id, $pickup_date, $end_date->format('Y-m-d'));
+        $base_without_extra  = $daily_rate * $rental_days;
+        $extra_daily         = $rental_days > 0 ? max(0, ($base_total - $base_without_extra) / $rental_days) : 0;
+
+        $line_items = array(
+            array(
+                'name'       => __('Noleggio', 'custom-rental-manager'),
+                'qty'        => $rental_days,
+                'amount'     => $base_total,
+                'free'       => false,
+                'type'       => 'daily',
+                'base_rate'  => $daily_rate,
+                'extra_rate' => $extra_daily,
+            ),
+        );
+
+        return array(
+            'base_total'      => $base_total,
+            'extras_total'    => 0,
+            'insurance_total' => 0,
+            'tax_total'       => 0,
+            'manual_discount' => 0,
+            'discount_reason' => '',
+            'final_total'     => $base_total,
+            'line_items'      => $line_items,
         );
     }
 
@@ -686,6 +742,7 @@ class CRCM_Booking_Manager {
     public function pricing_meta_box($post) {
         $booking_data = get_post_meta($post->ID, '_crcm_booking_data', true);
         $pricing_breakdown = get_post_meta($post->ID, '_crcm_pricing_breakdown', true);
+        $currency_symbol = crcm_get_setting('currency_symbol', '€');
         
         // Default values
         if (empty($pricing_breakdown)) {
@@ -759,22 +816,25 @@ class CRCM_Booking_Manager {
                             <?php foreach ($pricing_breakdown['line_items'] as $item) : ?>
                                 <tr class="pricing-row line-item">
                                     <td>
-                                        <?php echo esc_html($item['name']); ?>
-                                        <?php if (!empty($item['free'])) : ?>
-                                            (<?php _e('Incluso', 'custom-rental-manager'); ?>)
-                                        <?php endif; ?>
+                                        <?php
+                                        $label = crcm_format_line_item_label($item, $currency_symbol);
+                                        echo $label;
+                                        if (!empty($item['free'])) :
+                                            ?> (<?php _e('Incluso', 'custom-rental-manager'); ?>)<?php
+                                        endif;
+                                        ?>
                                     </td>
-                                    <td class="price-cell">€<span><?php echo esc_html(number_format((float) ($item['amount'] ?? 0), 2)); ?></span></td>
+                                    <td class="price-cell"><?php echo esc_html($currency_symbol); ?><span><?php echo esc_html(number_format((float) ($item['amount'] ?? 0), 2)); ?></span></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
                         <tr class="pricing-row discount-row" style="<?php echo (!empty($pricing_breakdown['manual_discount']) ? '' : 'display: none;'); ?>">
                             <td><?php _e('Sconto applicato', 'custom-rental-manager'); ?></td>
-                            <td class="price-cell discount">-€<span id="discount-total"><?php echo esc_html(number_format((float) ($pricing_breakdown['manual_discount'] ?? 0), 2)); ?></span></td>
+                            <td class="price-cell discount">-<?php echo esc_html($currency_symbol); ?><span id="discount-total"><?php echo esc_html(number_format((float) ($pricing_breakdown['manual_discount'] ?? 0), 2)); ?></span></td>
                         </tr>
                         <tr class="pricing-row total-row">
                             <td><strong><?php _e('TOTALE', 'custom-rental-manager'); ?></strong></td>
-                            <td class="price-cell"><strong>€<span id="final-total"><?php echo esc_html(number_format((float) ($pricing_breakdown['final_total'] ?? 0), 2)); ?></span></strong></td>
+                            <td class="price-cell"><strong><?php echo esc_html($currency_symbol); ?><span id="final-total"><?php echo esc_html(number_format((float) ($pricing_breakdown['final_total'] ?? 0), 2)); ?></span></strong></td>
                         </tr>
                     </tbody>
                 </table>
@@ -1096,10 +1156,13 @@ class CRCM_Booking_Manager {
                     if (is_array($items)) {
                         foreach ($items as $item) {
                             $pricing_breakdown['line_items'][] = array(
-                                'name'   => sanitize_text_field($item['name'] ?? ''),
-                                'qty'    => intval($item['qty'] ?? 0),
-                                'amount' => floatval($item['amount'] ?? 0),
-                                'free'   => !empty($item['free']),
+                                'name'       => sanitize_text_field($item['name'] ?? ''),
+                                'qty'        => intval($item['qty'] ?? 0),
+                                'amount'     => floatval($item['amount'] ?? 0),
+                                'free'       => !empty($item['free']),
+                                'type'       => in_array($item['type'] ?? 'flat', array('daily', 'flat'), true) ? $item['type'] : 'flat',
+                                'base_rate'  => floatval($item['base_rate'] ?? 0),
+                                'extra_rate' => floatval($item['extra_rate'] ?? 0),
                             );
                         }
                     }

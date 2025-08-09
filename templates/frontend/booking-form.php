@@ -62,7 +62,11 @@ $extras = array(
 );
 
 // Calculate base price
-$base_total = $daily_rate * $rental_days;
+$end_date = new DateTime($pickup_date ?: date('Y-m-d'));
+$end_date->add(new DateInterval('P' . $rental_days . 'D'));
+$base_total_calc = crcm_calculate_vehicle_pricing($vehicle_id, $pickup_date, $end_date->format('Y-m-d'));
+$extra_daily_rate = $rental_days > 0 ? max(0, ($base_total_calc - ($daily_rate * $rental_days)) / $rental_days) : 0;
+$base_total = $base_total_calc;
 ?>
 
 <div class="crcm-booking-container">
@@ -436,10 +440,16 @@ $base_total = $daily_rate * $rental_days;
                     <h4><?php _e('Costi', 'custom-rental-manager'); ?></h4>
                     <div class="crcm-pricing-breakdown">
                         <div class="crcm-price-item">
-                            <span><?php _e('Noleggio base', 'custom-rental-manager'); ?> (<?php echo $rental_days; ?> <?php _e('giorni', 'custom-rental-manager'); ?>)</span>
-                            <span id="base-price"><?php echo crcm_format_price($base_total, $currency_symbol); ?></span>
+                            <span><?php _e('Tariffa base', 'custom-rental-manager'); ?> <?php echo crcm_format_price($daily_rate, $currency_symbol); ?>/<?php _e('giorno', 'custom-rental-manager'); ?></span>
+                            <span id="base-price"><?php echo crcm_format_price($daily_rate * $rental_days, $currency_symbol); ?></span>
                         </div>
-                        
+                        <?php if ($extra_daily_rate > 0) : ?>
+                        <div class="crcm-price-item">
+                            <span><?php _e('Tariffa aggiuntiva', 'custom-rental-manager'); ?> <?php echo crcm_format_price($extra_daily_rate, $currency_symbol); ?>/<?php _e('giorno', 'custom-rental-manager'); ?></span>
+                            <span id="extra-price"><?php echo crcm_format_price($extra_daily_rate * $rental_days, $currency_symbol); ?></span>
+                        </div>
+                        <?php endif; ?>
+
                         <div id="extras-pricing" class="crcm-extras-pricing">
                             <!-- Extras will be added here by JavaScript -->
                         </div>
