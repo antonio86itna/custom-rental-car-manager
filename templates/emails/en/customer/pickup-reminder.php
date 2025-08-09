@@ -1,14 +1,17 @@
 <?php
 /**
- * Booking confirmation email template for customers (EN).
+ * Pickup reminder email template for customers (EN).
  *
  * @var array $booking
  * @var array $customer
  */
+$pickup_date = $booking['booking_data']['pickup_date'] ?? '';
+$pickup_time = $booking['booking_data']['pickup_time'] ?? '';
 ?>
 <p><?php printf(__('Dear %s,', 'custom-rental-manager'), esc_html($customer['first_name'])); ?></p>
-<p><?php _e('Thank you for your booking!', 'custom-rental-manager'); ?></p>
+<p><?php _e('This is a friendly reminder that your rental pickup is approaching.', 'custom-rental-manager'); ?></p>
 <p><strong><?php printf(__('Booking Number: %s', 'custom-rental-manager'), esc_html($booking['booking_number'])); ?></strong></p>
+<p><?php printf(__('Pickup: %s at %s', 'custom-rental-manager'), esc_html($pickup_date), esc_html($pickup_time)); ?></p>
 
 <?php if (! empty($booking['pricing_breakdown']['line_items'])) { ?>
 <table style="width:100%; border-collapse:collapse;">
@@ -30,12 +33,10 @@
             <td><?php echo $name; ?><?php if ($free) { ?> (<?php _e('Included', 'custom-rental-manager'); ?>)<?php } ?></td>
             <td align="right"><?php echo esc_html($amount_display); ?></td>
         </tr>
-    <?php }
-    ?>
+    <?php } ?>
     </tbody>
 </table>
-<?php }
-?>
+<?php } ?>
 
 <?php
 $total_amount = $booking['pricing_breakdown']['final_total'] ?? 0;
@@ -46,5 +47,4 @@ $total_amount = $booking['pricing_breakdown']['final_total'] ?? 0;
 
 <?php if ('pending' === $booking['status']) { ?>
 <p><?php _e('Please complete your booking by clicking the button below.', 'custom-rental-manager'); ?></p>
-<?php }
-?>
+<?php } ?>

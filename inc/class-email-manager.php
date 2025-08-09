@@ -450,68 +450,9 @@ class CRCM_Email_Manager {
      * Get pickup reminder email template
      */
     public function get_pickup_reminder_template($booking) {
-        $vehicle = get_post($booking['booking_data']['vehicle_id']);
-        $vehicle_name = $vehicle ? $vehicle->post_title : __('Unknown Vehicle', 'custom-rental-manager');
-
-        $pickup_location = '';
-        if ($booking['booking_data']['pickup_location']) {
-            $pickup_term = get_term($booking['booking_data']['pickup_location']);
-            $pickup_location = $pickup_term ? $pickup_term->name : '';
-        }
-
-        $company_name = 'Costabilerent';
-
-        ob_start();
-        ?>
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title><?php echo esc_html__('Pickup Reminder', 'custom-rental-manager'); ?></title>
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px;">
-            <div style="max-width: 600px; margin: 0 auto;">
-                <div style="background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
-                    <h1><?php echo esc_html($company_name); ?></h1>
-                    <h2><?php echo esc_html__('Pickup Reminder', 'custom-rental-manager'); ?></h2>
-                </div>
-
-                <div style="background: #fff; padding: 30px; border: 1px solid #e2e8f0; border-top: none;">
-                    <p><?php printf(__('Dear %s,', 'custom-rental-manager'), esc_html($booking['customer_data']['first_name'])); ?></p>
-
-                    <div style="background: #f0fdf4; border: 2px solid #059669; padding: 20px; border-radius: 6px; margin: 20px 0; text-align: center;">
-                        <h3><?php _e('Your rental is tomorrow!', 'custom-rental-manager'); ?></h3>
-                        <p><strong><?php printf(__('Booking Number: %s', 'custom-rental-manager'), $booking['booking_number']); ?></strong></p>
-                        <p><strong><?php printf(__('Vehicle: %s', 'custom-rental-manager'), $vehicle_name); ?></strong></p>
-                        <p><strong><?php printf(__('Pickup: %s at %s', 'custom-rental-manager'), $booking['booking_data']['pickup_date'], $booking['booking_data']['pickup_time']); ?></strong></p>
-                        <?php if ($pickup_location): ?>
-                        <p><strong><?php printf(__('Location: %s', 'custom-rental-manager'), $pickup_location); ?></strong></p>
-                        <?php endif; ?>
-                    </div>
-
-                    <h3><?php _e('Pickup Checklist', 'custom-rental-manager'); ?></h3>
-                    <ul>
-                        <li><?php _e('Valid driving license', 'custom-rental-manager'); ?></li>
-                        <li><?php _e('ID document (passport or national ID)', 'custom-rental-manager'); ?></li>
-                        <li><?php _e('Credit card for security deposit', 'custom-rental-manager'); ?></li>
-                    </ul>
-
-                    <p><?php _e('We look forward to serving you tomorrow!', 'custom-rental-manager'); ?></p>
-                </div>
-
-                <div style="background: #f1f5f9; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 14px; color: #64748b;">
-                    <p><strong><?php echo esc_html($company_name); ?></strong></p>
-                    <p><?php _e('Ischia, Italy', 'custom-rental-manager'); ?></p>
-                    <p style="margin-top: 20px; font-size: 12px; color: #94a3b8;">
-                        <?php printf(__('Powered by %s', 'custom-rental-manager'), '<a href="https://totaliweb.com" style="color: #059669;">Totaliweb</a>'); ?>
-                    </p>
-                </div>
-            </div>
-        </body>
-        </html>
-        <?php
-        return ob_get_clean();
+        $settings = get_option('crcm_settings', array());
+        $template = !empty($settings['pickup_reminder_template']) ? $settings['pickup_reminder_template'] : 'pickup-reminder';
+        return $this->render_template($template, $booking);
     }
 
     /**
@@ -601,10 +542,19 @@ class CRCM_Email_Manager {
      * @return string
      */
     private function render_template($template, $booking, $recipient = 'customer', $args = array()) {
-        $language = $this->get_customer_language($booking['booking_id']);
-        $path     = CRCM_PLUGIN_PATH . 'templates/emails/' . $language . '/' . $recipient . '/' . $template . '.php';
-        if (!file_exists($path)) {
-            $path = CRCM_PLUGIN_PATH . 'templates/emails/en/' . $recipient . '/' . $template . '.php';
+        $language      = $this->get_customer_language($booking['booking_id']);
+        $template_file = CRCM_PLUGIN_PATH . 'templates/emails/' . $language . '/' . $recipient . '/' . $template . '.php';
+        if (!file_exists($template_file)) {
+            $template_file = CRCM_PLUGIN_PATH . 'templates/emails/en/' . $recipient . '/' . $template . '.php';
+        }
+
+        $customer       = $booking['customer_data'];
+        $payment_button = '';
+        if ('pending' === $booking['status']) {
+            $payment_url = crcm()->payment_manager->get_checkout_url($booking['booking_id']);
+            if ($payment_url) {
+                $payment_button = '<a href="' . esc_url($payment_url) . '" style="display:inline-block;padding:10px 20px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:4px;">' . esc_html__('Pay Now', 'custom-rental-manager') . '</a>';
+            }
         }
 
         if (!empty($args)) {
@@ -612,7 +562,7 @@ class CRCM_Email_Manager {
         }
 
         ob_start();
-        include $path;
+        include CRCM_PLUGIN_PATH . 'templates/emails/base.php';
         return ob_get_clean();
     }
 
