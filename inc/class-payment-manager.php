@@ -1,14 +1,16 @@
 <?php
 /**
  * Payment Manager Class
- * 
+ *
  * Handles Stripe integration, payment processing,
  * refunds, and payment status management.
- * 
+ *
  * @package CustomRentalCarManager
  * @author Totaliweb
  * @since 1.0.0
  */
+
+use Stripe\StripeClient;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -26,6 +28,49 @@ class CRCM_Payment_Manager {
         add_action('wp_ajax_nopriv_crcm_process_payment', array($this, 'process_payment'));
         add_action('wp_ajax_crcm_process_refund', array($this, 'process_refund'));
         add_action('init', array($this, 'handle_stripe_return'));
+    }
+
+    /**
+     * Get Stripe client instance.
+     *
+     * @return \Stripe\StripeClient|null
+     */
+    private function get_stripe_client() {
+        $secret_key = crcm()->get_setting('stripe_secret_key');
+        if (empty($secret_key)) {
+            return null;
+        }
+
+        return new StripeClient($secret_key);
+    }
+
+    /**
+     * Retrieve or create Stripe customer for a user.
+     *
+     * @param \Stripe\StripeClient $client  Stripe client.
+     * @param int                   $user_id WordPress user ID.
+     *
+     * @return string Stripe customer ID.
+     */
+    private function get_or_create_customer($client, $user_id) {
+        $customer_id = get_user_meta($user_id, '_crcm_stripe_customer_id', true);
+        if ($customer_id) {
+            return $customer_id;
+        }
+
+        $user = get_userdata($user_id);
+        if (!$user) {
+            return '';
+        }
+
+        $customer = $client->customers->create(array(
+            'email' => $user->user_email,
+            'name'  => $user->display_name,
+        ));
+
+        update_user_meta($user_id, '_crcm_stripe_customer_id', $customer->id);
+
+        return $customer->id;
     }
 
     /**
@@ -139,24 +184,64 @@ class CRCM_Payment_Manager {
      * @return string
      */
     public function get_checkout_url($booking_id) {
-        $success_url = add_query_arg(
-            array(
-                'crcm_stripe_return' => 1,
-                'booking_id'        => $booking_id,
-            ),
-            home_url('/customer-dashboard/')
-        );
+        $client = $this->get_stripe_client();
+        if (!$client) {
+            return '';
+        }
 
-        $cancel_url = home_url('/customer-dashboard/');
+        $booking = crcm()->booking_manager->get_booking($booking_id);
+        if (is_wp_error($booking)) {
+            return '';
+        }
 
-        // Normally a Stripe Checkout session would be created here.
-        return add_query_arg(
-            array(
-                'success_url' => rawurlencode($success_url),
-                'cancel_url'  => rawurlencode($cancel_url),
-            ),
-            'https://example.com/stripe-checkout'
-        );
+        $amount = 0;
+        if (!empty($booking['pricing_breakdown']['final_total'])) {
+            $amount = (float) $booking['pricing_breakdown']['final_total'];
+        }
+
+        $user_id     = (int) get_post_meta($booking_id, '_crcm_customer_user_id', true);
+        $customer_id = '';
+        if ($user_id) {
+            $customer_id = $this->get_or_create_customer($client, $user_id);
+        }
+
+        try {
+            $session = $client->checkout->sessions->create(array(
+                'mode'                => 'payment',
+                'customer'            => $customer_id ?: null,
+                'line_items'          => array(
+                    array(
+                        'price_data' => array(
+                            'currency'     => 'eur',
+                            'product_data' => array(
+                                'name' => $booking['booking_number'],
+                            ),
+                            'unit_amount'  => (int) round($amount * 100),
+                        ),
+                        'quantity'   => 1,
+                    ),
+                ),
+                'payment_intent_data' => array(
+                    'setup_future_usage' => 'off_session',
+                ),
+                'success_url' => add_query_arg(
+                    array(
+                        'crcm_stripe_return' => 1,
+                        'booking_id'        => $booking_id,
+                        'session_id'        => '{CHECKOUT_SESSION_ID}',
+                    ),
+                    home_url('/customer-dashboard/')
+                ),
+                'cancel_url' => home_url('/customer-dashboard/'),
+            ));
+
+            update_post_meta($booking_id, '_crcm_stripe_session_id', $session->id);
+
+            return $session->url;
+        } catch (Exception $e) {
+            error_log($e->getMessage());
+            return '';
+        }
     }
 
     /**
@@ -165,11 +250,41 @@ class CRCM_Payment_Manager {
      * @return void
      */
     public function handle_stripe_return() {
-        if (isset($_GET['crcm_stripe_return'], $_GET['booking_id'])) {
+        if (isset($_GET['crcm_stripe_return'], $_GET['booking_id'], $_GET['session_id'])) {
             $booking_id = intval($_GET['booking_id']);
-            $old_status = get_post_meta($booking_id, '_crcm_booking_status', true);
-            update_post_meta($booking_id, '_crcm_booking_status', 'confirmed');
-            do_action('crcm_booking_status_changed', $booking_id, 'confirmed', $old_status);
+            $session_id = sanitize_text_field($_GET['session_id']);
+
+            $client = $this->get_stripe_client();
+            if ($client) {
+                try {
+                    $session        = $client->checkout->sessions->retrieve($session_id);
+                    $intent_id      = $session->payment_intent;
+                    $payment_intent = $client->paymentIntents->retrieve($intent_id);
+                    $payment_method = $payment_intent->payment_method;
+                    $amount_paid    = $payment_intent->amount_received / 100;
+
+                    $payment_data = get_post_meta($booking_id, '_crcm_payment_data', true);
+                    if (!is_array($payment_data)) {
+                        $payment_data = array();
+                    }
+                    $payment_data['stripe_payment_intent'] = $intent_id;
+                    $payment_data['paid_amount']           = $amount_paid;
+                    $payment_data['payment_status']        = 'completed';
+                    $payment_data['payment_method']        = $payment_method;
+                    update_post_meta($booking_id, '_crcm_payment_data', $payment_data);
+
+                    $user_id = (int) get_post_meta($booking_id, '_crcm_customer_user_id', true);
+                    if ($user_id && $payment_method) {
+                        update_user_meta($user_id, '_crcm_stripe_payment_method', $payment_method);
+                    }
+
+                    $old_status = get_post_meta($booking_id, '_crcm_booking_status', true);
+                    update_post_meta($booking_id, '_crcm_booking_status', 'confirmed');
+                    do_action('crcm_booking_status_changed', $booking_id, 'confirmed', $old_status);
+                } catch (Exception $e) {
+                    error_log($e->getMessage());
+                }
+            }
 
             wp_safe_redirect(home_url('/customer-dashboard/'));
             exit;
