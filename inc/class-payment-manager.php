@@ -27,6 +27,7 @@ class CRCM_Payment_Manager {
         add_action('wp_ajax_crcm_process_payment', array($this, 'process_payment'));
         add_action('wp_ajax_nopriv_crcm_process_payment', array($this, 'process_payment'));
         add_action('wp_ajax_crcm_process_refund', array($this, 'process_refund'));
+        add_action('wp_ajax_crcm_admin_cancel_booking', array($this, 'cancel_booking_admin'));
         add_action('init', array($this, 'handle_stripe_return'));
     }
 
@@ -126,6 +127,32 @@ class CRCM_Payment_Manager {
     }
 
     /**
+     * Cancel booking from admin.
+     *
+     * @return void
+     */
+    public function cancel_booking_admin() {
+        check_ajax_referer('crcm_admin_nonce', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(__('Permission denied', 'custom-rental-manager'));
+        }
+
+        $booking_id = intval($_POST['booking_id'] ?? 0);
+        if (!$booking_id) {
+            wp_send_json_error(__('Invalid booking ID', 'custom-rental-manager'));
+        }
+
+        $old_status = get_post_meta($booking_id, '_crcm_booking_status', true);
+        update_post_meta($booking_id, '_crcm_booking_status', 'cancelled');
+        do_action('crcm_booking_status_changed', $booking_id, 'cancelled', $old_status);
+
+        wp_send_json_success(array(
+            'message' => __('Booking cancelled successfully', 'custom-rental-manager'),
+        ));
+    }
+
+    /**
      * Process refund.
      *
      * @return void
@@ -156,16 +183,33 @@ class CRCM_Payment_Manager {
             $payment_data['refund_reason'] = $refund_reason;
             $payment_data['refund_id'] = $refund_id;
 
-            if ($refund_amount >= $payment_data['paid_amount']) {
+            if ($refund_amount >= ($payment_data['paid_amount'] ?? 0)) {
                 $payment_data['payment_status'] = 'refunded';
-                $old_status = get_post_meta($booking_id, '_crcm_booking_status', true);
-                update_post_meta($booking_id, '_crcm_booking_status', 'refunded');
-                do_action('crcm_booking_status_changed', $booking_id, 'refunded', $old_status);
             } else {
                 $payment_data['payment_status'] = 'partial_refund';
             }
 
             update_post_meta($booking_id, '_crcm_payment_data', $payment_data);
+
+            $old_status = get_post_meta($booking_id, '_crcm_booking_status', true);
+            update_post_meta($booking_id, '_crcm_booking_status', 'cancelled');
+            do_action('crcm_booking_status_changed', $booking_id, 'cancelled', $old_status);
+
+            $booking = crcm()->booking_manager->get_booking($booking_id);
+            if (!is_wp_error($booking) && !empty($booking['customer_data']['email'])) {
+                $currency_symbol = crcm_get_setting('currency_symbol', '€');
+                $subject = sprintf(__('Refund processed - %s', 'custom-rental-manager'), $booking['booking_number']);
+                $message = sprintf(
+                    __('A refund of %s has been processed for your booking.', 'custom-rental-manager'),
+                    crcm_format_price($refund_amount, $currency_symbol)
+                );
+                wp_mail(
+                    $booking['customer_data']['email'],
+                    $subject,
+                    $message,
+                    array('Content-Type: text/html; charset=UTF-8')
+                );
+            }
 
             wp_send_json_success(array(
                 'message' => __('Refund processed successfully', 'custom-rental-manager'),
