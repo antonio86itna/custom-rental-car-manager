@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
 </div>
 <script>
     jQuery(function($){
-        const allowed = ['#pickup_time', '#pickup_location', '#return_location', '#internal_notes', '#booking_notes'];
+        const allowed = ['#pickup_time', '#pickup_location', '#return_location', '#home_delivery', '#delivery_address', '#internal_notes', '#booking_notes'];
         $('#crcm_booking_details :input, #crcm_booking_customer :input, #crcm_booking_vehicle :input, #crcm_booking_pricing :input, #crcm_booking_status :input, #crcm_booking_notes :input').each(function(){
             const id = '#' + $(this).attr('id');
             if (allowed.indexOf(id) === -1) {
