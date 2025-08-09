@@ -406,9 +406,14 @@ class CRCM_Email_Manager {
         $vehicle_name = $vehicle ? $vehicle->post_title : __('Unknown Vehicle', 'custom-rental-manager');
         $company_name = 'Costabilerent';
 
-        $button_url = $checkout_url ? $checkout_url : $dashboard_url;
-        if (empty($button_url)) {
-            $button_url = home_url('/customer-dashboard/');
+        $payment_data   = get_post_meta($booking['booking_id'], '_crcm_payment_data', true);
+        $payment_status = $payment_data['payment_status'] ?? '';
+
+        $button_url = $dashboard_url ?: home_url('/customer-dashboard/');
+        $button_text = esc_html__('View Dashboard', 'custom-rental-manager');
+        if ('completed' !== $payment_status && $checkout_url) {
+            $button_url  = $checkout_url;
+            $button_text = esc_html__('Paga ora', 'custom-rental-manager');
         }
 
         $currency_symbol = '€';
@@ -448,7 +453,7 @@ class CRCM_Email_Manager {
 
                     <p style="text-align: center; margin: 30px 0;">
                         <a href="<?php echo esc_url($button_url); ?>" style="background: #2563eb; color: #fff; padding: 12px 24px; border-radius: 4px; text-decoration: none;">
-                            <?php echo $checkout_url ? esc_html__('Pay Now', 'custom-rental-manager') : esc_html__('View Dashboard', 'custom-rental-manager'); ?>
+                            <?php echo $button_text; ?>
                         </a>
                     </p>
                 </div>
@@ -570,12 +575,14 @@ class CRCM_Email_Manager {
             $template_file = CRCM_PLUGIN_PATH . 'templates/emails/en/' . $recipient . '/' . $template . '.php';
         }
 
-        $customer       = $booking['customer_data'];
-        $payment_button = '';
-        if ('pending' === $booking['status']) {
+        $customer        = $booking['customer_data'];
+        $payment_button  = '';
+        $payment_data    = get_post_meta($booking['booking_id'], '_crcm_payment_data', true);
+        $payment_status  = $payment_data['payment_status'] ?? '';
+        if ('completed' !== $payment_status) {
             $payment_url = crcm()->payment_manager->get_checkout_url($booking['booking_id']);
             if ($payment_url) {
-                $payment_button = '<a href="' . esc_url($payment_url) . '" style="display:inline-block;padding:10px 20px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:4px;">' . esc_html__('Pay Now', 'custom-rental-manager') . '</a>';
+                $payment_button = '<a href="' . esc_url($payment_url) . '" style="display:inline-block;padding:10px 20px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:4px;">' . esc_html__('Paga ora', 'custom-rental-manager') . '</a>';
             }
         }
 

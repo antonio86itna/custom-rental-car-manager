@@ -44,11 +44,13 @@ $user_bookings = get_posts(array(
 
         <?php if (!empty($user_bookings)): ?>
             <div class="crcm-bookings-list">
-                <?php foreach ($user_bookings as $booking): 
-                    $booking_data = get_post_meta($booking->ID, '_crcm_booking_data', true);
-                    $booking_status = get_post_meta($booking->ID, '_crcm_booking_status', true);
-                    $booking_number = get_post_meta($booking->ID, '_crcm_booking_number', true);
-                    $vehicle = get_post($booking_data['vehicle_id']);
+                <?php foreach ($user_bookings as $booking):
+                    $booking_data    = get_post_meta($booking->ID, '_crcm_booking_data', true);
+                    $booking_status  = get_post_meta($booking->ID, '_crcm_booking_status', true);
+                    $booking_number  = get_post_meta($booking->ID, '_crcm_booking_number', true);
+                    $payment_data    = get_post_meta($booking->ID, '_crcm_payment_data', true);
+                    $payment_status  = $payment_data['payment_status'] ?? '';
+                    $vehicle         = get_post($booking_data['vehicle_id']);
                 ?>
                     <div class="crcm-booking-item">
                         <div class="crcm-booking-header">
@@ -67,9 +69,9 @@ $user_bookings = get_posts(array(
 
                         <?php if ($booking_status === 'pending' || $booking_status === 'confirmed'): ?>
                             <div class="crcm-booking-actions">
-                                <?php if ($booking_status === 'pending'): ?>
+                                <?php if ('completed' !== $payment_status): ?>
                                     <a class="crcm-btn crcm-btn-primary" href="<?php echo esc_url(crcm()->payment_manager->get_checkout_url($booking->ID)); ?>">
-                                        <?php _e('Pay Now', 'custom-rental-manager'); ?>
+                                        <?php _e('Paga ora', 'custom-rental-manager'); ?>
                                     </a>
                                 <?php endif; ?>
                                 <button class="crcm-btn crcm-btn-danger" onclick="cancelBooking('<?php echo esc_attr($booking->ID); ?>')">
