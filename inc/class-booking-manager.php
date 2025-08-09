@@ -771,6 +771,9 @@ class CRCM_Booking_Manager {
                         <?php if (!empty($misc_data['featured_vehicle'])): ?>
                             <li>⭐ Veicolo in evidenza</li>
                         <?php endif; ?>
+                        <?php if (!empty($misc_data['late_return_rule']) && !empty($misc_data['late_return_time'])): ?>
+                            <li><?php printf(__('Riconsegna tardiva entro %s', 'custom-rental-manager'), esc_html($misc_data['late_return_time'])); ?></li>
+                        <?php endif; ?>
                     </ul>
                 </div>
             <?php endif; ?>
