@@ -46,6 +46,8 @@ class CRCM_Booking_Manager {
             wp_schedule_event(time(), 'hourly', 'crcm_booking_status_check');
         }
 
+        add_action('admin_notices', array($this, 'render_booking_lock_notice'));
+
     }
 
     /**
@@ -1080,7 +1082,83 @@ class CRCM_Booking_Manager {
             wp_send_json_error('Vehicle manager not available');
         }
     }
-    
+
+    /**
+     * Render notice and disable fields for locked bookings.
+     *
+     * @return void
+     */
+    public function render_booking_lock_notice() {
+        global $pagenow, $post;
+
+        if ('post.php' !== $pagenow || ! $post || 'crcm_booking' !== $post->post_type) {
+            return;
+        }
+
+        $status = get_post_meta($post->ID, '_crcm_booking_status', true);
+        if (!in_array($status, array('confirmed', 'active'), true)) {
+            return;
+        }
+
+        $template = CRCM_PLUGIN_PATH . 'templates/admin/booking-edit.php';
+        if (file_exists($template)) {
+            include $template;
+        }
+    }
+
+    /**
+     * Compare old and new booking data.
+     *
+     * @param array $old_data Previous booking data.
+     * @param array $new_data Updated booking data.
+     *
+     * @return array
+     */
+    private function compare_booking_data($old_data, $new_data) {
+        $changes = array();
+
+        foreach ($new_data as $key => $value) {
+            $old_value = $old_data[$key] ?? '';
+            if ($value !== $old_value) {
+                $changes[$key] = array(
+                    'old' => $old_value,
+                    'new' => $value,
+                );
+            }
+        }
+
+        return $changes;
+    }
+
+    /**
+     * Send update email for pending bookings highlighting changes.
+     *
+     * @param int   $booking_id Booking ID.
+     * @param array $changes    Changed fields.
+     *
+     * @return void
+     */
+    private function send_pending_update_email($booking_id, $changes) {
+        $customer = get_post_meta($booking_id, '_crcm_customer_data', true);
+        $email    = sanitize_email($customer['email'] ?? '');
+
+        if (empty($email)) {
+            return;
+        }
+
+        $booking_number = get_post_meta($booking_id, '_crcm_booking_number', true);
+
+        $subject = sprintf(__('Booking Update - %s', 'custom-rental-manager'), $booking_number);
+        $body    = __('The following details of your booking have been updated:', 'custom-rental-manager') . "\n\n";
+
+        foreach ($changes as $field => $data) {
+            $label = ucwords(str_replace('_', ' ', $field));
+            $body .= sprintf('%s: %s → %s', $label, $data['old'], $data['new']) . "\n";
+        }
+
+        wp_mail($email, $subject, $body);
+    }
+
     /**
      * Save booking meta data
      */
@@ -1106,12 +1184,30 @@ class CRCM_Booking_Manager {
             return;
         }
         
+        $old_status       = get_post_meta($post_id, '_crcm_booking_status', true);
+        $posted_status    = isset($_POST['booking_status']) ? sanitize_text_field($_POST['booking_status']) : $old_status;
+        $old_booking_data = get_post_meta($post_id, '_crcm_booking_data', true);
+        if (!is_array($old_booking_data)) {
+            $old_booking_data = array();
+        }
+
         // Save booking data
         if (isset($_POST['booking_data'])) {
-            $booking_data = array();
+            $posted_data = array();
             foreach ($_POST['booking_data'] as $key => $value) {
-                $booking_data[$key] = sanitize_text_field($value);
+                $posted_data[$key] = sanitize_text_field($value);
             }
+
+            $booking_data = array_merge($old_booking_data, $posted_data);
+
+            if ('pending' === $old_status && 'pending' === $posted_status) {
+                update_post_meta($post_id, '_crcm_prev_booking_data', $old_booking_data);
+                $changes = $this->compare_booking_data($old_booking_data, $booking_data);
+                if (!empty($changes)) {
+                    $this->send_pending_update_email($post_id, $changes);
+                }
+            }
+
             update_post_meta($post_id, '_crcm_booking_data', $booking_data);
 
             $previous_customer_id = (int) get_post_meta($post_id, '_crcm_customer_user_id', true);
@@ -1177,10 +1273,10 @@ class CRCM_Booking_Manager {
         
         // Save booking status
         if (isset($_POST['booking_status'])) {
-            $new_status = sanitize_text_field($_POST['booking_status']);
-            $old_status = get_post_meta($post_id, '_crcm_booking_status', true);
+            $new_status      = sanitize_text_field($_POST['booking_status']);
+            $previous_status = get_post_meta($post_id, '_crcm_booking_status', true);
             $this->update_booking_status($post_id, $new_status);
-            if (empty($old_status) && 'pending' === $new_status) {
+            if (empty($previous_status) && 'pending' === $new_status) {
                 do_action('crcm_booking_created', $post_id);
             }
         }
