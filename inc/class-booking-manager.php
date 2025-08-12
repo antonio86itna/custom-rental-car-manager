@@ -180,7 +180,10 @@ class CRCM_Booking_Manager {
         }
 
         $booking_number = crcm_get_next_booking_number();
-        update_post_meta($booking_id, '_crcm_booking_number', $booking_number);
+        if ( crcm_booking_number_exists( $booking_number ) ) {
+            return new WP_Error( 'duplicate_booking_number', __( 'Booking number collision, please try again', 'custom-rental-manager' ) );
+        }
+        update_post_meta( $booking_id, '_crcm_booking_number', $booking_number );
 
         $booking_data = array(
             'vehicle_id'      => $vehicle_id,

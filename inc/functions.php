@@ -1171,30 +1171,41 @@ function crcm_get_location_name($location_key) {
 }
 
 /**
- * Get next available booking number
+ * Check if a booking number already exists.
+ *
+ * @param string $booking_number Booking number to verify.
+ * @return bool True if the number exists, false otherwise.
  */
-function crcm_get_next_booking_number() {
-    $prefix = 'CBR'; // Costabilerent
-    $year = date('y');
-    $month = date('m');
-    
+function crcm_booking_number_exists( $booking_number ) {
     global $wpdb;
-    $last_number = $wpdb->get_var($wpdb->prepare(
-        "SELECT meta_value FROM {$wpdb->postmeta} 
-         WHERE meta_key = '_crcm_booking_number' 
-         AND meta_value LIKE %s 
-         ORDER BY meta_value DESC 
-         LIMIT 1",
-        $prefix . $year . $month . '%'
-    ));
-    
-    if ($last_number) {
-        $sequence = intval(substr($last_number, -4)) + 1;
-    } else {
-        $sequence = 1;
-    }
-    
-    return $prefix . $year . $month . str_pad($sequence, 4, '0', STR_PAD_LEFT);
+
+    $exists = $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_crcm_booking_number' AND meta_value = %s LIMIT 1",
+            $booking_number
+        )
+    );
+
+    return ! empty( $exists );
+}
+
+/**
+ * Generate a unique booking number using uniqid with a prefix.
+ *
+ * @param callable|null $generator Optional generator callable for testing.
+ * @return string Unique booking number.
+ */
+function crcm_get_next_booking_number( $generator = null ) {
+    $prefix    = 'CBR'; // Costabilerent prefix.
+    $generator = $generator ?: static function () use ( $prefix ) {
+        return $prefix . strtoupper( uniqid() );
+    };
+
+    do {
+        $booking_number = call_user_func( $generator );
+    } while ( crcm_booking_number_exists( $booking_number ) );
+
+    return $booking_number;
 }
 
 // ===============================================
