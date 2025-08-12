@@ -47,10 +47,12 @@ Il plugin **Custom Rental Car Manager** è un sistema completo e professionale p
 
 ## Autenticazione REST API
 
-Le chiamate all'API REST (`/wp-json/crcm/v1/`) richiedono una forma di autenticazione:
+Le chiamate all'API REST (`/wp-json/crcm/v1/`) richiedono una forma di autenticazione e verificano sempre un **nonce** o i **ruoli** dell'utente:
 
 - **Nonce WordPress** – per richieste provenienti dal frontend, invia l'header `X-WP-Nonce` generato da WordPress.
-- **JWT Bearer token** – i client esterni possono includere `Authorization: Bearer <token>` se è presente un plugin JWT compatibile.
+- **Ruoli WordPress** – per richieste server-to-server o backend, l'autorizzazione avviene tramite `current_user_can()`.
+  - Gli endpoint gestionali (`/bookings` `GET`, `/calendar`) richiedono la capability `manage_options` o `crcm_manage_bookings`.
+  - Gli endpoint pubblici (veicoli, disponibilità, creazione prenotazioni) accettano utenti con capability `read`.
 
 Gli endpoint pubblici applicano un semplice rate limiting per indirizzo IP (max 100 richieste ogni 10 minuti).
 
