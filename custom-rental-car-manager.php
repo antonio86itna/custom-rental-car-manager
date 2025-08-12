@@ -616,7 +616,11 @@ class CRCM_Plugin {
         if (!is_user_logged_in()) {
             return '<p>' . esc_html__('Please log in to access your dashboard.', 'custom-rental-manager') . '</p>';
         }
-        
+
+        if (!crcm_user_is_customer()) {
+            return '<p>' . esc_html__('Access restricted to rental customers.', 'custom-rental-manager') . '</p>';
+        }
+
         wp_enqueue_style(
             'crcm-customer-dashboard',
             CRCM_PLUGIN_URL . 'assets/css/frontend-customer-dashboard.css',
