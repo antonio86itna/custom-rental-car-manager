@@ -197,11 +197,28 @@ class CRCM_Booking_Manager {
             'delivery_address'=> sanitize_text_field($data['delivery_address'] ?? ''),
             'extras'          => array_map('sanitize_text_field', $data['extras'] ?? array()),
             'insurance_type'  => sanitize_text_field($data['insurance_type'] ?? 'basic'),
+            'penalties'       => array(),
             'notes'           => sanitize_textarea_field($data['notes'] ?? ''),
         );
+
+        if (!empty($data['penalties']) && is_array($data['penalties'])) {
+            foreach ($data['penalties'] as $penalty) {
+                $p_name   = sanitize_text_field($penalty['name'] ?? '');
+                $p_amount = floatval($penalty['amount'] ?? 0);
+                $booking_data['penalties'][] = array(
+                    'name'   => $p_name,
+                    'amount' => $p_amount,
+                );
+            }
+        }
+
         update_post_meta($booking_id, '_crcm_booking_data', $booking_data);
         update_post_meta($booking_id, '_crcm_delivery_address', $booking_data['delivery_address']);
         update_post_meta($booking_id, '_crcm_customer_data', $customer_data);
+
+        // Calculate and save pricing breakdown
+        $pricing_breakdown = $this->calculate_booking_pricing($booking_data);
+        update_post_meta($booking_id, '_crcm_pricing_breakdown', $pricing_breakdown);
 
         $this->update_booking_status($booking_id, 'pending');
 
@@ -210,6 +227,7 @@ class CRCM_Booking_Manager {
             'booking_number' => $booking_number,
             'booking_data'   => $booking_data,
             'customer_data'  => $customer_data,
+            'pricing_breakdown' => $pricing_breakdown,
             'status'         => 'pending',
         );
     }
@@ -231,15 +249,38 @@ class CRCM_Booking_Manager {
             return new WP_Error('booking_not_found', __('Booking not found', 'custom-rental-manager'));
         }
 
-        $booking_data = get_post_meta($booking_id, '_crcm_booking_data', true);
-        if (!is_array($booking_data)) {
-            $booking_data = array();
+        $raw_booking_data = get_post_meta($booking_id, '_crcm_booking_data', true);
+        if (!is_array($raw_booking_data)) {
+            $raw_booking_data = array();
         }
-        $booking_data = array_map('sanitize_text_field', $booking_data);
-        $booking_data['home_delivery']   = !empty($booking_data['home_delivery']);
-        $booking_data['delivery_address'] = sanitize_text_field($booking_data['delivery_address'] ?? get_post_meta($booking_id, '_crcm_delivery_address', true));
-        if (isset($booking_data['extras']) && is_array($booking_data['extras'])) {
-            $booking_data['extras'] = array_map('sanitize_text_field', $booking_data['extras']);
+
+        $booking_data = array(
+            'vehicle_id'      => intval($raw_booking_data['vehicle_id'] ?? 0),
+            'pickup_date'     => sanitize_text_field($raw_booking_data['pickup_date'] ?? ''),
+            'return_date'     => sanitize_text_field($raw_booking_data['return_date'] ?? ''),
+            'pickup_time'     => sanitize_text_field($raw_booking_data['pickup_time'] ?? ''),
+            'return_time'     => sanitize_text_field($raw_booking_data['return_time'] ?? ''),
+            'pickup_location' => sanitize_text_field($raw_booking_data['pickup_location'] ?? ''),
+            'return_location' => sanitize_text_field($raw_booking_data['return_location'] ?? ''),
+            'home_delivery'   => !empty($raw_booking_data['home_delivery']),
+            'delivery_address'=> sanitize_text_field($raw_booking_data['delivery_address'] ?? get_post_meta($booking_id, '_crcm_delivery_address', true)),
+            'extras'          => array(),
+            'insurance_type'  => sanitize_text_field($raw_booking_data['insurance_type'] ?? ''),
+            'penalties'       => array(),
+            'notes'           => sanitize_textarea_field($raw_booking_data['notes'] ?? ''),
+        );
+
+        if (!empty($raw_booking_data['extras']) && is_array($raw_booking_data['extras'])) {
+            $booking_data['extras'] = array_map('sanitize_text_field', $raw_booking_data['extras']);
+        }
+
+        if (!empty($raw_booking_data['penalties']) && is_array($raw_booking_data['penalties'])) {
+            foreach ($raw_booking_data['penalties'] as $penalty) {
+                $booking_data['penalties'][] = array(
+                    'name'   => sanitize_text_field($penalty['name'] ?? ''),
+                    'amount' => floatval($penalty['amount'] ?? 0),
+                );
+            }
         }
 
         $customer_data = get_post_meta($booking_id, '_crcm_customer_data', true);
