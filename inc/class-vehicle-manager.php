@@ -1362,15 +1362,15 @@ class CRCM_Vehicle_Manager {
 
         $pickup_date    = sanitize_text_field($_POST['pickup_date'] ?? '');
         $return_date    = sanitize_text_field($_POST['return_date'] ?? '');
-        $vehicle_type   = sanitize_text_field($_POST['vehicle_type'] ?? '');
-        $posts_per_page = isset($_POST['posts_per_page']) ? absint($_POST['posts_per_page']) : 10;
-        $paged          = isset($_POST['paged']) ? absint($_POST['paged']) : 1;
+        $vehicle_type = sanitize_text_field($_POST['vehicle_type'] ?? '');
+        $per_page     = isset($_POST['per_page']) ? absint($_POST['per_page']) : 10;
+        $page         = isset($_POST['page']) ? absint($_POST['page']) : 1;
 
         if (empty($pickup_date) || empty($return_date)) {
             wp_send_json_error(__('Please select pickup and return dates.', 'custom-rental-manager'));
         }
 
-        $results = $this->search_available_vehicles($pickup_date, $return_date, $vehicle_type, $posts_per_page, $paged);
+        $results = $this->search_available_vehicles($pickup_date, $return_date, $vehicle_type, $per_page, $page);
 
         wp_send_json_success($results);
     }
@@ -1378,22 +1378,22 @@ class CRCM_Vehicle_Manager {
     /**
      * Search available vehicles with featured priority
      *
-     * @param string $pickup_date    Pickup date.
-     * @param string $return_date    Return date.
-     * @param string $vehicle_type   Optional vehicle type filter.
-     * @param int    $posts_per_page Number of posts per page.
-     * @param int    $paged          Current page number.
+     * @param string $pickup_date  Pickup date.
+     * @param string $return_date  Return date.
+     * @param string $vehicle_type Optional vehicle type filter.
+     * @param int    $per_page     Number of vehicles per page.
+     * @param int    $page         Current page number.
      *
      * @return array
      */
-    public function search_available_vehicles($pickup_date, $return_date, $vehicle_type = '', $posts_per_page = 10, $paged = 1) {
-        $args = array(
-            'post_type'      => 'crcm_vehicle',
-            'post_status'    => 'publish',
-            'posts_per_page' => $posts_per_page,
-            'paged'          => $paged,
-            'fields'         => 'ids',
-        );
+      public function search_available_vehicles($pickup_date, $return_date, $vehicle_type = '', $per_page = 10, $page = 1) {
+          $args = array(
+              'post_type'      => 'crcm_vehicle',
+              'post_status'    => 'publish',
+              'posts_per_page' => $per_page,
+              'paged'          => $page,
+              'fields'         => 'ids',
+          );
 
         if (!empty($vehicle_type)) {
             $args['meta_query'] = array(
@@ -1467,10 +1467,11 @@ class CRCM_Vehicle_Manager {
         });
 
         return array(
-            'vehicles'    => $available_vehicles,
-            'pagination'  => array(
-                'current' => $paged,
-                'total'   => (int) $query->max_num_pages,
+            'vehicles'   => $available_vehicles,
+            'pagination' => array(
+                'current'  => $page,
+                'total'    => (int) $query->max_num_pages,
+                'per_page' => $per_page,
             ),
         );
     }

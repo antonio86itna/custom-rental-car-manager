@@ -30,7 +30,7 @@ $vehicle_types = crcm_get_vehicle_types();
 
 // Pagination parameters
 $per_page = isset( $_GET['per_page'] ) ? absint( $_GET['per_page'] ) : 10;
-$paged    = isset( $_GET['page'] ) ? absint( $_GET['page'] ) : 1;
+$page     = isset( $_GET['page'] ) ? absint( $_GET['page'] ) : 1;
 
 // Get vehicles with pagination
 $args = array(
@@ -39,7 +39,7 @@ $args = array(
     'posts_per_page' => $per_page,
     'orderby'        => 'title',
     'order'          => 'ASC',
-    'paged'          => $paged,
+    'paged'          => $page,
 );
 
 $query    = new WP_Query( $args );
@@ -330,7 +330,7 @@ if ($pickup_date && $return_date) {
                 array(
                     'base'      => add_query_arg( 'page', '%#%' ),
                     'format'    => '',
-                    'current'   => $paged,
+                    'current'   => $page,
                     'total'     => (int) $query->max_num_pages,
                     'add_args'  => $add_args,
                     'prev_text' => __( '&laquo; Precedente', 'custom-rental-manager' ),
