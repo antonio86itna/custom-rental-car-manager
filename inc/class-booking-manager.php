@@ -40,10 +40,10 @@ class CRCM_Booking_Manager {
         add_filter('manage_crcm_booking_posts_columns', array($this, 'booking_columns'));
         add_action('manage_crcm_booking_posts_custom_column', array($this, 'booking_column_content'), 10, 2);
 
-        // Booking status scheduler
+        // Daily booking status scheduler
         add_action('crcm_booking_status_check', array($this, 'process_scheduled_statuses'));
         if (!wp_next_scheduled('crcm_booking_status_check')) {
-            wp_schedule_event(time(), 'hourly', 'crcm_booking_status_check');
+            wp_schedule_event(time(), 'daily', 'crcm_booking_status_check');
         }
 
         add_action('admin_notices', array($this, 'render_booking_lock_notice'));
@@ -53,8 +53,9 @@ class CRCM_Booking_Manager {
     /**
      * Process booking status transitions on scheduled event.
      *
-     * Activates confirmed bookings whose pickup time has passed and
-     * completes active bookings whose return time has passed.
+     * Activates confirmed bookings whose pickup time has passed,
+     * completes active bookings whose return time has passed,
+     * and cancels pending bookings whose pickup time has passed.
      *
      * @return void
      */

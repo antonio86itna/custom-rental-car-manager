@@ -105,13 +105,13 @@ class CRCM_Email_Manager {
     }
 
     /**
-     * Send booking status change notification.
+     * Send booking status change notification to customer and admin.
      *
-     * @param int    $booking_id  Booking ID.
-     * @param string $new_status  New booking status.
-     * @param string $old_status  Previous booking status.
+     * @param int    $booking_id Booking ID.
+     * @param string $new_status New booking status.
+     * @param string $old_status Previous booking status.
      *
-     * @return bool Whether the notification was sent.
+     * @return bool Whether the customer notification was sent.
      */
     public function send_status_change_notification($booking_id, $new_status, $old_status) {
         if ($new_status === $old_status) {
@@ -147,11 +147,9 @@ class CRCM_Email_Manager {
             $headers
         );
 
-        if (!empty($settings['enable_admin_notifications'])) {
-            $admin_email   = !empty($settings['company_email']) ? $settings['company_email'] : get_option('admin_email');
-            $admin_message = $this->get_status_change_template($booking, $new_status, $old_status, 'admin');
-            wp_mail($admin_email, $subject, $admin_message, $headers);
-        }
+        $admin_email   = !empty($settings['company_email']) ? $settings['company_email'] : get_option('admin_email');
+        $admin_message = $this->get_status_change_template($booking, $new_status, $old_status, 'admin');
+        wp_mail($admin_email, $subject, $admin_message, $headers);
 
         if ($switched) {
             restore_previous_locale();
