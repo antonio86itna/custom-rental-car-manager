@@ -80,6 +80,7 @@ text
 ├─ /templates/          # Custom admin/checkout templates
 ├─ /assets/             # CSS (backend & frontend), JS (admin, booking wizard)
 ├─ /languages/          # .pot for translation
+├─ /costabilerent-theme/ # Frontend theme (templates, assets, styles)
 ├─ /api/                # REST endpoint handlers
 └─ README.md/AGENTS.md
 🛠️ Development Guidelines for AI/AGENT
@@ -106,6 +107,11 @@ Run linter and automated test suite before merging
 No direct changes to main branch without approval unless urgent fix
 
 QA/focus on accessibility (WCAG 2.1)
+
+🎨 Theme Development
+- **Styles:** Place custom CSS/JS in `costabilerent-theme/assets/` and `style.css`; follow BEM naming and enqueue only where needed.
+- **Translations:** Base strings in English, wrapped with `__()`/`_e()` using the `costabilerent` text domain. Store `.pot/.po/.mo` files in `costabilerent-theme/languages/`.
+- **Assets:** Version and minify assets; load them via `wp_enqueue_style()` and `wp_enqueue_script()` to ensure caching and performance.
 
 🚀 Example Output / Expected UX
 “Fiat 500, Automatic, 4 Seats — €45/day”
