@@ -224,6 +224,9 @@ class CRCM_Payment_Manager {
     /**
      * Generate Stripe checkout URL for a booking.
      *
+     * Creates a Stripe Checkout session and stores the customer's
+     * payment method for future off-session charges.
+     *
      * @param int $booking_id Booking ID.
      * @return string
      */
@@ -253,6 +256,7 @@ class CRCM_Payment_Manager {
             $session = $client->checkout->sessions->create(array(
                 'mode'                => 'payment',
                 'customer'            => $customer_id ?: null,
+                'customer_creation'   => 'always',
                 'line_items'          => array(
                     array(
                         'price_data' => array(
@@ -306,6 +310,7 @@ class CRCM_Payment_Manager {
                     $payment_intent = $client->paymentIntents->retrieve($intent_id);
                     $payment_method = $payment_intent->payment_method;
                     $amount_paid    = $payment_intent->amount_received / 100;
+                    $customer_id    = $session->customer;
 
                     $payment_data = get_post_meta($booking_id, '_crcm_payment_data', true);
                     if (!is_array($payment_data)) {
@@ -320,6 +325,10 @@ class CRCM_Payment_Manager {
                     $user_id = (int) get_post_meta($booking_id, '_crcm_customer_user_id', true);
                     if ($user_id && $payment_method) {
                         update_user_meta($user_id, '_crcm_stripe_payment_method', $payment_method);
+                    }
+
+                    if ($user_id && $customer_id) {
+                        update_user_meta($user_id, '_crcm_stripe_customer_id', $customer_id);
                     }
 
                     $old_status = get_post_meta($booking_id, '_crcm_booking_status', true);

@@ -83,16 +83,22 @@ $user_bookings = get_posts(array(
                             <?php endif; ?>
                         </div>
 
-                        <?php if ($booking_status === 'pending' || $booking_status === 'confirmed'): ?>
+                        <?php
+                        $show_pay_button = ('completed' !== $payment_status);
+                        $can_cancel      = in_array($booking_status, array('pending', 'confirmed'), true);
+                        if ($show_pay_button || $can_cancel) :
+                        ?>
                             <div class="crcm-booking-actions">
-                                <?php if ('completed' !== $payment_status): ?>
+                                <?php if ($show_pay_button) : ?>
                                     <a class="crcm-btn crcm-btn-primary" href="<?php echo esc_url(crcm()->payment_manager->get_checkout_url($booking->ID)); ?>">
                                         <?php _e('Paga ora', 'custom-rental-manager'); ?>
                                     </a>
                                 <?php endif; ?>
-                                <button class="crcm-btn crcm-btn-danger" onclick="cancelBooking('<?php echo esc_attr($booking->ID); ?>')">
-                                    <?php _e('Cancel Booking', 'custom-rental-manager'); ?>
-                                </button>
+                                <?php if ($can_cancel) : ?>
+                                    <button class="crcm-btn crcm-btn-danger" onclick="cancelBooking('<?php echo esc_attr($booking->ID); ?>')">
+                                        <?php _e('Cancel Booking', 'custom-rental-manager'); ?>
+                                    </button>
+                                <?php endif; ?>
                             </div>
                         <?php endif; ?>
                     </div>
