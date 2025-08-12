@@ -25,8 +25,9 @@ $return_time = ! empty( sanitize_text_field( $_GET['return_time'] ?? '' ) )
     ? sanitize_text_field( $_GET['return_time'] )
     : '18:00';
 
-// Get vehicle types for filtering
+// Get vehicle types and locations for filtering
 $vehicle_types = crcm_get_vehicle_types();
+$locations     = crcm_get_locations();
 
 // Pagination parameters
 $per_page = isset( $_GET['per_page'] ) ? absint( $_GET['per_page'] ) : 10;
@@ -114,7 +115,19 @@ if ($pickup_date && $return_date) {
                     <?php endforeach; ?>
                 </select>
             </div>
-            
+
+            <div class="crcm-filter-group">
+                <label for="location-filter"><?php _e('Sede:', 'custom-rental-manager'); ?></label>
+                <select id="location-filter" class="crcm-filter-select">
+                    <option value=""><?php _e('Tutte le sedi', 'custom-rental-manager'); ?></option>
+                    <?php foreach ($locations as $location): ?>
+                        <option value="<?php echo esc_attr($location->slug); ?>">
+                            <?php echo esc_html($location->name); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
             <div class="crcm-filter-group">
                 <label for="price-sort-filter"><?php _e('Ordina per prezzo:', 'custom-rental-manager'); ?></label>
                 <select id="price-sort-filter" class="crcm-filter-select">
@@ -149,6 +162,10 @@ if ($pickup_date && $return_date) {
                 }
                 $thumbnail = get_the_post_thumbnail($vehicle->ID, 'medium');
                 $features  = get_post_meta($vehicle->ID, '_crcm_vehicle_features', true) ?: array();
+                $vehicle_location = get_post_meta($vehicle->ID, '_crcm_vehicle_location', true);
+                if (! $vehicle_location) {
+                    $vehicle_location = 'ischia-porto';
+                }
                 
                 // Check availability for selected dates
                 $available_quantity = 0;
@@ -172,8 +189,9 @@ if ($pickup_date && $return_date) {
                 }
                 
             ?>
-                <div class="crcm-vehicle-card <?php echo $is_available ? 'available' : 'unavailable'; ?>" 
+                <div class="crcm-vehicle-card <?php echo $is_available ? 'available' : 'unavailable'; ?>"
                      data-vehicle-type="<?php echo esc_attr($vehicle_type_slug); ?>"
+                     data-location="<?php echo esc_attr($vehicle_location); ?>"
                      data-daily-rate="<?php echo esc_attr($daily_rate); ?>"
                      data-vehicle-id="<?php echo esc_attr($vehicle->ID); ?>">
                      
