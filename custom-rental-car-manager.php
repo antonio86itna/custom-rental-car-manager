@@ -106,10 +106,8 @@ class CRCM_Plugin {
      * @since 1.0.0
      *
      * @return void
-     */
+    */
     public function init() {
-        $this->maybe_upgrade_db();
-
         // Load dependencies first
         $this->load_dependencies();
         
@@ -916,7 +914,7 @@ class CRCM_Plugin {
         $plugin->register_post_types();
 
         // Create or update required database tables
-        $plugin->maybe_upgrade_db();
+        self::maybe_upgrade_db();
 
         // Flush rewrite rules
         flush_rewrite_rules();
@@ -953,7 +951,7 @@ class CRCM_Plugin {
      *
      * @return void
      */
-    private function create_availability_table() {
+    private static function create_availability_table() {
         global $wpdb;
 
         $table_name      = $wpdb->prefix . 'crcm_availability';
@@ -986,10 +984,10 @@ class CRCM_Plugin {
      *
      * @return void
      */
-    private function maybe_upgrade_db() {
+    public static function maybe_upgrade_db() {
         $installed_version = get_option('crcm_db_version');
         if (CRCM_DB_VERSION !== $installed_version) {
-            $this->create_availability_table();
+            self::create_availability_table();
         }
     }
 
@@ -1404,6 +1402,7 @@ function crcm() {
 }
 
 // Initialize only after WordPress is loaded
+add_action('plugins_loaded', array('CRCM_Plugin', 'maybe_upgrade_db'), 5);
 add_action('plugins_loaded', 'crcm', 10);
 
 /**
