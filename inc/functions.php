@@ -19,8 +19,12 @@ if (!defined('ABSPATH')) {
 // ===============================================
 
 /**
- * Create and manage custom user roles for rental system
- * Called on plugin activation or via repair tool
+ * Create and manage custom user roles for rental system.
+ * Called on plugin activation or via repair tool.
+ *
+ * @since 1.0.0
+ *
+ * @return void
  */
 function crcm_create_custom_user_roles() {
     // Remove existing roles to ensure clean setup
@@ -165,6 +169,8 @@ function crcm_create_custom_user_roles() {
 /**
  * Assign default customer role to new users.
  *
+ * @since 1.0.0
+ *
  * @param int $user_id User ID.
  * @return void
  */
@@ -186,6 +192,8 @@ add_action('user_register', 'crcm_assign_default_customer_role');
 /**
  * Add rental role column to users table.
  *
+ * @since 1.0.0
+ *
  * @param array $columns Existing columns.
  * @return array
  */
@@ -197,6 +205,8 @@ add_filter('manage_users_columns', 'crcm_add_rental_role_column');
 
 /**
  * Show rental role in users table.
+ *
+ * @since 1.0.0
  *
  * @param string $value       Current column value.
  * @param string $column_name Column name.
@@ -215,14 +225,16 @@ function crcm_show_rental_role_column($value, $column_name, $user_id) {
             $badge_class = $status === 'active' ? 'customer-active' : 'customer-inactive';
             
             return sprintf(
-                '<span class="crcm-role-badge %s">🙋‍♂️ Customer</span><br><small>%d bookings</small>',
-                $badge_class,
-                $total_bookings
+                '<span class="crcm-role-badge %1$s">🙋‍♂️ %2$s</span><br><small>%3$d %4$s</small>',
+                esc_attr( $badge_class ),
+                esc_html__( 'Customer', 'custom-rental-manager' ),
+                intval( $total_bookings ),
+                esc_html__( 'bookings', 'custom-rental-manager' )
             );
         } elseif (in_array('crcm_manager', $roles)) {
-            return '<span class="crcm-role-badge manager">👨‍💼 Manager</span>';
+            return '<span class="crcm-role-badge manager">👨‍💼 ' . esc_html__( 'Manager', 'custom-rental-manager' ) . '</span>';
         } elseif (in_array('administrator', $roles)) {
-            return '<span class="crcm-role-badge admin">👑 Admin</span>';
+            return '<span class="crcm-role-badge admin">👑 ' . esc_html__( 'Admin', 'custom-rental-manager' ) . '</span>';
         }
         
         return '<span class="crcm-role-badge other">👤 ' . ucfirst(reset($roles)) . '</span>';
@@ -234,6 +246,8 @@ add_action('manage_users_custom_column', 'crcm_show_rental_role_column', 10, 3);
 
 /**
  * Add role filter links to users page.
+ *
+ * @since 1.0.0
  *
  * @param array $views Existing views.
  * @return array
@@ -270,6 +284,8 @@ add_filter('views_users', 'crcm_add_role_filter_links');
 
 /**
  * Add rental fields to user profile.
+ *
+ * @since 1.0.0
  *
  * @param WP_User $user User object.
  * @return void
@@ -366,6 +382,8 @@ add_action('edit_user_profile', 'crcm_add_rental_fields_to_profile');
 /**
  * Save rental profile fields.
  *
+ * @since 1.0.0
+ *
  * @param int $user_id User ID.
  * @return bool|void
  */
@@ -390,6 +408,8 @@ add_action('edit_user_profile_update', 'crcm_save_rental_profile_fields');
 
 /**
  * AJAX: Search customers with role filter.
+ *
+ * @since 1.0.0
  *
  * @return void
  */
@@ -439,6 +459,8 @@ add_action('wp_ajax_crcm_search_customers', 'crcm_ajax_search_customers');
 
 /**
  * AJAX: Create customer account.
+ *
+ * @since 1.0.0
  *
  * @return void
  */

@@ -60,9 +60,13 @@ class CRCM_Plugin {
     public $payment_manager;
     public $api_endpoints;
     public $customer_portal;
-    
+
     /**
-     * Get single instance
+     * Get single instance.
+     *
+     * @since 1.0.0
+     *
+     * @return CRCM_Plugin Plugin instance.
      */
     public static function get_instance() {
         if (null === self::$instance) {
@@ -70,16 +74,22 @@ class CRCM_Plugin {
         }
         return self::$instance;
     }
-    
+
     /**
-     * Constructor
+     * Constructor.
+     *
+     * @since 1.0.0
      */
     private function __construct() {
         $this->init_hooks();
     }
-    
+
     /**
-     * Initialize hooks
+     * Initialize hooks.
+     *
+     * @since 1.0.0
+     *
+     * @return void
      */
     private function init_hooks() {
         add_action('init', array($this, 'init'), 10);
@@ -88,9 +98,13 @@ class CRCM_Plugin {
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
         add_action('admin_init', array($this, 'register_settings'));
     }
-    
+
     /**
-     * Initialize plugin
+     * Initialize plugin.
+     *
+     * @since 1.0.0
+     *
+     * @return void
      */
     public function init() {
         $this->maybe_upgrade_db();
@@ -110,17 +124,25 @@ class CRCM_Plugin {
         // Initialize shortcodes
         $this->init_shortcodes();
     }
-    
+
     /**
-     * Load plugin textdomain
+     * Load plugin textdomain.
+     *
+     * @since 1.0.0
+     *
+     * @return void
      */
     public function load_textdomain() {
         $languages_path = dirname(plugin_basename(__FILE__)) . '/languages/';
         load_plugin_textdomain('custom-rental-manager', false, $languages_path);
     }
-    
+
     /**
-     * Load plugin dependencies
+     * Load plugin dependencies.
+     *
+     * @since 1.0.0
+     *
+     * @return void
      */
     private function load_dependencies() {
         // Load helper functions first
@@ -148,7 +170,11 @@ class CRCM_Plugin {
     }
     
     /**
-     * Initialize manager instances
+     * Initialize manager instances.
+     *
+     * @since 1.0.0
+     *
+     * @return void
      */
     private function init_managers() {
         if (class_exists('CRCM_Vehicle_Manager')) {
@@ -181,7 +207,11 @@ class CRCM_Plugin {
     }
     
     /**
-     * Register custom post types - CLEANED: No taxonomies, no editor
+     * Register custom post types - CLEANED: No taxonomies, no editor.
+     *
+     * @since 1.0.0
+     *
+     * @return void
      */
     private function register_post_types() {
         // Vehicle post type - CLEANED: No editor, no taxonomies
@@ -240,14 +270,22 @@ class CRCM_Plugin {
     }
     
     /**
-     * Add admin menu - CLEANED: Removed taxonomy menus
+     * Add admin menu - CLEANED: Removed taxonomy menus.
+     *
+     * @since 1.0.0
+     *
+     * @return void
      */
     private function add_admin_menu() {
         add_action('admin_menu', array($this, 'admin_menu'));
     }
-    
+
     /**
-     * Admin menu callback - CLEANED: No more taxonomy submenus
+     * Admin menu callback - CLEANED: No more taxonomy submenus.
+     *
+     * @since 1.0.0
+     *
+     * @return void
      */
     public function admin_menu() {
         // Main menu page
@@ -319,7 +357,11 @@ class CRCM_Plugin {
     }
     
     /**
-     * Dashboard page
+     * Dashboard page.
+     *
+     * @since 1.0.0
+     *
+     * @return void
      */
     public function dashboard_page() {
         $template_path = CRCM_PLUGIN_PATH . 'templates/admin/dashboard.php';
@@ -341,11 +383,11 @@ class CRCM_Plugin {
             echo '<p>' . sprintf(esc_html__('Bookings: %d', 'custom-rental-manager'), $booking_count->publish ?? 0) . '</p>';
             
             // Show role status for debugging
-            echo '<h3>' . __('Role Status (Debug)', 'custom-rental-manager') . '</h3>';
-            $customer_role = get_role('crcm_customer');
-            $manager_role = get_role('crcm_manager');
-            echo '<p><strong>Customer Role:</strong> ' . ($customer_role ? '✅ Created' : '❌ Missing') . '</p>';
-            echo '<p><strong>Manager Role:</strong> ' . ($manager_role ? '✅ Created' : '❌ Missing') . '</p>';
+            echo '<h3>' . esc_html__( 'Role Status (Debug)', 'custom-rental-manager' ) . '</h3>';
+            $customer_role = get_role( 'crcm_customer' );
+            $manager_role  = get_role( 'crcm_manager' );
+            echo '<p><strong>' . esc_html__( 'Customer Role:', 'custom-rental-manager' ) . '</strong> ' . ( $customer_role ? esc_html__( '✅ Created', 'custom-rental-manager' ) : esc_html__( '❌ Missing', 'custom-rental-manager' ) ) . '</p>';
+            echo '<p><strong>' . esc_html__( 'Manager Role:', 'custom-rental-manager' ) . '</strong> ' . ( $manager_role ? esc_html__( '✅ Created', 'custom-rental-manager' ) : esc_html__( '❌ Missing', 'custom-rental-manager' ) ) . '</p>';
             
             echo '</div>';
             echo '</div>';
@@ -353,7 +395,11 @@ class CRCM_Plugin {
     }
     
     /**
-     * Calendar page
+     * Calendar page.
+     *
+     * @since 1.0.0
+     *
+     * @return void
      */
     public function calendar_page() {
         $template_path = CRCM_PLUGIN_PATH . 'templates/admin/calendar.php';
@@ -368,7 +414,11 @@ class CRCM_Plugin {
     }
     
     /**
-     * Settings page
+     * Settings page.
+     *
+     * @since 1.0.0
+     *
+     * @return void
      */
     public function settings_page() {
         $template_path = CRCM_PLUGIN_PATH . 'templates/admin/settings.php';
@@ -383,7 +433,11 @@ class CRCM_Plugin {
     }
     
     /**
-     * Initialize shortcodes
+     * Initialize shortcodes.
+     *
+     * @since 1.0.0
+     *
+     * @return void
      */
     private function init_shortcodes() {
         add_shortcode('crcm_search_form', array($this, 'search_form_shortcode'));
@@ -393,7 +447,12 @@ class CRCM_Plugin {
     }
     
     /**
-     * Search form shortcode
+     * Search form shortcode.
+     *
+     * @since 1.0.0
+     *
+     * @param array $atts Shortcode attributes.
+     * @return string Shortcode output.
      */
     public function search_form_shortcode($atts) {
         $atts = shortcode_atts(array(
@@ -426,7 +485,12 @@ class CRCM_Plugin {
     }
     
     /**
-     * Vehicle list shortcode
+     * Vehicle list shortcode.
+     *
+     * @since 1.0.0
+     *
+     * @param array $atts Shortcode attributes.
+     * @return string Shortcode output.
      */
     public function vehicle_list_shortcode($atts) {
         $atts = shortcode_atts(array(
@@ -460,7 +524,12 @@ class CRCM_Plugin {
     }
     
     /**
-     * Booking form shortcode
+     * Booking form shortcode.
+     *
+     * @since 1.0.0
+     *
+     * @param array $atts Shortcode attributes.
+     * @return string Shortcode output.
      */
     public function booking_form_shortcode($atts) {
         $atts = shortcode_atts(array(
@@ -530,7 +599,12 @@ class CRCM_Plugin {
     }
 
     /**
-     * Customer dashboard shortcode
+     * Customer dashboard shortcode.
+     *
+     * @since 1.0.0
+     *
+     * @param array $atts Shortcode attributes.
+     * @return string Shortcode output.
      */
     public function customer_dashboard_shortcode($atts) {
         if (!is_user_logged_in()) {
@@ -555,7 +629,11 @@ class CRCM_Plugin {
     }
     
     /**
-     * Enqueue frontend assets
+     * Enqueue frontend assets.
+     *
+     * @since 1.0.0
+     *
+     * @return void
      */
     public function enqueue_frontend_assets() {
         $css_path = CRCM_PLUGIN_PATH . 'assets/css/frontend.css';
@@ -589,7 +667,12 @@ class CRCM_Plugin {
     }
     
     /**
-     * Enqueue admin assets
+     * Enqueue admin assets.
+     *
+     * @since 1.0.0
+     *
+     * @param string $hook Current admin page hook.
+     * @return void
      */
     public function enqueue_admin_assets( $hook ) {
         $screen = get_current_screen();
@@ -775,7 +858,13 @@ class CRCM_Plugin {
     }
     
     /**
-     * Get plugin setting
+     * Get plugin setting.
+     *
+     * @since 1.0.0
+     *
+     * @param string $key     Setting key.
+     * @param mixed  $default Default value if not set.
+     * @return mixed Setting value.
      */
     public function get_setting($key, $default = '') {
         $settings = get_option('crcm_settings', array());
@@ -783,7 +872,11 @@ class CRCM_Plugin {
     }
     
     /**
-     * Plugin activation - FIXED: Now properly creates roles
+     * Plugin activation - FIXED: Now properly creates roles.
+     *
+     * @since 1.0.0
+     *
+     * @return void
      */
     public static function activate() {
         $plugin = self::get_instance();
@@ -816,7 +909,11 @@ class CRCM_Plugin {
     }
     
     /**
-     * Plugin deactivation
+     * Plugin deactivation.
+     *
+     * @since 1.0.0
+     *
+     * @return void
      */
     public static function deactivate() {
         wp_clear_scheduled_hook('crcm_daily_reminder_check');
@@ -835,6 +932,7 @@ class CRCM_Plugin {
      * version for future upgrades.
      *
      * @since 1.0.0
+     *
      * @return void
      */
     private function create_availability_table() {
@@ -867,6 +965,7 @@ class CRCM_Plugin {
      * Check database version and run upgrades when necessary.
      *
      * @since 1.0.0
+     *
      * @return void
      */
     private function maybe_upgrade_db() {
@@ -878,6 +977,8 @@ class CRCM_Plugin {
 
     /**
      * Register plugin settings using the WordPress Settings API.
+     *
+     * @since 1.0.0
      *
      * @return void
      */
@@ -1114,8 +1215,9 @@ class CRCM_Plugin {
     /**
      * Sanitize settings input.
      *
-     * @param array $input Raw settings.
+     * @since 1.0.0
      *
+     * @param array $input Raw settings.
      * @return array Sanitized settings.
      */
     public function sanitize_settings( $input ) {
@@ -1158,8 +1260,9 @@ class CRCM_Plugin {
     /**
      * Render a settings field.
      *
-     * @param array $args Field arguments.
+     * @since 1.0.0
      *
+     * @param array $args Field arguments.
      * @return void
      */
     public function render_field( $args ) {
@@ -1210,7 +1313,9 @@ class CRCM_Plugin {
     /**
      * Default settings values.
      *
-     * @return array
+     * @since 1.0.0
+     *
+     * @return array Default settings.
      */
     private function get_default_settings() {
         return array(
@@ -1244,7 +1349,11 @@ class CRCM_Plugin {
         );
     }
     /**
-     * Create default settings
+     * Create default settings.
+     *
+     * @since 1.0.0
+     *
+     * @return void
      */
     private function create_default_settings() {
         $default_settings = array(
@@ -1266,7 +1375,11 @@ register_activation_hook(CRCM_PLUGIN_FILE, array('CRCM_Plugin', 'activate'));
 register_deactivation_hook(CRCM_PLUGIN_FILE, array('CRCM_Plugin', 'deactivate'));
 
 /**
- * Initialize the plugin
+ * Initialize the plugin.
+ *
+ * @since 1.0.0
+ *
+ * @return CRCM_Plugin Plugin instance.
  */
 function crcm() {
     return CRCM_Plugin::get_instance();
@@ -1307,7 +1420,7 @@ if (
 ) {
     add_action('admin_notices', function () {
         echo '<div class="notice notice-success is-dismissible">';
-        echo '<p><strong>Custom Rental Manager:</strong> User roles created successfully!</p>';
+        echo '<p><strong>' . esc_html__( 'Custom Rental Manager:', 'custom-rental-manager' ) . '</strong> ' . esc_html__( 'User roles created successfully!', 'custom-rental-manager' ) . '</p>';
         echo '</div>';
     });
 }
