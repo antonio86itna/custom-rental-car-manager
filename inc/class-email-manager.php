@@ -648,15 +648,21 @@ class CRCM_Email_Manager {
             $template_file = CRCM_PLUGIN_PATH . 'templates/emails/en/' . $recipient . '/' . $template . '.php';
         }
 
-        $customer        = $booking['customer_data'];
-        $payment_button  = '';
-        $payment_data    = get_post_meta($booking['booking_id'], '_crcm_payment_data', true);
-        $payment_status  = $payment_data['payment_status'] ?? '';
+        $customer       = $booking['customer_data'];
+        $payment_button = '';
+        $payment_data   = get_post_meta($booking['booking_id'], '_crcm_payment_data', true);
+        $payment_status = $payment_data['payment_status'] ?? '';
+        $payment_url    = '';
+        $dashboard_url  = home_url('/customer-dashboard/');
+
         if ('completed' !== $payment_status) {
             $payment_url = crcm()->payment_manager->get_checkout_url($booking['booking_id']);
-            if ($payment_url) {
-                $payment_button = '<a href="' . esc_url($payment_url) . '" style="display:inline-block;padding:10px 20px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:4px;">' . esc_html__('Paga ora', 'custom-rental-manager') . '</a>';
-            }
+        }
+
+        if ($payment_url) {
+            $payment_button = '<a href="' . esc_url($payment_url) . '" style="display:inline-block;padding:10px 20px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:4px;">' . esc_html__('Paga ora', 'custom-rental-manager') . '</a>';
+        } else {
+            $payment_button = '<a href="' . esc_url($dashboard_url) . '" style="display:inline-block;padding:10px 20px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:4px;">' . esc_html__('View Booking', 'custom-rental-manager') . '</a>';
         }
 
         if (!empty($args)) {
