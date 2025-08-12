@@ -30,10 +30,12 @@ Il plugin **Custom Rental Car Manager** è un sistema completo e professionale p
 2. Attiva il plugin via Plugins nel backend WordPress
 3. Configura le impostazioni dal menu “Costabilerent” → **Impostazioni**
 4. Crea veicoli, tariffe, sedi, servizi, assicurazioni tramite admin
+5. Copia la directory `costabilerent-theme/` nella cartella `/wp-content/themes/` e attiva il tema da **Aspetto** → **Temi**
+6. Per maggiori dettagli consulta la [documentazione aggiornata](https://www.totaliweb.com/docs/custom-rental-car-manager)
 
 ## Uso
 
-- Inserisci shortcode `[crcm_search]`, `[crcm_list]`, `[crcm_booking]`, `[crcm_area]` nelle pagine desiderate
+- Inserisci shortcode `[crcm_search_form]`, `[crcm_vehicle_list]`, `[crcm_booking_form]`, `[crcm_customer_dashboard]` nelle pagine desiderate
 - Personalizza layout e stile in front-end tramite template override
 - Gestisci prenotazioni, veicoli, calendario in backend
 
