@@ -478,14 +478,13 @@ class CRCM_Plugin {
             true
         );
 
-        ob_start();
-        $template_path = CRCM_PLUGIN_PATH . 'templates/frontend/search-form.php';
-        if (file_exists($template_path)) {
-            include $template_path;
-        } else {
-            echo '<p>' . esc_html__('Search form template not found.', 'custom-rental-manager') . '</p>';
+        $output = apply_filters('crcm_search_form', '', $atts);
+
+        if (empty($output)) {
+            $output = '<p>' . esc_html__('Search form template not found.', 'custom-rental-manager') . '</p>';
         }
-        return ob_get_clean();
+
+        return $output;
     }
     
     /**
@@ -517,14 +516,13 @@ class CRCM_Plugin {
             true
         );
 
-        ob_start();
-        $template_path = CRCM_PLUGIN_PATH . 'templates/frontend/vehicle-list.php';
-        if (file_exists($template_path)) {
-            include $template_path;
-        } else {
-            echo '<p>' . esc_html__('Vehicle list template not found.', 'custom-rental-manager') . '</p>';
+        $output = apply_filters('crcm_vehicle_list', '', $atts);
+
+        if (empty($output)) {
+            $output = '<p>' . esc_html__('Vehicle list template not found.', 'custom-rental-manager') . '</p>';
         }
-        return ob_get_clean();
+
+        return $output;
     }
     
     /**
@@ -600,14 +598,26 @@ class CRCM_Plugin {
             )
         );
 
-        ob_start();
-        $template_path = CRCM_PLUGIN_PATH . 'templates/frontend/booking-form.php';
-        if (file_exists($template_path)) {
-            include $template_path;
-        } else {
-            echo '<p>' . esc_html__('Booking form template not found.', 'custom-rental-manager') . '</p>';
+        $template_data = array(
+            'vehicle_id'       => $vehicle_id,
+            'pickup_date'      => $pickup_date,
+            'return_date'      => $return_date,
+            'pickup_time'      => $pickup_time,
+            'return_time'      => $return_time,
+            'pricing_data'     => $pricing_data,
+            'daily_rate'       => $daily_rate,
+            'rental_days'      => $rental_days,
+            'extra_daily_rate' => $extra_daily_rate,
+            'currency_symbol'  => $currency_symbol,
+        );
+
+        $output = apply_filters('crcm_booking_form', '', $atts, $template_data);
+
+        if (empty($output)) {
+            $output = '<p>' . esc_html__('Booking form template not found.', 'custom-rental-manager') . '</p>';
         }
-        return ob_get_clean();
+
+        return $output;
     }
 
     /**
@@ -634,14 +644,13 @@ class CRCM_Plugin {
             CRCM_VERSION
         );
 
-        ob_start();
-        $template_path = CRCM_PLUGIN_PATH . 'templates/frontend/customer-dashboard.php';
-        if (file_exists($template_path)) {
-            include $template_path;
-        } else {
-            echo '<p>' . esc_html__('Customer dashboard template not found.', 'custom-rental-manager') . '</p>';
+        $output = apply_filters('crcm_customer_dashboard', '', $atts);
+
+        if (empty($output)) {
+            $output = '<p>' . esc_html__('Customer dashboard template not found.', 'custom-rental-manager') . '</p>';
         }
-        return ob_get_clean();
+
+        return $output;
     }
     
     /**
