@@ -512,8 +512,9 @@ class CRCM_API_Endpoints {
     /**
      * Basic permission check for public endpoints.
      *
-     * Validates REST nonce when provided and applies a simple
-     * rate limiting based on the request IP to mitigate abuse.
+     * Applies a simple rate limit per IP and grants access when a
+     * valid REST nonce is supplied or the current user has the
+     * `read` capability.
      *
      * @param WP_REST_Request $request Current request.
      * @return true|WP_Error
@@ -534,33 +535,20 @@ class CRCM_API_Endpoints {
 
         set_transient( $key, $hits + 1, MINUTE_IN_SECONDS * 10 );
 
-        $nonce = $request->get_header( 'X-WP-Nonce' );
-        if ( $nonce && wp_verify_nonce( $nonce, 'wp_rest' ) ) {
-            return true;
-        }
-
-        if ( is_user_logged_in() ) {
-            return current_user_can( 'read' );
-        }
-
-        return new WP_Error(
-            'rest_forbidden',
-            __( 'Invalid or missing nonce', 'custom-rental-manager' ),
-            array( 'status' => rest_authorization_required_code() )
-        );
+        return $this->validate_nonce_or_caps( $request, array( 'read' ) );
     }
 
     /**
-     * Check if user has manage permissions
+     * Permission check for management endpoints.
+     *
+     * Allows access when a valid nonce is supplied and the
+     * current user has either `manage_options` or
+     * `crcm_manage_bookings` capability.
      */
     public function check_manage_permissions( $request ) {
-        $nonce = $request->get_header( 'X-WP-Nonce' );
-        if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
-            return new WP_Error(
-                'rest_forbidden',
-                __( 'Invalid or missing nonce', 'custom-rental-manager' ),
-                array( 'status' => rest_authorization_required_code() )
-            );
+        $result = $this->validate_nonce_or_caps( $request, array( 'manage_options', 'crcm_manage_bookings' ) );
+        if ( is_wp_error( $result ) ) {
+            return $result;
         }
 
         if ( current_user_can( 'manage_options' ) || current_user_can( 'crcm_manage_bookings' ) ) {
@@ -575,16 +563,15 @@ class CRCM_API_Endpoints {
     }
 
     /**
-     * Check booking permissions (own booking or admin)
+     * Check booking permissions (own booking or admin).
+     *
+     * Requires a valid nonce and grants access to admins or to
+     * customers when the booking belongs to them.
      */
     public function check_booking_permissions( $request ) {
-        $nonce = $request->get_header( 'X-WP-Nonce' );
-        if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
-            return new WP_Error(
-                'rest_forbidden',
-                __( 'Invalid or missing nonce', 'custom-rental-manager' ),
-                array( 'status' => rest_authorization_required_code() )
-            );
+        $result = $this->validate_nonce_or_caps( $request, array( 'manage_options', 'crcm_manage_bookings', 'read' ) );
+        if ( is_wp_error( $result ) ) {
+            return $result;
         }
 
         if ( current_user_can( 'manage_options' ) || current_user_can( 'crcm_manage_bookings' ) ) {
@@ -613,6 +600,35 @@ class CRCM_API_Endpoints {
         return new WP_Error(
             'rest_forbidden',
             __( 'You are not allowed to view this booking.', 'custom-rental-manager' ),
+            array( 'status' => rest_authorization_required_code() )
+        );
+    }
+
+    /**
+     * Validate request via nonce or capability check.
+     *
+     * Allows access when a valid REST nonce is provided or when the
+     * current user has one of the supplied capabilities.
+     *
+     * @param WP_REST_Request $request Request being served.
+     * @param array           $caps    Optional capabilities that grant access.
+     * @return true|WP_Error
+     */
+    protected function validate_nonce_or_caps( $request, $caps = array() ) {
+        $nonce = $request->get_header( 'X-WP-Nonce' );
+        if ( $nonce && wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+            return true;
+        }
+
+        foreach ( (array) $caps as $cap ) {
+            if ( current_user_can( $cap ) ) {
+                return true;
+            }
+        }
+
+        return new WP_Error(
+            'rest_forbidden',
+            __( 'Invalid or missing authentication.', 'custom-rental-manager' ),
             array( 'status' => rest_authorization_required_code() )
         );
     }
