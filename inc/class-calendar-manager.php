@@ -34,58 +34,69 @@ class CRCM_Calendar_Manager {
             wp_send_json_error(__('Permission denied', 'custom-rental-manager'));
         }
 
-        $month = sanitize_text_field($_POST['month'] ?? date('Y-m'));
-        $vehicle_id = intval($_POST['vehicle_id'] ?? 0);
+        $month      = sanitize_text_field( $_POST['month'] ?? date( 'Y-m' ) );
+        $vehicle_id = intval( $_POST['vehicle_id'] ?? 0 );
+        $per_page   = isset( $_POST['per_page'] ) ? absint( $_POST['per_page'] ) : 20;
+        $page       = isset( $_POST['page'] ) ? absint( $_POST['page'] ) : 1;
 
-        $calendar_data = $this->get_calendar_data($month, $vehicle_id);
-        wp_send_json_success($calendar_data);
+        $calendar_data = $this->get_calendar_data( $month, $vehicle_id, $per_page, $page );
+        wp_send_json_success( $calendar_data );
     }
 
     /**
-     * Get calendar data for a specific month
+     * Get calendar data for a specific month.
+     *
+     * @param string $month      Month in 'Y-m' format.
+     * @param int    $vehicle_id Optional vehicle ID filter.
+     * @param int    $per_page   Number of bookings per page.
+     * @param int    $paged      Current page number.
+     *
+     * @return array{events: array, pagination: array} Calendar events and pagination info.
      */
-    public function get_calendar_data($month, $vehicle_id = 0) {
+    public function get_calendar_data( $month, $vehicle_id = 0, $per_page = 20, $paged = 1 ) {
         $start_date = $month . '-01';
-        $end_date = date('Y-m-t', strtotime($start_date));
+        $end_date   = date( 'Y-m-t', strtotime( $start_date ) );
 
         // Get bookings for the month
         $booking_args = array(
-            'post_type' => 'crcm_booking',
-            'post_status' => array('publish', 'private'),
-            'posts_per_page' => -1,
-            'meta_query' => array(
+            'post_type'      => 'crcm_booking',
+            'post_status'    => array( 'publish', 'private' ),
+            'posts_per_page' => $per_page,
+            'paged'          => $paged,
+            'meta_query'     => array(
                 'relation' => 'AND',
                 array(
                     'relation' => 'OR',
                     array(
-                        'key' => '_crcm_pickup_date',
-                        'value' => array($start_date, $end_date),
+                        'key'     => '_crcm_pickup_date',
+                        'value'   => array( $start_date, $end_date ),
                         'compare' => 'BETWEEN',
-                        'type' => 'DATE',
+                        'type'    => 'DATE',
                     ),
                     array(
-                        'key' => '_crcm_return_date',
-                        'value' => array($start_date, $end_date),
+                        'key'     => '_crcm_return_date',
+                        'value'   => array( $start_date, $end_date ),
                         'compare' => 'BETWEEN',
-                        'type' => 'DATE',
+                        'type'    => 'DATE',
                     ),
                 ),
             ),
         );
 
-        if ($vehicle_id > 0) {
+        if ( $vehicle_id > 0 ) {
             $booking_args['meta_query'][] = array(
-                'key' => '_crcm_vehicle_id',
-                'value' => $vehicle_id,
+                'key'     => '_crcm_vehicle_id',
+                'value'   => $vehicle_id,
                 'compare' => '=',
             );
         }
 
-        $bookings = get_posts($booking_args);
+        $query    = new WP_Query( $booking_args );
+        $bookings = $query->posts;
 
         $calendar_events = array();
 
-        foreach ($bookings as $booking) {
+        foreach ( $bookings as $booking ) {
             $booking_data = get_post_meta($booking->ID, '_crcm_booking_data', true);
             $customer_data = get_post_meta($booking->ID, '_crcm_customer_data', true);
             $booking_status = get_post_meta($booking->ID, '_crcm_booking_status', true);
@@ -115,7 +126,16 @@ class CRCM_Calendar_Manager {
             );
         }
 
-        return $calendar_events;
+        $pagination = array(
+            'current'   => $paged,
+            'total'     => (int) $query->max_num_pages,
+            'per_page'  => $per_page,
+        );
+
+        return array(
+            'events'     => $calendar_events,
+            'pagination' => $pagination,
+        );
     }
 
     /**
@@ -183,26 +203,33 @@ class CRCM_Calendar_Manager {
     }
 
     /**
-     * Get upcoming bookings for dashboard
+     * Get upcoming bookings for dashboard.
+     *
+     * @param int $days     Number of days to look ahead.
+     * @param int $per_page Number of bookings per page.
+     * @param int $paged    Current page number.
+     *
+     * @return array
      */
-    public function get_upcoming_bookings($days = 7) {
-        $start_date = date('Y-m-d');
-        $end_date = date('Y-m-d', strtotime('+' . $days . ' days'));
+    public function get_upcoming_bookings( $days = 7, $per_page = 20, $paged = 1 ) {
+        $start_date = date( 'Y-m-d' );
+        $end_date   = date( 'Y-m-d', strtotime( '+' . $days . ' days' ) );
 
         $args = array(
-            'post_type' => 'crcm_booking',
-            'post_status' => array('publish', 'private'),
-            'posts_per_page' => -1,
-            'meta_query' => array(
+            'post_type'      => 'crcm_booking',
+            'post_status'    => array( 'publish', 'private' ),
+            'posts_per_page' => $per_page,
+            'paged'          => $paged,
+            'meta_query'     => array(
                 array(
-                    'key' => '_crcm_pickup_date',
-                    'value' => array($start_date, $end_date),
+                    'key'     => '_crcm_pickup_date',
+                    'value'   => array( $start_date, $end_date ),
                     'compare' => 'BETWEEN',
-                    'type' => 'DATE',
+                    'type'    => 'DATE',
                 ),
                 array(
-                    'key' => '_crcm_booking_status',
-                    'value' => array('confirmed', 'active'),
+                    'key'     => '_crcm_booking_status',
+                    'value'   => array( 'confirmed', 'active' ),
                     'compare' => 'IN',
                 ),
             ),
@@ -211,62 +238,80 @@ class CRCM_Calendar_Manager {
             'order' => 'ASC',
         );
 
-        return get_posts($args);
+        $query = new WP_Query( $args );
+
+        return $query->posts;
     }
 
     /**
-     * Get vehicles out today
+     * Get vehicles out today.
+     *
+     * @param int $per_page Number of bookings per page.
+     * @param int $paged    Current page number.
+     *
+     * @return array
      */
-    public function get_vehicles_out_today() {
-        $today = date('Y-m-d');
+    public function get_vehicles_out_today( $per_page = 20, $paged = 1 ) {
+        $today = date( 'Y-m-d' );
 
         $args = array(
-            'post_type' => 'crcm_booking',
-            'post_status' => array('publish', 'private'),
-            'posts_per_page' => -1,
-            'meta_query' => array(
+            'post_type'      => 'crcm_booking',
+            'post_status'    => array( 'publish', 'private' ),
+            'posts_per_page' => $per_page,
+            'paged'          => $paged,
+            'meta_query'     => array(
                 array(
-                    'key' => '_crcm_pickup_date',
-                    'value' => $today,
+                    'key'     => '_crcm_pickup_date',
+                    'value'   => $today,
                     'compare' => '=',
-                    'type' => 'DATE',
+                    'type'    => 'DATE',
                 ),
                 array(
-                    'key' => '_crcm_booking_status',
-                    'value' => array('confirmed', 'active'),
+                    'key'     => '_crcm_booking_status',
+                    'value'   => array( 'confirmed', 'active' ),
                     'compare' => 'IN',
                 ),
             ),
         );
 
-        return get_posts($args);
+        $query = new WP_Query( $args );
+
+        return $query->posts;
     }
 
     /**
-     * Get vehicles returning today
+     * Get vehicles returning today.
+     *
+     * @param int $per_page Number of bookings per page.
+     * @param int $paged    Current page number.
+     *
+     * @return array
      */
-    public function get_vehicles_returning_today() {
-        $today = date('Y-m-d');
+    public function get_vehicles_returning_today( $per_page = 20, $paged = 1 ) {
+        $today = date( 'Y-m-d' );
 
         $args = array(
-            'post_type' => 'crcm_booking',
-            'post_status' => array('publish', 'private'),
-            'posts_per_page' => -1,
-            'meta_query' => array(
+            'post_type'      => 'crcm_booking',
+            'post_status'    => array( 'publish', 'private' ),
+            'posts_per_page' => $per_page,
+            'paged'          => $paged,
+            'meta_query'     => array(
                 array(
-                    'key' => '_crcm_return_date',
-                    'value' => $today,
+                    'key'     => '_crcm_return_date',
+                    'value'   => $today,
                     'compare' => '=',
-                    'type' => 'DATE',
+                    'type'    => 'DATE',
                 ),
                 array(
-                    'key' => '_crcm_booking_status',
-                    'value' => 'active',
+                    'key'     => '_crcm_booking_status',
+                    'value'   => 'active',
                     'compare' => '=',
                 ),
             ),
         );
 
-        return get_posts($args);
+        $query = new WP_Query( $args );
+
+        return $query->posts;
     }
 }
