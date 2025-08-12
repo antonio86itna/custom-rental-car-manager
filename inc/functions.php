@@ -14,6 +14,20 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+/**
+ * Retrieve a theme-provided option.
+ *
+ * Themes can hook into the `crcm_theme_option` filter to supply
+ * Customizer values stored in theme mods.
+ *
+ * @param string $option  Option key.
+ * @param mixed  $default Default value if not provided by the theme.
+ * @return mixed
+ */
+function crcm_get_theme_option( $option, $default = null ) {
+    return apply_filters( 'crcm_theme_option', $default, $option );
+}
+
 // ===============================================
 // ENHANCED USER ROLE MANAGEMENT SYSTEM
 // ===============================================

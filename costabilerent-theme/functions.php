@@ -46,8 +46,9 @@ function costabilerent_enqueue_assets() {
         $version
     );
 
-    $primary_color = get_theme_mod( 'costabilerent_primary_color', '#ff6600' );
-    $css           = ":root { --primary-color: {$primary_color}; }";
+    $primary_color   = get_theme_mod( 'costabilerent_primary_color', '#ff6600' );
+    $secondary_color = get_theme_mod( 'costabilerent_secondary_color', '#333333' );
+    $css             = ":root { --primary-color: {$primary_color}; --secondary-color: {$secondary_color}; }";
     wp_add_inline_style( 'costabilerent-style', $css );
 
     wp_enqueue_style(
@@ -68,12 +69,20 @@ function costabilerent_enqueue_assets() {
 add_action( 'wp_enqueue_scripts', 'costabilerent_enqueue_assets' );
 
 /**
- * Register Customizer settings for colors.
+ * Register Customizer settings for branding and options.
  *
  * @param WP_Customize_Manager $wp_customize Theme Customizer object.
  * @return void
  */
 function costabilerent_customize_register( $wp_customize ) {
+    $wp_customize->add_section(
+        'costabilerent_branding',
+        array(
+            'title'    => __( 'Costabilerent Branding', 'costabilerent' ),
+            'priority' => 30,
+        )
+    );
+
     $wp_customize->add_setting(
         'costabilerent_primary_color',
         array(
@@ -92,6 +101,88 @@ function costabilerent_customize_register( $wp_customize ) {
             )
         )
     );
+
+    $wp_customize->add_setting(
+        'costabilerent_secondary_color',
+        array(
+            'default'           => '#333333',
+            'sanitize_callback' => 'sanitize_hex_color',
+        )
+    );
+
+    $wp_customize->add_control(
+        new WP_Customize_Color_Control(
+            $wp_customize,
+            'costabilerent_secondary_color',
+            array(
+                'label'   => __( 'Secondary Color', 'costabilerent' ),
+                'section' => 'colors',
+            )
+        )
+    );
+
+    $wp_customize->add_setting(
+        'costabilerent_popular_vehicle_count',
+        array(
+            'default'           => 6,
+            'sanitize_callback' => 'absint',
+        )
+    );
+
+    $wp_customize->add_control(
+        'costabilerent_popular_vehicle_count',
+        array(
+            'label'       => __( 'Number of Popular Vehicles', 'costabilerent' ),
+            'section'     => 'costabilerent_branding',
+            'type'        => 'number',
+            'input_attrs' => array(
+                'min' => 1,
+                'max' => 20,
+            ),
+        )
+    );
+
+    $wp_customize->add_setting(
+        'costabilerent_logo',
+        array(
+            'sanitize_callback' => 'absint',
+        )
+    );
+
+    $wp_customize->add_control(
+        new WP_Customize_Media_Control(
+            $wp_customize,
+            'costabilerent_logo',
+            array(
+                'label'     => __( 'Brand Logo', 'costabilerent' ),
+                'section'   => 'costabilerent_branding',
+                'mime_type' => 'image',
+            )
+        )
+    );
 }
 add_action( 'customize_register', 'costabilerent_customize_register' );
+
+/**
+ * Provide theme mods to the Custom Rental Car Manager plugin.
+ *
+ * @param mixed  $default Default value provided by the plugin.
+ * @param string $option  Option key requested.
+ * @return mixed
+ */
+function costabilerent_crcm_theme_option( $default, $option ) {
+    switch ( $option ) {
+        case 'popular_vehicle_count':
+            return (int) get_theme_mod( 'costabilerent_popular_vehicle_count', $default );
+        case 'primary_color':
+            return get_theme_mod( 'costabilerent_primary_color', $default );
+        case 'secondary_color':
+            return get_theme_mod( 'costabilerent_secondary_color', $default );
+        case 'logo':
+            return get_theme_mod( 'costabilerent_logo', $default );
+        default:
+            return $default;
+    }
+}
+add_filter( 'crcm_theme_option', 'costabilerent_crcm_theme_option', 10, 2 );
 
