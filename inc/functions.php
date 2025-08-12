@@ -515,26 +515,31 @@ function crcm_format_price($amount, $currency_symbol = '€') {
  * @return string
  */
 function crcm_format_line_item_label($item, $currency_symbol = '€') {
+    $name       = sanitize_text_field($item['name'] ?? '');
+    $qty        = isset($item['qty']) ? intval($item['qty']) : 0;
     $type       = isset($item['type']) ? $item['type'] : 'flat';
     $base_rate  = isset($item['base_rate']) ? floatval($item['base_rate']) : 0;
     $extra_rate = isset($item['extra_rate']) ? floatval($item['extra_rate']) : 0;
-    $name       = sanitize_text_field($item['name'] ?? '');
 
-    if ($extra_rate > 0) {
-        $label  = sprintf(
-            __('Tariffa base %s/giorno', 'custom-rental-manager'),
-            crcm_format_price($base_rate, $currency_symbol)
+    if ('daily' === $type) {
+        $day_label = __('day', 'custom-rental-manager');
+        $label     = sprintf(
+            '%s × %d (%s/%s',
+            esc_html($name),
+            $qty,
+            crcm_format_price($base_rate, $currency_symbol),
+            $day_label
         );
-        $label .= '<br>' . sprintf(
-            __('Tariffa aggiuntiva %s/giorno', 'custom-rental-manager'),
-            crcm_format_price($extra_rate, $currency_symbol)
-        );
+        if ($extra_rate > 0) {
+            $label .= ' +' . crcm_format_price($extra_rate, $currency_symbol) . '/' . $day_label;
+        }
+        $label .= ')';
         return $label;
     }
 
-    if ('daily' === $type) {
+    if ($base_rate > 0) {
         return sprintf(
-            '%s %s/giorno',
+            '%s (%s)',
             esc_html($name),
             crcm_format_price($base_rate, $currency_symbol)
         );
