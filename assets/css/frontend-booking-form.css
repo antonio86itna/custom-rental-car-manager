@@ -8,6 +8,20 @@
     margin-bottom: 30px;
 }
 
+.crcm-step-dates {
+    margin-top: 15px;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.crcm-step-dates label {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
 .crcm-breadcrumb {
     margin-bottom: 15px;
 }

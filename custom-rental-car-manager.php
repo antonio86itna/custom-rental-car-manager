@@ -567,6 +567,11 @@ class CRCM_Plugin {
             }
         }
 
+        $end_date = new DateTime($pickup_date ?: date('Y-m-d'));
+        $end_date->add(new DateInterval('P' . $rental_days . 'D'));
+        $base_total_calc  = crcm_calculate_vehicle_pricing($vehicle_id, $pickup_date, $end_date->format('Y-m-d'));
+        $extra_daily_rate = $rental_days > 0 ? max(0, ($base_total_calc - ($daily_rate * $rental_days)) / $rental_days) : 0;
+
         $currency_symbol = crcm_get_setting('currency_symbol', '€');
 
         wp_enqueue_style(
@@ -589,8 +594,11 @@ class CRCM_Plugin {
             'crcmBookingData',
             array(
                 'daily_rate'      => $daily_rate,
+                'extra_daily_rate'=> $extra_daily_rate,
                 'rental_days'     => $rental_days,
                 'currency_symbol' => $currency_symbol,
+                'days_label'      => __('giorni', 'custom-rental-manager'),
+                'free_label'      => __('Gratis', 'custom-rental-manager'),
             )
         );
 
