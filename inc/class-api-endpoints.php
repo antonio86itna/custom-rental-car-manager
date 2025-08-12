@@ -324,6 +324,7 @@ class CRCM_API_Endpoints {
             'post_status'    => array( 'publish', 'private' ),
             'posts_per_page' => $per_page,
             'paged'          => $page,
+            'fields'         => 'ids',
         );
 
         // Add filters if provided
@@ -336,13 +337,13 @@ class CRCM_API_Endpoints {
             );
         }
 
-        $query    = new WP_Query( $args );
-        $posts    = $query->posts;
-        $bookings = array();
+        $query       = new WP_Query( $args );
+        $booking_ids = $query->posts;
+        $bookings    = array();
 
-        foreach ( $posts as $post ) {
+        foreach ( $booking_ids as $booking_id ) {
             $booking_manager = crcm()->booking_manager;
-            $booking         = $booking_manager->get_booking( $post->ID );
+            $booking         = $booking_manager->get_booking( $booking_id );
             if ( ! is_wp_error( $booking ) ) {
                 $bookings[] = $booking;
             }

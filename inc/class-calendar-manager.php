@@ -58,7 +58,7 @@ class CRCM_Calendar_Manager {
         $end_date   = date( 'Y-m-t', strtotime( $start_date ) );
 
         $cache_key = 'crcm_calendar_' . md5( $month . '_' . $vehicle_id . '_' . $per_page . '_' . $page );
-        $cached    = wp_cache_get( $cache_key, 'crcm_calendar' );
+        $cached    = get_transient( $cache_key );
         if ( false !== $cached ) {
             return $cached;
         }
@@ -144,7 +144,7 @@ class CRCM_Calendar_Manager {
             'pagination' => $pagination,
         );
 
-        wp_cache_set( $cache_key, $result, 'crcm_calendar', DAY_IN_SECONDS );
+        set_transient( $cache_key, $result, MONTH_IN_SECONDS );
 
         return $result;
     }
