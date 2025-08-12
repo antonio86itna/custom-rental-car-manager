@@ -65,6 +65,87 @@ function costabilerent_enqueue_assets() {
         $version,
         true
     );
+
+    wp_enqueue_style(
+        'crcm-frontend',
+        get_template_directory_uri() . '/assets/css/frontend.css',
+        array(),
+        $version
+    );
+
+    wp_enqueue_script(
+        'crcm-frontend',
+        get_template_directory_uri() . '/assets/js/frontend.js',
+        array( 'jquery' ),
+        $version,
+        true
+    );
+
+    if ( class_exists( 'CRCM_Plugin' ) ) {
+        $plugin = CRCM_Plugin::get_instance();
+        wp_localize_script(
+            'crcm-frontend',
+            'crcm_ajax',
+            array(
+                'ajax_url'        => admin_url( 'admin-ajax.php' ),
+                'nonce'           => wp_create_nonce( 'crcm_nonce' ),
+                'currency_symbol' => $plugin->get_setting( 'currency_symbol', '€' ),
+                'booking_page_url'=> home_url( '/booking/' ),
+            )
+        );
+    }
+
+    wp_enqueue_style(
+        'crcm-search-form',
+        get_template_directory_uri() . '/assets/css/frontend-search-form.css',
+        array(),
+        $version
+    );
+
+    wp_enqueue_script(
+        'crcm-search-form',
+        get_template_directory_uri() . '/assets/js/frontend-search-form.js',
+        array( 'jquery' ),
+        $version,
+        true
+    );
+
+    wp_enqueue_style(
+        'crcm-vehicle-list',
+        get_template_directory_uri() . '/assets/css/frontend-vehicle-list.css',
+        array(),
+        $version
+    );
+
+    wp_enqueue_script(
+        'crcm-vehicle-list',
+        get_template_directory_uri() . '/assets/js/frontend-vehicle-list.js',
+        array( 'jquery' ),
+        $version,
+        true
+    );
+
+    wp_enqueue_style(
+        'crcm-booking-form',
+        get_template_directory_uri() . '/assets/css/frontend-booking-form.css',
+        array(),
+        $version
+    );
+
+    wp_enqueue_script(
+        'crcm-booking-form',
+        get_template_directory_uri() . '/assets/js/frontend-booking-form.js',
+        array( 'jquery' ),
+        $version,
+        true
+    );
+
+    wp_enqueue_style(
+        'crcm-customer-dashboard',
+        get_template_directory_uri() . '/assets/css/frontend-customer-dashboard.css',
+        array(),
+        $version
+    );
 }
 add_action( 'wp_enqueue_scripts', 'costabilerent_enqueue_assets' );
 
