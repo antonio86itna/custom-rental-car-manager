@@ -359,6 +359,8 @@ jQuery(document).ready(function ($) {
         let lineItems = [];
 
         const baseDailyRate = rentalDays ? baseTotal / rentalDays : 0;
+        const baseRate = vehicleData && vehicleData.pricing ? parseFloat(vehicleData.pricing.daily_rate) || 0 : 0;
+        const extraDaily = baseDailyRate > baseRate ? baseDailyRate - baseRate : 0;
         if (lateReturnApplied && rentalDays > 1) {
             const baseDays = rentalDays - 1;
             if (baseDays > 0) {
@@ -366,21 +368,30 @@ jQuery(document).ready(function ($) {
                     name: i18n.base_rate,
                     qty: baseDays,
                     amount: baseDailyRate * baseDays,
-                    free: false
+                    free: false,
+                    type: 'daily',
+                    base_rate: baseRate,
+                    extra_rate: extraDaily
                 });
             }
             lineItems.push({
                 name: i18n.late_return_fee,
                 qty: 1,
                 amount: baseDailyRate,
-                free: false
+                free: false,
+                type: 'flat',
+                base_rate: baseDailyRate,
+                extra_rate: 0
             });
         } else {
             lineItems.push({
                 name: i18n.base_rate,
                 qty: rentalDays,
                 amount: baseTotal,
-                free: false
+                free: false,
+                type: 'daily',
+                base_rate: baseRate,
+                extra_rate: extraDaily
             });
         }
 
@@ -393,7 +404,10 @@ jQuery(document).ready(function ($) {
                 name: name,
                 qty: rentalDays,
                 amount: amount,
-                free: rate === 0
+                free: rate === 0,
+                type: 'daily',
+                base_rate: rate,
+                extra_rate: 0
             });
         });
 
@@ -406,14 +420,20 @@ jQuery(document).ready(function ($) {
                 name: i18n.premium_insurance,
                 qty: rentalDays,
                 amount: insuranceTotal,
-                free: false
+                free: false,
+                type: 'daily',
+                base_rate: rate,
+                extra_rate: 0
             });
         } else {
             lineItems.push({
                 name: i18n.basic_insurance,
                 qty: rentalDays,
                 amount: 0,
-                free: true
+                free: true,
+                type: 'daily',
+                base_rate: 0,
+                extra_rate: 0
             });
         }
 

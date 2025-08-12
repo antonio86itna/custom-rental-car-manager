@@ -312,12 +312,45 @@ class CRCM_Booking_Manager {
         $end_date = new DateTime($pickup_date);
         $end_date->add(new DateInterval('P' . $rental_days . 'D'));
 
-        $base_total          = crcm_calculate_vehicle_pricing($vehicle_id, $pickup_date, $end_date->format('Y-m-d'));
-        $base_without_extra  = $daily_rate * $rental_days;
-        $extra_daily         = $rental_days > 0 ? max(0, ($base_total - $base_without_extra) / $rental_days) : 0;
+        $base_total         = crcm_calculate_vehicle_pricing($vehicle_id, $pickup_date, $end_date->format('Y-m-d'));
+        $base_without_extra = $daily_rate * $rental_days;
+        $extra_daily        = $rental_days > 0 ? max(0, ($base_total - $base_without_extra) / $rental_days) : 0;
 
-        $line_items = array(
-            array(
+        $line_items = array();
+
+        $misc_data = get_post_meta($vehicle_id, '_crcm_misc_data', true);
+        $late_fee  = 0;
+
+        if (!empty($misc_data['late_return_rule']) && $return_time && !empty($misc_data['late_return_time']) && $return_time > $misc_data['late_return_time'] && $rental_days > 1) {
+            $base_days = $rental_days - 1;
+            $end_base  = new DateTime($pickup_date);
+            $end_base->add(new DateInterval('P' . $base_days . 'D'));
+            $base_cost = crcm_calculate_vehicle_pricing($vehicle_id, $pickup_date, $end_base->format('Y-m-d'));
+            $late_fee  = max(0, $base_total - $base_cost);
+
+            if ($base_days > 0) {
+                $line_items[] = array(
+                    'name'       => __('Noleggio', 'custom-rental-manager'),
+                    'qty'        => $base_days,
+                    'amount'     => $base_cost,
+                    'free'       => false,
+                    'type'       => 'daily',
+                    'base_rate'  => $daily_rate,
+                    'extra_rate' => $base_days > 0 ? max(0, ($base_cost - ($daily_rate * $base_days)) / $base_days) : 0,
+                );
+            }
+
+            $line_items[] = array(
+                'name'       => __('Late return fee', 'custom-rental-manager'),
+                'qty'        => 1,
+                'amount'     => $late_fee,
+                'free'       => false,
+                'type'       => 'flat',
+                'base_rate'  => $late_fee,
+                'extra_rate' => 0,
+            );
+        } else {
+            $line_items[] = array(
                 'name'       => __('Noleggio', 'custom-rental-manager'),
                 'qty'        => $rental_days,
                 'amount'     => $base_total,
@@ -325,18 +358,89 @@ class CRCM_Booking_Manager {
                 'type'       => 'daily',
                 'base_rate'  => $daily_rate,
                 'extra_rate' => $extra_daily,
-            ),
-        );
+            );
+        }
+
+        $extras_total = 0;
+        if (!empty($data['extras']) && is_array($data['extras'])) {
+            $extras_data = get_post_meta($vehicle_id, '_crcm_extras_data', true);
+            foreach ($data['extras'] as $extra_index) {
+                if (isset($extras_data[ $extra_index ])) {
+                    $extra   = $extras_data[ $extra_index ];
+                    $rate    = floatval($extra['daily_rate'] ?? 0);
+                    $amount  = $rate * $rental_days;
+                    $line_items[] = array(
+                        'name'       => sanitize_text_field($extra['name']),
+                        'qty'        => $rental_days,
+                        'amount'     => $amount,
+                        'free'       => $rate <= 0,
+                        'type'       => 'daily',
+                        'base_rate'  => $rate,
+                        'extra_rate' => 0,
+                    );
+                    $extras_total += $amount;
+                }
+            }
+        }
+
+        $insurance_total = 0;
+        $insurance_type  = sanitize_text_field($data['insurance_type'] ?? 'basic');
+        $insurance_data  = get_post_meta($vehicle_id, '_crcm_insurance_data', true);
+        if ('premium' === $insurance_type && !empty($insurance_data['premium']['enabled'])) {
+            $rate   = floatval($insurance_data['premium']['daily_rate'] ?? 0);
+            $amount = $rate * $rental_days;
+            $line_items[] = array(
+                'name'       => __('Premium insurance', 'custom-rental-manager'),
+                'qty'        => $rental_days,
+                'amount'     => $amount,
+                'free'       => false,
+                'type'       => 'daily',
+                'base_rate'  => $rate,
+                'extra_rate' => 0,
+            );
+            $insurance_total += $amount;
+        } else {
+            $line_items[] = array(
+                'name'       => __('Basic insurance', 'custom-rental-manager'),
+                'qty'        => $rental_days,
+                'amount'     => 0,
+                'free'       => true,
+                'type'       => 'daily',
+                'base_rate'  => 0,
+                'extra_rate' => 0,
+            );
+        }
+
+        $penalties_total = 0;
+        if (!empty($data['penalties']) && is_array($data['penalties'])) {
+            foreach ($data['penalties'] as $penalty) {
+                $p_name   = sanitize_text_field($penalty['name'] ?? __('Penalty', 'custom-rental-manager'));
+                $p_amount = floatval($penalty['amount'] ?? 0);
+                $line_items[] = array(
+                    'name'       => $p_name,
+                    'qty'        => 1,
+                    'amount'     => $p_amount,
+                    'free'       => $p_amount <= 0,
+                    'type'       => 'flat',
+                    'base_rate'  => $p_amount,
+                    'extra_rate' => 0,
+                );
+                $penalties_total += $p_amount;
+            }
+        }
+
+        $final_total = $base_total + $extras_total + $insurance_total + $penalties_total;
 
         return array(
-            'base_total'      => $base_total,
-            'extras_total'    => 0,
-            'insurance_total' => 0,
-            'tax_total'       => 0,
-            'manual_discount' => 0,
-            'discount_reason' => '',
-            'final_total'     => $base_total,
-            'line_items'      => $line_items,
+            'base_total'       => $base_total,
+            'extras_total'     => $extras_total,
+            'insurance_total'  => $insurance_total,
+            'penalties_total'  => $penalties_total,
+            'tax_total'        => 0,
+            'manual_discount'  => 0,
+            'discount_reason'  => '',
+            'final_total'      => $final_total,
+            'line_items'       => $line_items,
         );
     }
 
