@@ -15,6 +15,7 @@
     <thead>
         <tr>
             <th align="left"><?php _e('Item', 'custom-rental-manager'); ?></th>
+            <th align="right"><?php _e('Qty', 'custom-rental-manager'); ?></th>
             <th align="right"><?php _e('Amount', 'custom-rental-manager'); ?></th>
         </tr>
     </thead>
@@ -25,10 +26,12 @@
         $amount        = floatval($item['amount'] ?? 0);
         $free          = ! empty($item['free']);
         $label         = crcm_format_line_item_label($item, $currency_symbol);
+        $qty           = intval($item['qty'] ?? 0);
         $amount_display = $free ? __('Free', 'custom-rental-manager') : crcm_format_price($amount, $currency_symbol);
         ?>
         <tr>
             <td><?php echo $label; ?><?php if ($free) { ?> (<?php _e('Included', 'custom-rental-manager'); ?>)<?php } ?></td>
+            <td align="right"><?php echo esc_html($qty); ?></td>
             <td align="right"><?php echo esc_html($amount_display); ?></td>
         </tr>
     <?php }
