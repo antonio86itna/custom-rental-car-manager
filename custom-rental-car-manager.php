@@ -819,6 +819,34 @@ class CRCM_Plugin {
                     )
                 );
             }
+
+            $post_id = isset( $_GET['post'] ) ? intval( $_GET['post'] ) : 0;
+            if ( $post_id ) {
+                $status = get_post_meta( $post_id, '_crcm_booking_status', true );
+                if ( in_array( $status, array( 'confirmed', 'active' ), true ) ) {
+                    $lock_js = CRCM_PLUGIN_PATH . 'assets/js/admin-booking-lock.js';
+                    if ( file_exists( $lock_js ) ) {
+                        wp_enqueue_script(
+                            'crcm-admin-booking-lock',
+                            CRCM_PLUGIN_URL . 'assets/js/admin-booking-lock.js',
+                            array( 'jquery', 'crcm-admin-booking' ),
+                            CRCM_VERSION,
+                            true
+                        );
+
+                        wp_localize_script(
+                            'crcm-admin-booking-lock',
+                            'crcm_booking_lock',
+                            array(
+                                'ajax_url'       => admin_url( 'admin-ajax.php' ),
+                                'booking_id'     => $post_id,
+                                'nonce'          => wp_create_nonce( 'crcm_admin_nonce' ),
+                                'confirm_cancel' => __( 'Sei sicuro di voler cancellare questa prenotazione?', 'custom-rental-manager' ),
+                            )
+                        );
+                    }
+                }
+            }
         }
 
         $page_param   = sanitize_text_field( $_GET['page'] ?? '' );
@@ -1124,6 +1152,23 @@ class CRCM_Plugin {
             array( 'label_for' => 'minimum_deposit', 'type' => 'number' )
         );
 
+        add_settings_field(
+            'stripe_publishable_key',
+            __( 'Stripe Publishable Key', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_payment_section',
+            array( 'label_for' => 'stripe_publishable_key', 'type' => 'text' )
+        );
+        add_settings_field(
+            'stripe_secret_key',
+            __( 'Stripe Secret Key', 'custom-rental-manager' ),
+            array( $this, 'render_field' ),
+            'crcm-settings',
+            'crcm_payment_section',
+            array( 'label_for' => 'stripe_secret_key', 'type' => 'text' )
+        );
+
         add_settings_section( 'crcm_email_section', '', '__return_false', 'crcm-settings' );
         add_settings_field(
             'email_from_name',
@@ -1267,6 +1312,8 @@ class CRCM_Plugin {
         $output['enable_online_payment']     = isset( $input['enable_online_payment'] ) ? 1 : 0;
         $output['deposit_percentage']        = intval( $input['deposit_percentage'] );
         $output['minimum_deposit']           = floatval( $input['minimum_deposit'] );
+        $output['stripe_publishable_key']    = sanitize_text_field( $input['stripe_publishable_key'] );
+        $output['stripe_secret_key']         = sanitize_text_field( $input['stripe_secret_key'] );
         $output['show_totaliweb_credit']     = isset( $input['show_totaliweb_credit'] ) ? 1 : 0;
         $output['custom_css']                = wp_kses_post( $input['custom_css'] );
 
@@ -1360,6 +1407,8 @@ class CRCM_Plugin {
             'enable_online_payment'     => 0,
             'deposit_percentage'        => 30,
             'minimum_deposit'           => 200,
+            'stripe_publishable_key'    => '',
+            'stripe_secret_key'         => '',
             'show_totaliweb_credit'     => 1,
             'custom_css'                => '',
         );
@@ -1378,6 +1427,8 @@ class CRCM_Plugin {
             'company_phone' => '+39 123 456 789',
             'company_email' => 'info@costabilerent.com',
             'currency_symbol' => '€',
+            'stripe_publishable_key' => '',
+            'stripe_secret_key' => '',
             'show_totaliweb_credit' => true,
         );
         
