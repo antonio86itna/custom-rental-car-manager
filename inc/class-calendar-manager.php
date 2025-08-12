@@ -57,12 +57,19 @@ class CRCM_Calendar_Manager {
         $start_date = $month . '-01';
         $end_date   = date( 'Y-m-t', strtotime( $start_date ) );
 
+        $cache_key = 'crcm_calendar_' . md5( $month . '_' . $vehicle_id . '_' . $per_page . '_' . $page );
+        $cached    = wp_cache_get( $cache_key, 'crcm_calendar' );
+        if ( false !== $cached ) {
+            return $cached;
+        }
+
         // Get bookings for the month
         $booking_args = array(
             'post_type'      => 'crcm_booking',
             'post_status'    => array( 'publish', 'private' ),
             'posts_per_page' => $per_page,
             'paged'          => $page,
+            'fields'         => 'ids',
             'meta_query'     => array(
                 'relation' => 'AND',
                 array(
@@ -96,46 +103,50 @@ class CRCM_Calendar_Manager {
 
         $calendar_events = array();
 
-        foreach ( $bookings as $booking ) {
-            $booking_data = get_post_meta($booking->ID, '_crcm_booking_data', true);
-            $customer_data = get_post_meta($booking->ID, '_crcm_customer_data', true);
-            $booking_status = get_post_meta($booking->ID, '_crcm_booking_status', true);
-            $booking_number = get_post_meta($booking->ID, '_crcm_booking_number', true);
+        foreach ( $bookings as $booking_id ) {
+            $booking_data   = get_post_meta( $booking_id, '_crcm_booking_data', true );
+            $customer_data  = get_post_meta( $booking_id, '_crcm_customer_data', true );
+            $booking_status = get_post_meta( $booking_id, '_crcm_booking_status', true );
+            $booking_number = get_post_meta( $booking_id, '_crcm_booking_number', true );
 
-            $vehicle = get_post($booking_data['vehicle_id']);
+            $vehicle = get_post( $booking_data['vehicle_id'] );
 
             $calendar_events[] = array(
-                'id' => $booking->ID,
-                'title' => $booking_number . ' - ' . $customer_data['first_name'] . ' ' . $customer_data['last_name'],
-                'start' => $booking_data['pickup_date'],
-                'end' => date('Y-m-d', strtotime($booking_data['return_date'] . ' +1 day')), // FullCalendar needs exclusive end date
-                'vehicle' => $vehicle ? $vehicle->post_title : '',
-                'customer' => $customer_data['first_name'] . ' ' . $customer_data['last_name'],
-                'phone' => $customer_data['phone'],
-                'status' => $booking_status,
+                'id'        => $booking_id,
+                'title'     => $booking_number . ' - ' . $customer_data['first_name'] . ' ' . $customer_data['last_name'],
+                'start'     => $booking_data['pickup_date'],
+                'end'       => date( 'Y-m-d', strtotime( $booking_data['return_date'] . ' +1 day' ) ), // FullCalendar needs exclusive end date
+                'vehicle'   => $vehicle ? $vehicle->post_title : '',
+                'customer'  => $customer_data['first_name'] . ' ' . $customer_data['last_name'],
+                'phone'     => $customer_data['phone'],
+                'status'    => $booking_status,
                 'className' => 'crcm-booking-' . $booking_status,
                 'extendedProps' => array(
-                    'booking_number' => $booking_number,
-                    'pickup_time' => $booking_data['pickup_time'],
-                    'return_time' => $booking_data['return_time'],
-                    'pickup_location' => $booking_data['pickup_location'],
-                    'return_location' => $booking_data['return_location'],
-                    'home_delivery' => $booking_data['home_delivery'],
+                    'booking_number'   => $booking_number,
+                    'pickup_time'      => $booking_data['pickup_time'],
+                    'return_time'      => $booking_data['return_time'],
+                    'pickup_location'  => $booking_data['pickup_location'],
+                    'return_location'  => $booking_data['return_location'],
+                    'home_delivery'    => $booking_data['home_delivery'],
                     'delivery_address' => $booking_data['delivery_address'],
                 ),
             );
         }
 
         $pagination = array(
-            'current'   => $page,
-            'total'     => (int) $query->max_num_pages,
-            'per_page'  => $per_page,
+            'current'  => $page,
+            'total'    => (int) $query->max_num_pages,
+            'per_page' => $per_page,
         );
 
-        return array(
+        $result = array(
             'events'     => $calendar_events,
             'pagination' => $pagination,
         );
+
+        wp_cache_set( $cache_key, $result, 'crcm_calendar', DAY_IN_SECONDS );
+
+        return $result;
     }
 
     /**

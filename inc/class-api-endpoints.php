@@ -177,6 +177,30 @@ class CRCM_API_Endpoints {
                 ),
             ),
         ));
+
+        register_rest_route('crcm/v1', '/slots', array(
+            'methods'  => 'GET',
+            'callback' => array($this, 'get_slots'),
+            'permission_callback' => array($this, 'check_public_permissions'),
+            'args'     => array(
+                'month' => array(
+                    'required' => false,
+                    'type'     => 'string',
+                ),
+                'vehicle_id' => array(
+                    'required' => false,
+                    'type'     => 'integer',
+                ),
+                'per_page' => array(
+                    'required' => false,
+                    'type'     => 'integer',
+                ),
+                'page' => array(
+                    'required' => false,
+                    'type'     => 'integer',
+                ),
+            ),
+        ));
     }
 
     /**
@@ -424,6 +448,30 @@ class CRCM_API_Endpoints {
         $calendar_data    = $calendar_manager->get_calendar_data( $month, $vehicle_id, $per_page, $page );
 
         return new WP_REST_Response( $calendar_data, 200 );
+    }
+
+    /**
+     * Get paginated slots endpoint.
+     *
+     * @param WP_REST_Request $request Request data.
+     * @return WP_REST_Response
+     */
+    public function get_slots( $request ) {
+        $month      = sanitize_text_field( $request->get_param( 'month' ) ?: date( 'Y-m' ) );
+        $vehicle_id = absint( $request->get_param( 'vehicle_id' ) ?: 0 );
+        $per_page   = $request->get_param( 'per_page' ) ? absint( $request->get_param( 'per_page' ) ) : 20;
+        $page       = $request->get_param( 'page' ) ? absint( $request->get_param( 'page' ) ) : 1;
+
+        $calendar_manager = new CRCM_Calendar_Manager();
+        $calendar_data    = $calendar_manager->get_calendar_data( $month, $vehicle_id, $per_page, $page );
+
+        return new WP_REST_Response(
+            array(
+                'slots'      => $calendar_data['events'],
+                'pagination' => $calendar_data['pagination'],
+            ),
+            200
+        );
     }
 
     /**
