@@ -60,6 +60,7 @@ class CRCM_Plugin {
     public $payment_manager;
     public $api_endpoints;
     public $customer_portal;
+    public $locale_manager;
 
     /**
      * Get single instance.
@@ -158,7 +159,8 @@ class CRCM_Plugin {
             'class-email-manager.php',
             'class-payment-manager.php',
             'class-api-endpoints.php',
-            'class-customer-portal.php'
+            'class-customer-portal.php',
+            'class-locale-manager.php'
         );
         
         foreach ($classes as $class_file) {
@@ -203,6 +205,10 @@ class CRCM_Plugin {
         
         if (class_exists('CRCM_Customer_Portal')) {
             $this->customer_portal = new CRCM_Customer_Portal();
+        }
+
+        if (class_exists('CRCM_Locale_Manager')) {
+            $this->locale_manager = new CRCM_Locale_Manager();
         }
     }
     

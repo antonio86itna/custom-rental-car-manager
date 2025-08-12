@@ -681,7 +681,15 @@ class CRCM_Email_Manager {
      */
     private function get_customer_language($booking_id) {
         $user_id  = (int) get_post_meta($booking_id, '_crcm_customer_user_id', true);
-        $language = $user_id ? get_user_meta($user_id, 'crcm_language', true) : '';
+        $language = '';
+        if ( $user_id ) {
+            $language = get_user_meta( $user_id, 'crcm_preferred_language', true );
+        }
+        if ( ! $language ) {
+            $customer_data = get_post_meta( $booking_id, '_crcm_customer_data', true );
+            $language      = $customer_data['preferred_language'] ?? '';
+        }
+
         return $language ? $language : 'en';
     }
 
