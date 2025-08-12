@@ -169,20 +169,72 @@ jQuery(document).ready(function($) {
     // Form submission
     $('#crcm-booking-form').on('submit', function(e) {
         e.preventDefault();
-        
+
         if (!validateStep(currentStep)) {
             return;
         }
-        
-        // Show loading
+
         $('#stripe-pay-btn').prop('disabled', true).html('💳 Elaborazione...');
-        
-        // Here you would integrate with Stripe
-        // For now, just simulate success
-        setTimeout(function() {
-            alert('Prenotazione completata con successo!');
-            // Redirect to confirmation page or customer dashboard
-        }, 2000);
+
+        const formArray = $(this).serializeArray();
+        const formData = {};
+        formArray.forEach(function(field) {
+            if (field.name.endsWith('[]')) {
+                const key = field.name.replace('[]', '');
+                if (!formData[key]) {
+                    formData[key] = [];
+                }
+                formData[key].push(field.value);
+            } else {
+                formData[field.name] = field.value;
+            }
+        });
+
+        const payload = {
+            vehicle_id: parseInt(formData.vehicle_id),
+            pickup_date: formData.pickup_date,
+            return_date: formData.return_date,
+            pickup_time: formData.pickup_time,
+            return_time: formData.return_time,
+            pickup_location: formData.pickup_location,
+            return_location: formData.return_location,
+            home_delivery: !!formData.home_delivery,
+            delivery_address: formData.delivery_address || '',
+            extras: formData.extras || [],
+            insurance_type: formData.insurance_type || 'basic',
+            customer_data: {
+                first_name: formData.first_name,
+                last_name: formData.last_name,
+                email: formData.email,
+                phone: formData.phone
+            },
+            notes: formData.notes || ''
+        };
+
+        $.ajax({
+            url: window.location.origin + '/wp-json/crcm/v1/bookings',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(payload),
+            success: function(res) {
+                const bookingId = res.booking_id;
+                $.ajax({
+                    url: window.location.origin + '/wp-json/crcm/v1/bookings/' + bookingId + '/checkout',
+                    method: 'POST',
+                    success: function(resp) {
+                        window.location.href = resp.checkout_url;
+                    },
+                    error: function() {
+                        alert('Errore creazione sessione di pagamento.');
+                        $('#stripe-pay-btn').prop('disabled', false).html('💳 Paga con Stripe');
+                    }
+                });
+            },
+            error: function() {
+                alert('Errore creazione prenotazione.');
+                $('#stripe-pay-btn').prop('disabled', false).html('💳 Paga con Stripe');
+            }
+        });
     });
     
     // Utility functions

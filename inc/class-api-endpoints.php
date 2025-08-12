@@ -132,6 +132,18 @@ class CRCM_API_Endpoints {
             ),
         ));
 
+        register_rest_route('crcm/v1', '/bookings/(?P<id>\d+)/checkout', array(
+            'methods'             => 'POST',
+            'callback'            => array($this, 'create_checkout_session'),
+            'permission_callback' => array($this, 'check_public_permissions'),
+            'args'                => array(
+                'id' => array(
+                    'required' => true,
+                    'type'     => 'integer',
+                ),
+            ),
+        ));
+
         register_rest_route('crcm/v1', '/availability', array(
             'methods' => 'GET',
             'callback' => array($this, 'get_availability'),
@@ -387,6 +399,28 @@ class CRCM_API_Endpoints {
         do_action('crcm_booking_created', $result['booking_id']);
 
         return new WP_REST_Response($result, 201);
+    }
+
+    /**
+     * Create Stripe checkout session for a booking.
+     *
+     * @param WP_REST_Request $request Request object.
+     * @return WP_REST_Response|WP_Error
+     */
+    public function create_checkout_session($request) {
+        $booking_id = absint($request->get_param('id'));
+        if (!$booking_id) {
+            return new WP_Error('invalid_booking_id', __('Invalid booking ID', 'custom-rental-manager'), array('status' => 400));
+        }
+
+        $payment_manager = crcm()->payment_manager;
+        $checkout_url    = $payment_manager->get_checkout_url($booking_id);
+
+        if (empty($checkout_url)) {
+            return new WP_Error('checkout_session_failed', __('Unable to create checkout session', 'custom-rental-manager'), array('status' => 500));
+        }
+
+        return new WP_REST_Response(array('checkout_url' => $checkout_url), 200);
     }
 
     /**

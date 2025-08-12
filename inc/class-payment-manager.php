@@ -278,7 +278,7 @@ class CRCM_Payment_Manager {
                         'booking_id'        => $booking_id,
                         'session_id'        => '{CHECKOUT_SESSION_ID}',
                     ),
-                    home_url('/customer-dashboard/')
+                    home_url('/confirmation/')
                 ),
                 'cancel_url' => home_url('/customer-dashboard/'),
             ));
@@ -339,7 +339,7 @@ class CRCM_Payment_Manager {
                 }
             }
 
-            wp_safe_redirect(home_url('/customer-dashboard/'));
+            wp_safe_redirect(add_query_arg('booking_id', $booking_id, home_url('/confirmation/')));
             exit;
         }
     }
