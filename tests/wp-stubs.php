@@ -67,6 +67,13 @@ if (!function_exists('add_filter')) {
     function add_filter() {}
 }
 
+if (!function_exists('apply_filters')) {
+    function apply_filters($hook, $value)
+    {
+        return $value;
+    }
+}
+
 if (!function_exists('wp_next_scheduled')) {
     function wp_next_scheduled($hook) {
         return false;
