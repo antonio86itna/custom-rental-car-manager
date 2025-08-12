@@ -83,10 +83,10 @@ if ( $top_vehicle_ids ) :
                     <p class="crcm-top-vehicles__meta">
                         <?php echo esc_html( $transmission ); ?> |
                         <?php echo esc_html( $seats ); ?>
-                        <?php echo esc_html__( 'Seats', 'custom-rental-manager' ); ?>
+                        <?php echo esc_html__( 'Seats', 'costabilerent' ); ?>
                     </p>
                     <p class="crcm-top-vehicles__rate">
-                        <?php echo esc_html( sprintf( '€%s/%s', $rate, __( 'day', 'custom-rental-manager' ) ) ); ?>
+                        <?php echo esc_html( sprintf( '€%s/%s', $rate, __( 'day', 'costabilerent' ) ) ); ?>
                     </p>
                 </div>
             </div>

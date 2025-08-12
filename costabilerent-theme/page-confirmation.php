@@ -12,7 +12,7 @@ $booking    = $booking_id ? crcm()->booking_manager->get_booking($booking_id) : 
 
 if (!$booking || is_wp_error($booking)) :
     ?>
-    <p><?php esc_html_e('Booking not found.', 'custom-rental-manager'); ?></p>
+    <p><?php esc_html_e('Booking not found.', 'costabilerent'); ?></p>
     <?php
     get_footer();
     return;
@@ -23,22 +23,22 @@ $vehicle_title   = get_the_title($booking['booking_data']['vehicle_id']);
 ?>
 
 <div class="crcm-confirmation">
-    <h1><?php esc_html_e('Booking Confirmed', 'custom-rental-manager'); ?></h1>
+    <h1><?php esc_html_e('Booking Confirmed', 'costabilerent'); ?></h1>
     <p>
         <?php
         printf(
-            esc_html__('Your booking code is %s', 'custom-rental-manager'),
+            esc_html__('Your booking code is %s', 'costabilerent'),
             '<strong>' . esc_html($booking['booking_number']) . '</strong>'
         );
         ?>
     </p>
 
-    <h2><?php esc_html_e('Summary', 'custom-rental-manager'); ?></h2>
+    <h2><?php esc_html_e('Summary', 'costabilerent'); ?></h2>
     <ul>
-        <li><strong><?php esc_html_e('Vehicle', 'custom-rental-manager'); ?>:</strong> <?php echo esc_html($vehicle_title); ?></li>
-        <li><strong><?php esc_html_e('Pickup', 'custom-rental-manager'); ?>:</strong> <?php echo esc_html(date_i18n('d/m/Y', strtotime($booking['booking_data']['pickup_date'])) . ' ' . $booking['booking_data']['pickup_time']); ?></li>
-        <li><strong><?php esc_html_e('Return', 'custom-rental-manager'); ?>:</strong> <?php echo esc_html(date_i18n('d/m/Y', strtotime($booking['booking_data']['return_date'])) . ' ' . $booking['booking_data']['return_time']); ?></li>
-        <li><strong><?php esc_html_e('Total', 'custom-rental-manager'); ?>:</strong> <?php echo esc_html(crcm_format_price($booking['pricing_breakdown']['final_total'] ?? 0, $currency_symbol)); ?></li>
+        <li><strong><?php esc_html_e('Vehicle', 'costabilerent'); ?>:</strong> <?php echo esc_html($vehicle_title); ?></li>
+        <li><strong><?php esc_html_e('Pickup', 'costabilerent'); ?>:</strong> <?php echo esc_html(date_i18n('d/m/Y', strtotime($booking['booking_data']['pickup_date'])) . ' ' . $booking['booking_data']['pickup_time']); ?></li>
+        <li><strong><?php esc_html_e('Return', 'costabilerent'); ?>:</strong> <?php echo esc_html(date_i18n('d/m/Y', strtotime($booking['booking_data']['return_date'])) . ' ' . $booking['booking_data']['return_time']); ?></li>
+        <li><strong><?php esc_html_e('Total', 'costabilerent'); ?>:</strong> <?php echo esc_html(crcm_format_price($booking['pricing_breakdown']['final_total'] ?? 0, $currency_symbol)); ?></li>
     </ul>
 </div>
 
