@@ -28,16 +28,22 @@ $return_time = ! empty( sanitize_text_field( $_GET['return_time'] ?? '' ) )
 // Get vehicle types for filtering
 $vehicle_types = crcm_get_vehicle_types();
 
-// Get vehicles with availability check
+// Pagination parameters
+$per_page = isset( $_GET['per_page'] ) ? absint( $_GET['per_page'] ) : 10;
+$paged    = isset( $_GET['page'] ) ? absint( $_GET['page'] ) : 1;
+
+// Get vehicles with pagination
 $args = array(
     'post_type'      => 'crcm_vehicle',
     'post_status'    => 'publish',
-    'posts_per_page' => -1,
+    'posts_per_page' => $per_page,
     'orderby'        => 'title',
     'order'          => 'ASC',
+    'paged'          => $paged,
 );
 
-$vehicles = get_posts($args);
+$query    = new WP_Query( $args );
+$vehicles = $query->posts;
 
 if (!empty($atts['type'])) {
     $filter_type = $atts['type'];
@@ -120,7 +126,7 @@ if ($pickup_date && $return_date) {
             
             <div class="crcm-filter-group">
                 <span class="crcm-results-count">
-                    <?php printf(__('Trovati %d veicoli', 'custom-rental-manager'), count($vehicles)); ?>
+                    <?php printf(__('Trovati %d veicoli', 'custom-rental-manager'), (int) $query->found_posts); ?>
                 </span>
             </div>
         </div>
@@ -312,5 +318,27 @@ if ($pickup_date && $return_date) {
             </div>
         <?php endif; ?>
     </div>
+
+    <?php if ( isset( $query ) && $query->max_num_pages > 1 ) : ?>
+        <div class="crcm-pagination">
+            <?php
+            $add_args = $_GET;
+            unset( $add_args['page'] );
+            $add_args['per_page'] = $per_page;
+
+            echo paginate_links(
+                array(
+                    'base'      => add_query_arg( 'page', '%#%' ),
+                    'format'    => '',
+                    'current'   => $paged,
+                    'total'     => (int) $query->max_num_pages,
+                    'add_args'  => $add_args,
+                    'prev_text' => __( '&laquo; Precedente', 'custom-rental-manager' ),
+                    'next_text' => __( 'Successivo &raquo;', 'custom-rental-manager' ),
+                )
+            );
+            ?>
+        </div>
+    <?php endif; ?>
 </div>
 
