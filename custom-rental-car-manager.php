@@ -95,7 +95,6 @@ class CRCM_Plugin {
     private function init_hooks() {
         add_action('init', array($this, 'init'), 10);
         add_action('init', array($this, 'load_textdomain'), 5);
-        add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_assets'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
         add_action('admin_init', array($this, 'register_settings'));
     }
@@ -463,21 +462,6 @@ class CRCM_Plugin {
             'style' => 'default',
         ), $atts);
 
-        wp_enqueue_style(
-            'crcm-search-form',
-            CRCM_PLUGIN_URL . 'assets/css/frontend-search-form.css',
-            array(),
-            CRCM_VERSION
-        );
-
-        wp_enqueue_script(
-            'crcm-search-form',
-            CRCM_PLUGIN_URL . 'assets/js/frontend-search-form.js',
-            array('jquery'),
-            CRCM_VERSION,
-            true
-        );
-
         $output = apply_filters('crcm_search_form', '', $atts);
 
         if (empty($output)) {
@@ -500,21 +484,6 @@ class CRCM_Plugin {
             'type' => '',
             'limit' => 12,
         ), $atts);
-
-        wp_enqueue_style(
-            'crcm-vehicle-list',
-            CRCM_PLUGIN_URL . 'assets/css/frontend-vehicle-list.css',
-            array(),
-            CRCM_VERSION
-        );
-
-        wp_enqueue_script(
-            'crcm-vehicle-list',
-            CRCM_PLUGIN_URL . 'assets/js/frontend-vehicle-list.js',
-            array('jquery'),
-            CRCM_VERSION,
-            true
-        );
 
         $output = apply_filters('crcm_vehicle_list', '', $atts);
 
@@ -570,21 +539,6 @@ class CRCM_Plugin {
 
         $currency_symbol = crcm_get_setting('currency_symbol', '€');
 
-        wp_enqueue_style(
-            'crcm-booking-form',
-            CRCM_PLUGIN_URL . 'assets/css/frontend-booking-form.css',
-            array(),
-            CRCM_VERSION
-        );
-
-        wp_enqueue_script(
-            'crcm-booking-form',
-            CRCM_PLUGIN_URL . 'assets/js/frontend-booking-form.js',
-            array('jquery'),
-            CRCM_VERSION,
-            true
-        );
-
         wp_localize_script(
             'crcm-booking-form',
             'crcmBookingData',
@@ -637,13 +591,6 @@ class CRCM_Plugin {
             return '<p>' . esc_html__('Access restricted to rental customers.', 'custom-rental-manager') . '</p>';
         }
 
-        wp_enqueue_style(
-            'crcm-customer-dashboard',
-            CRCM_PLUGIN_URL . 'assets/css/frontend-customer-dashboard.css',
-            array(),
-            CRCM_VERSION
-        );
-
         $output = apply_filters('crcm_customer_dashboard', '', $atts);
 
         if (empty($output)) {
@@ -651,44 +598,6 @@ class CRCM_Plugin {
         }
 
         return $output;
-    }
-    
-    /**
-     * Enqueue frontend assets.
-     *
-     * @since 1.0.0
-     *
-     * @return void
-     */
-    public function enqueue_frontend_assets() {
-        $css_path = CRCM_PLUGIN_PATH . 'assets/css/frontend.css';
-        $js_path = CRCM_PLUGIN_PATH . 'assets/js/frontend.js';
-        
-        if (file_exists($css_path)) {
-            wp_enqueue_style(
-                'crcm-frontend',
-                CRCM_PLUGIN_URL . 'assets/css/frontend.css',
-                array(),
-                CRCM_VERSION
-            );
-        }
-        
-        if (file_exists($js_path)) {
-            wp_enqueue_script(
-                'crcm-frontend',
-                CRCM_PLUGIN_URL . 'assets/js/frontend.js',
-                array('jquery'),
-                CRCM_VERSION,
-                true
-            );
-            
-            wp_localize_script('crcm-frontend', 'crcm_ajax', array(
-                'ajax_url' => admin_url('admin-ajax.php'),
-                'nonce' => wp_create_nonce('crcm_nonce'),
-                'currency_symbol' => $this->get_setting('currency_symbol', '€'),
-                'booking_page_url' => home_url('/booking/'),
-            ));
-        }
     }
     
     /**
