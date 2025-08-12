@@ -76,6 +76,18 @@ $base_total = $base_total_calc;
             <a href="javascript:history.back()" class="crcm-back-link">← <?php _e('Cambia veicolo o date', 'custom-rental-manager'); ?></a>
         </div>
         <h1><?php _e('Prenota il tuo veicolo', 'custom-rental-manager'); ?></h1>
+        <div class="crcm-step-dates">
+            <label for="header_pickup_date">
+                <?php _e('Ritiro', 'custom-rental-manager'); ?>
+                <input type="date" id="header_pickup_date" value="<?php echo esc_attr($pickup_date); ?>" />
+                <input type="time" id="header_pickup_time" value="<?php echo esc_attr($pickup_time); ?>" />
+            </label>
+            <label for="header_return_date">
+                <?php _e('Riconsegna', 'custom-rental-manager'); ?>
+                <input type="date" id="header_return_date" value="<?php echo esc_attr($return_date); ?>" />
+                <input type="time" id="header_return_time" value="<?php echo esc_attr($return_time); ?>" />
+            </label>
+        </div>
     </div>
     
     <div class="crcm-booking-wrapper">

@@ -2,8 +2,11 @@ jQuery(document).ready(function($) {
     let currentStep = 1;
     const totalSteps = 4;
     const dailyRate = parseFloat(crcmBookingData.daily_rate);
-    const rentalDays = parseInt(crcmBookingData.rental_days);
+    const extraDailyRate = parseFloat(crcmBookingData.extra_daily_rate);
+    let rentalDays = parseInt(crcmBookingData.rental_days);
     const currencySymbol = crcmBookingData.currency_symbol;
+    const daysLabel = crcmBookingData.days_label;
+    const freeLabel = crcmBookingData.free_label;
     
     // Initialize
     showStep(1);
@@ -19,6 +22,31 @@ jQuery(document).ready(function($) {
     $('.crcm-prev-btn').on('click', function() {
         const prevStep = parseInt($(this).data('prev'));
         showStep(prevStep);
+    });
+
+    // Header date/time change handlers
+    $('#header_pickup_date, #header_return_date, #header_pickup_time, #header_return_time').on('change', function() {
+        const pickupDate = $('#header_pickup_date').val();
+        const returnDate = $('#header_return_date').val();
+        const pickupTime = $('#header_pickup_time').val();
+        const returnTime = $('#header_return_time').val();
+
+        $('input[name="pickup_date"]').val(pickupDate);
+        $('input[name="return_date"]').val(returnDate);
+        $('input[name="pickup_time"]').val(pickupTime);
+        $('input[name="return_time"]').val(returnTime);
+
+        if (pickupDate && returnDate) {
+            const pickup = new Date(pickupDate);
+            const ret = new Date(returnDate);
+            rentalDays = Math.max(1, Math.ceil((ret - pickup) / (1000 * 60 * 60 * 24)));
+            $('#duration-summary').text(rentalDays + ' ' + daysLabel);
+        }
+
+        $('#pickup-summary').text(formatDate(pickupDate, pickupTime));
+        $('#return-summary').text(formatDate(returnDate, returnTime));
+
+        updatePricing();
     });
     
     // Show specific step
@@ -109,25 +137,30 @@ jQuery(document).ready(function($) {
     
     // Update pricing
     function updatePricing() {
-        let total = dailyRate * rentalDays;
+        let total = (dailyRate + extraDailyRate) * rentalDays;
         let extrasTotal = 0;
-        
+
         // Clear extras pricing
         $('#extras-pricing').empty();
+
+        // Update base prices
+        $('#base-price').text(formatPrice(dailyRate * rentalDays));
+        $('#extra-price').text(formatPrice(extraDailyRate * rentalDays));
         
         // Calculate extras
         $('input[name="extras[]"]:checked').each(function() {
             const extraPrice = parseFloat($(this).data('price'));
             const extraName = $(this).closest('.crcm-extra-item').find('.crcm-extra-name').text();
             const extraTotal = extraPrice * rentalDays;
-            
+
             extrasTotal += extraTotal;
-            
+            const priceText = extraTotal > 0 ? formatPrice(extraTotal) : freeLabel;
+
             // Add to sidebar
             $('#extras-pricing').append(
                 '<div class="crcm-price-item">' +
-                '<span>' + extraName + ' (' + rentalDays + ' giorni)</span>' +
-                '<span>' + formatPrice(extraTotal) + '</span>' +
+                '<span>' + extraName + ' (' + rentalDays + ' ' + daysLabel + ')</span>' +
+                '<span>' + priceText + '</span>' +
                 '</div>'
             );
         });
@@ -164,6 +197,15 @@ jQuery(document).ready(function($) {
     // Format price
     function formatPrice(amount) {
         return currencySymbol + amount.toFixed(2);
+    }
+
+    function formatDate(dateStr, timeStr) {
+        if (!dateStr) {
+            return '-';
+        }
+        const date = new Date(dateStr);
+        const formatted = date.toLocaleDateString();
+        return formatted + (timeStr ? ' alle ' + timeStr : '');
     }
     
     // Form submission
