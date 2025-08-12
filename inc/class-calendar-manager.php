@@ -49,11 +49,11 @@ class CRCM_Calendar_Manager {
      * @param string $month      Month in 'Y-m' format.
      * @param int    $vehicle_id Optional vehicle ID filter.
      * @param int    $per_page   Number of bookings per page.
-     * @param int    $paged      Current page number.
+     * @param int    $page       Current page number.
      *
      * @return array{events: array, pagination: array} Calendar events and pagination info.
      */
-    public function get_calendar_data( $month, $vehicle_id = 0, $per_page = 20, $paged = 1 ) {
+    public function get_calendar_data( $month, $vehicle_id = 0, $per_page = 20, $page = 1 ) {
         $start_date = $month . '-01';
         $end_date   = date( 'Y-m-t', strtotime( $start_date ) );
 
@@ -62,7 +62,7 @@ class CRCM_Calendar_Manager {
             'post_type'      => 'crcm_booking',
             'post_status'    => array( 'publish', 'private' ),
             'posts_per_page' => $per_page,
-            'paged'          => $paged,
+            'paged'          => $page,
             'meta_query'     => array(
                 'relation' => 'AND',
                 array(
@@ -127,7 +127,7 @@ class CRCM_Calendar_Manager {
         }
 
         $pagination = array(
-            'current'   => $paged,
+            'current'   => $page,
             'total'     => (int) $query->max_num_pages,
             'per_page'  => $per_page,
         );
@@ -207,11 +207,11 @@ class CRCM_Calendar_Manager {
      *
      * @param int $days     Number of days to look ahead.
      * @param int $per_page Number of bookings per page.
-     * @param int $paged    Current page number.
+     * @param int $page     Current page number.
      *
      * @return array
      */
-    public function get_upcoming_bookings( $days = 7, $per_page = 20, $paged = 1 ) {
+    public function get_upcoming_bookings( $days = 7, $per_page = 20, $page = 1 ) {
         $start_date = date( 'Y-m-d' );
         $end_date   = date( 'Y-m-d', strtotime( '+' . $days . ' days' ) );
 
@@ -219,7 +219,7 @@ class CRCM_Calendar_Manager {
             'post_type'      => 'crcm_booking',
             'post_status'    => array( 'publish', 'private' ),
             'posts_per_page' => $per_page,
-            'paged'          => $paged,
+            'paged'          => $page,
             'meta_query'     => array(
                 array(
                     'key'     => '_crcm_pickup_date',
@@ -247,18 +247,18 @@ class CRCM_Calendar_Manager {
      * Get vehicles out today.
      *
      * @param int $per_page Number of bookings per page.
-     * @param int $paged    Current page number.
+     * @param int $page     Current page number.
      *
      * @return array
      */
-    public function get_vehicles_out_today( $per_page = 20, $paged = 1 ) {
+    public function get_vehicles_out_today( $per_page = 20, $page = 1 ) {
         $today = date( 'Y-m-d' );
 
         $args = array(
             'post_type'      => 'crcm_booking',
             'post_status'    => array( 'publish', 'private' ),
             'posts_per_page' => $per_page,
-            'paged'          => $paged,
+            'paged'          => $page,
             'meta_query'     => array(
                 array(
                     'key'     => '_crcm_pickup_date',
@@ -283,18 +283,18 @@ class CRCM_Calendar_Manager {
      * Get vehicles returning today.
      *
      * @param int $per_page Number of bookings per page.
-     * @param int $paged    Current page number.
+     * @param int $page     Current page number.
      *
      * @return array
      */
-    public function get_vehicles_returning_today( $per_page = 20, $paged = 1 ) {
+    public function get_vehicles_returning_today( $per_page = 20, $page = 1 ) {
         $today = date( 'Y-m-d' );
 
         $args = array(
             'post_type'      => 'crcm_booking',
             'post_status'    => array( 'publish', 'private' ),
             'posts_per_page' => $per_page,
-            'paged'          => $paged,
+            'paged'          => $page,
             'meta_query'     => array(
                 array(
                     'key'     => '_crcm_return_date',

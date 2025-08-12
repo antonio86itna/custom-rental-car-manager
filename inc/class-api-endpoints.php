@@ -300,18 +300,31 @@ class CRCM_API_Endpoints {
             );
         }
 
-        $posts = get_posts($args);
+        $query    = new WP_Query( $args );
+        $posts    = $query->posts;
         $bookings = array();
 
-        foreach ($posts as $post) {
+        foreach ( $posts as $post ) {
             $booking_manager = crcm()->booking_manager;
-            $booking = $booking_manager->get_booking($post->ID);
-            if (!is_wp_error($booking)) {
+            $booking         = $booking_manager->get_booking( $post->ID );
+            if ( ! is_wp_error( $booking ) ) {
                 $bookings[] = $booking;
             }
         }
 
-        return new WP_REST_Response($bookings, 200);
+        $pagination = array(
+            'current'  => $page,
+            'total'    => (int) $query->max_num_pages,
+            'per_page' => $per_page,
+        );
+
+        return new WP_REST_Response(
+            array(
+                'bookings'   => $bookings,
+                'pagination' => $pagination,
+            ),
+            200
+        );
     }
 
     /**
