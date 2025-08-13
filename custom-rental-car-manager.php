@@ -59,7 +59,6 @@ class CRCM_Plugin {
     public $email_manager;
     public $payment_manager;
     public $api_endpoints;
-    public $customer_portal;
     public $locale_manager;
     public $shortcode_endpoints;
 
@@ -155,7 +154,6 @@ class CRCM_Plugin {
             'class-payment-manager.php',
             'class-api-endpoints.php',
             'class-shortcode-endpoints.php',
-            'class-customer-portal.php',
             'class-locale-manager.php'
         );
         
@@ -201,10 +199,6 @@ class CRCM_Plugin {
 
         if ( class_exists( 'CRCM_Shortcode_Endpoints' ) ) {
             $this->shortcode_endpoints = new CRCM_Shortcode_Endpoints();
-        }
-
-        if ( class_exists( 'CRCM_Customer_Portal' ) ) {
-            $this->customer_portal = new CRCM_Customer_Portal();
         }
 
         if ( class_exists( 'CRCM_Locale_Manager' ) ) {

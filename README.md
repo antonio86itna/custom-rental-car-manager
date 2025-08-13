@@ -9,15 +9,15 @@
 
 ## Descrizione
 
-Il plugin **Custom Rental Car Manager** è un sistema completo e professionale per la gestione autonoleggio di auto e scooter, ideato per l'agenzia Costabilerent a Ischia. Include gestione veicoli, tariffe (base e personalizzate), disponibilità, servizi extra, assicurazioni, prenotazioni online con checklist passo-passo, pagamenti Stripe, area clienti, notifiche email, calendario dinamico e REST API full.
+Il plugin **Custom Rental Car Manager** è un sistema completo e professionale per la gestione autonoleggio di auto e scooter, ideato per l'agenzia Costabilerent a Ischia. Include gestione veicoli, tariffe (base e personalizzate), disponibilità, servizi extra, assicurazioni, automazioni email, calendario dinamico e REST API. Le funzionalità front-end sono demandate al tema dedicato.
 
 ## Caratteristiche principali
 
 - Gestione veicoli: modelli, stock, tariffe, immagini, servizi
 - Tariffe personalizzate per date/ scenari
 - Disponibilità individuale, ricorrente e settimanale
-- Prenotazioni con wizard, checkout Stripe e numero prenotazione unico
-- Area riservata clienti e gestione prenotazioni
+- Integrazione pagamenti Stripe via API
+- REST API per integrazione front-end su tema dedicato
 - Calendario amministrativo in tempo reale
 - Automazioni email dinamiche
 - Compatibilità con PHP 8.0+, WP ultime versioni

@@ -668,7 +668,7 @@ class CRCM_Email_Manager {
         }
 
         ob_start();
-        include CRCM_PLUGIN_PATH . 'templates/emails/base.php';
+        include CRCM_PLUGIN_PATH . 'templates/emails/components/base.php';
         return ob_get_clean();
     }
 
