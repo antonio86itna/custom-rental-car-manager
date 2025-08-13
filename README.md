@@ -35,9 +35,22 @@ Il plugin **Custom Rental Car Manager** è un sistema completo e professionale p
 
 ## Uso
 
-- Inserisci shortcode `[crcm_search_form]`, `[crcm_vehicle_list]`, `[crcm_booking_form]`, `[crcm_customer_dashboard]` nelle pagine desiderate
+- Utilizza gli shortcode del tema `[crcm_search_form]`, `[crcm_vehicle_list]`, `[crcm_booking_form]`, `[crcm_customer_dashboard]`
 - Personalizza layout e stile in front-end tramite template override
 - Gestisci prenotazioni, veicoli, calendario in backend
+
+## Endpoint & Hook disponibili
+
+Il plugin espone endpoint REST che forniscono i dati degli shortcode e relativi hook per ulteriori personalizzazioni:
+
+| Endpoint | Descrizione | Hook dati |
+| --- | --- | --- |
+| `/wp-json/crcm/v1/search-form` | Dati per il form di ricerca (sedi) | `crcm_search_form_data` |
+| `/wp-json/crcm/v1/vehicles` | Elenco veicoli disponibili | `crcm_vehicle_list_data` |
+| `/wp-json/crcm/v1/booking-form` | Dati per il form di prenotazione | `crcm_booking_form_data` |
+| `/wp-json/crcm/v1/customer-dashboard` | Dati area cliente (richiede login) | `crcm_customer_dashboard_data` |
+
+Gli hook permettono al tema o ad altre estensioni di modificare gli array restituiti prima dell'invio al client.
 
 ## Personalizzazione e sviluppo
 

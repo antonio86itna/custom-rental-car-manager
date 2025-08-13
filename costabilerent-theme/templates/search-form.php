@@ -7,11 +7,9 @@
  * @since 1.0.0
  */
 
-if (!defined('ABSPATH')) {
+if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
-
-$locations = crcm_get_locations();
 ?>
 
 <div class="crcm-search-container">
@@ -87,9 +85,9 @@ $locations = crcm_get_locations();
                         <label for="pickup_location"><?php _e('Sede di ritiro', 'custom-rental-manager'); ?></label>
                         <select id="pickup_location" name="pickup_location">
                             <option value=""><?php _e('Ischia Porto', 'custom-rental-manager'); ?></option>
-                            <?php foreach ($locations as $location): ?>
-                                <option value="<?php echo $location->term_id; ?>">
-                                    <?php echo esc_html($location->name); ?>
+                            <?php foreach ( $locations as $location ) : ?>
+                                <option value="<?php echo esc_attr( $location['id'] ); ?>">
+                                    <?php echo esc_html( $location['name'] ); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -99,9 +97,9 @@ $locations = crcm_get_locations();
                         <label for="return_location"><?php _e('Sede di riconsegna', 'custom-rental-manager'); ?></label>
                         <select id="return_location" name="return_location">
                             <option value=""><?php _e('Ischia Porto', 'custom-rental-manager'); ?></option>
-                            <?php foreach ($locations as $location): ?>
-                                <option value="<?php echo $location->term_id; ?>">
-                                    <?php echo esc_html($location->name); ?>
+                            <?php foreach ( $locations as $location ) : ?>
+                                <option value="<?php echo esc_attr( $location['id'] ); ?>">
+                                    <?php echo esc_html( $location['name'] ); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
