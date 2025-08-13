@@ -60,7 +60,7 @@ class CRCM_Plugin {
     public $payment_manager;
     public $api_endpoints;
     public $locale_manager;
-    public $shortcode_endpoints;
+    public $public_endpoints;
 
     /**
      * Get single instance.
@@ -153,7 +153,7 @@ class CRCM_Plugin {
             'class-email-manager.php',
             'class-payment-manager.php',
             'class-api-endpoints.php',
-            'class-shortcode-endpoints.php',
+            'class-public-endpoints.php',
             'class-locale-manager.php'
         );
         
@@ -197,8 +197,8 @@ class CRCM_Plugin {
             $this->api_endpoints = new CRCM_API_Endpoints();
         }
 
-        if ( class_exists( 'CRCM_Shortcode_Endpoints' ) ) {
-            $this->shortcode_endpoints = new CRCM_Shortcode_Endpoints();
+        if ( class_exists( 'CRCM_Public_Endpoints' ) ) {
+            $this->public_endpoints = new CRCM_Public_Endpoints();
         }
 
         if ( class_exists( 'CRCM_Locale_Manager' ) ) {
@@ -433,7 +433,7 @@ class CRCM_Plugin {
     }
     
     /**
-     * Initialize shortcodes.
+     * Enqueue admin assets.
      *
      * @since 1.0.0
      *
