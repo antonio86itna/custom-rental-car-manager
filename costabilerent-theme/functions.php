@@ -268,87 +268,87 @@ function costabilerent_crcm_theme_option( $default, $option ) {
 add_filter( 'crcm_theme_option', 'costabilerent_crcm_theme_option', 10, 2 );
 
 /**
- * Render the search form template for the Custom Rental Car Manager plugin.
+ * Shortcodes rendering plugin data.
+ */
+
+/**
+ * Output the rental search form.
  *
- * @param string $output Current output.
- * @param array  $atts   Shortcode attributes.
+ * @param array $atts Shortcode attributes.
  * @return string
  */
-function costabilerent_render_search_form( $output, $atts ) {
+function costabilerent_search_form_shortcode( $atts ) {
+    $response  = wp_remote_get( rest_url( 'crcm/v1/search-form' ) );
+    $locations = array();
+
+    if ( ! is_wp_error( $response ) ) {
+        $body = wp_remote_retrieve_body( $response );
+        $data = json_decode( $body, true );
+        $locations = $data['locations'] ?? array();
+    }
+
     $template = locate_template( 'templates/search-form.php', false, false );
-
-    if ( $template ) {
-        ob_start();
-        include $template; // phpcs:ignore WPThemeReview.CoreFunctionality.FileInclude,PHPCS.Squiz.PHP.DiscouragedFunctions
-        $output = ob_get_clean();
+    if ( ! $template ) {
+        return '';
     }
 
-    return $output;
+    ob_start();
+    include $template; // phpcs:ignore WPThemeReview.CoreFunctionality.FileInclude,PHPCS.Squiz.PHP.DiscouragedFunctions
+    return ob_get_clean();
 }
-add_filter( 'crcm_search_form', 'costabilerent_render_search_form', 10, 2 );
+add_shortcode( 'crcm_search_form', 'costabilerent_search_form_shortcode' );
 
 /**
- * Render the vehicle list template for the Custom Rental Car Manager plugin.
+ * Output the vehicle list.
  *
- * @param string $output Current output.
- * @param array  $atts   Shortcode attributes.
+ * @param array $atts Shortcode attributes.
  * @return string
  */
-function costabilerent_render_vehicle_list( $output, $atts ) {
+function costabilerent_vehicle_list_shortcode( $atts ) {
     $template = locate_template( 'templates/vehicle-list.php', false, false );
-
-    if ( $template ) {
-        ob_start();
-        include $template; // phpcs:ignore WPThemeReview.CoreFunctionality.FileInclude,PHPCS.Squiz.PHP.DiscouragedFunctions
-        $output = ob_get_clean();
+    if ( ! $template ) {
+        return '';
     }
 
-    return $output;
+    ob_start();
+    include $template; // phpcs:ignore WPThemeReview.CoreFunctionality.FileInclude,PHPCS.Squiz.PHP.DiscouragedFunctions
+    return ob_get_clean();
 }
-add_filter( 'crcm_vehicle_list', 'costabilerent_render_vehicle_list', 10, 2 );
+add_shortcode( 'crcm_vehicle_list', 'costabilerent_vehicle_list_shortcode' );
 
 /**
- * Render the booking form template for the Custom Rental Car Manager plugin.
+ * Output the booking form.
  *
- * @param string $output Current output.
- * @param array  $atts   Shortcode attributes.
- * @param array  $data   Template data passed from the plugin.
+ * @param array $atts Shortcode attributes.
  * @return string
  */
-function costabilerent_render_booking_form( $output, $atts, $data ) {
-    if ( is_array( $data ) ) {
-        extract( $data, EXTR_SKIP ); // phpcs:ignore WordPress.PHP.DontExtract.extract_extract
-    }
-
+function costabilerent_booking_form_shortcode( $atts ) {
     $template = locate_template( 'templates/booking-form.php', false, false );
-
-    if ( $template ) {
-        ob_start();
-        include $template; // phpcs:ignore WPThemeReview.CoreFunctionality.FileInclude,PHPCS.Squiz.PHP.DiscouragedFunctions
-        $output = ob_get_clean();
+    if ( ! $template ) {
+        return '';
     }
 
-    return $output;
+    ob_start();
+    include $template; // phpcs:ignore WPThemeReview.CoreFunctionality.FileInclude,PHPCS.Squiz.PHP.DiscouragedFunctions
+    return ob_get_clean();
 }
-add_filter( 'crcm_booking_form', 'costabilerent_render_booking_form', 10, 3 );
+add_shortcode( 'crcm_booking_form', 'costabilerent_booking_form_shortcode' );
 
 /**
- * Render the customer dashboard template for the Custom Rental Car Manager plugin.
+ * Output the customer dashboard.
  *
- * @param string $output Current output.
- * @param array  $atts   Shortcode attributes.
+ * @param array $atts Shortcode attributes.
  * @return string
  */
-function costabilerent_render_customer_dashboard( $output, $atts ) {
+function costabilerent_customer_dashboard_shortcode( $atts ) {
     $template = locate_template( 'templates/customer-dashboard.php', false, false );
-
-    if ( $template ) {
-        ob_start();
-        include $template; // phpcs:ignore WPThemeReview.CoreFunctionality.FileInclude,PHPCS.Squiz.PHP.DiscouragedFunctions
-        $output = ob_get_clean();
+    if ( ! $template ) {
+        return '';
     }
 
-    return $output;
+    ob_start();
+    include $template; // phpcs:ignore WPThemeReview.CoreFunctionality.FileInclude,PHPCS.Squiz.PHP.DiscouragedFunctions
+    return ob_get_clean();
 }
-add_filter( 'crcm_customer_dashboard', 'costabilerent_render_customer_dashboard', 10, 2 );
+add_shortcode( 'crcm_customer_dashboard', 'costabilerent_customer_dashboard_shortcode' );
 

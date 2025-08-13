@@ -61,6 +61,7 @@ class CRCM_Plugin {
     public $api_endpoints;
     public $customer_portal;
     public $locale_manager;
+    public $shortcode_endpoints;
 
     /**
      * Get single instance.
@@ -118,9 +119,6 @@ class CRCM_Plugin {
         
         // Add admin menu
         $this->add_admin_menu();
-        
-        // Initialize shortcodes
-        $this->init_shortcodes();
     }
 
     /**
@@ -156,6 +154,7 @@ class CRCM_Plugin {
             'class-email-manager.php',
             'class-payment-manager.php',
             'class-api-endpoints.php',
+            'class-shortcode-endpoints.php',
             'class-customer-portal.php',
             'class-locale-manager.php'
         );
@@ -199,12 +198,16 @@ class CRCM_Plugin {
         if ( class_exists( 'CRCM_API_Endpoints' ) && null === $this->api_endpoints ) {
             $this->api_endpoints = new CRCM_API_Endpoints();
         }
-        
-        if (class_exists('CRCM_Customer_Portal')) {
+
+        if ( class_exists( 'CRCM_Shortcode_Endpoints' ) ) {
+            $this->shortcode_endpoints = new CRCM_Shortcode_Endpoints();
+        }
+
+        if ( class_exists( 'CRCM_Customer_Portal' ) ) {
             $this->customer_portal = new CRCM_Customer_Portal();
         }
 
-        if (class_exists('CRCM_Locale_Manager')) {
+        if ( class_exists( 'CRCM_Locale_Manager' ) ) {
             $this->locale_manager = new CRCM_Locale_Manager();
         }
     }
@@ -440,172 +443,6 @@ class CRCM_Plugin {
      *
      * @since 1.0.0
      *
-     * @return void
-     */
-    private function init_shortcodes() {
-        add_shortcode('crcm_search_form', array($this, 'search_form_shortcode'));
-        add_shortcode('crcm_vehicle_list', array($this, 'vehicle_list_shortcode'));
-        add_shortcode('crcm_booking_form', array($this, 'booking_form_shortcode'));
-        add_shortcode('crcm_customer_dashboard', array($this, 'customer_dashboard_shortcode'));
-    }
-    
-    /**
-     * Search form shortcode.
-     *
-     * @since 1.0.0
-     *
-     * @param array $atts Shortcode attributes.
-     * @return string Shortcode output.
-     */
-    public function search_form_shortcode($atts) {
-        $atts = shortcode_atts(array(
-            'style' => 'default',
-        ), $atts);
-
-        $output = apply_filters('crcm_search_form', '', $atts);
-
-        if (empty($output)) {
-            $output = '<p>' . esc_html__('Search form template not found.', 'custom-rental-manager') . '</p>';
-        }
-
-        return $output;
-    }
-    
-    /**
-     * Vehicle list shortcode.
-     *
-     * @since 1.0.0
-     *
-     * @param array $atts Shortcode attributes.
-     * @return string Shortcode output.
-     */
-    public function vehicle_list_shortcode($atts) {
-        $atts = shortcode_atts(array(
-            'type' => '',
-            'limit' => 12,
-        ), $atts);
-
-        $output = apply_filters('crcm_vehicle_list', '', $atts);
-
-        if (empty($output)) {
-            $output = '<p>' . esc_html__('Vehicle list template not found.', 'custom-rental-manager') . '</p>';
-        }
-
-        return $output;
-    }
-    
-    /**
-     * Booking form shortcode.
-     *
-     * @since 1.0.0
-     *
-     * @param array $atts Shortcode attributes.
-     * @return string Shortcode output.
-     */
-    public function booking_form_shortcode($atts) {
-        $atts = shortcode_atts(array(
-            'vehicle_id' => '',
-        ), $atts);
-
-        $vehicle_id = ! empty( sanitize_text_field( $_GET['vehicle'] ?? '' ) )
-            ? intval( sanitize_text_field( $_GET['vehicle'] ) )
-            : intval( $atts['vehicle_id'] );
-
-        $pickup_date = ! empty( sanitize_text_field( $_GET['pickup_date'] ?? '' ) )
-            ? sanitize_text_field( $_GET['pickup_date'] )
-            : '';
-
-        $return_date = ! empty( sanitize_text_field( $_GET['return_date'] ?? '' ) )
-            ? sanitize_text_field( $_GET['return_date'] )
-            : '';
-        $pricing_data = get_post_meta($vehicle_id, '_crcm_pricing_data', true);
-        $daily_rate   = $pricing_data['daily_rate'] ?? 0;
-        $rental_days  = 1;
-
-        if ($pickup_date && $return_date) {
-            try {
-                $pickup = new DateTime($pickup_date);
-                $return = new DateTime($return_date);
-                $rental_days = max(1, $return->diff($pickup)->days);
-            } catch (Exception $e) {
-                $rental_days = 1;
-            }
-        }
-
-        $end_date = new DateTime($pickup_date ?: date('Y-m-d'));
-        $end_date->add(new DateInterval('P' . $rental_days . 'D'));
-        $base_total_calc  = crcm_calculate_vehicle_pricing($vehicle_id, $pickup_date, $end_date->format('Y-m-d'));
-        $extra_daily_rate = $rental_days > 0 ? max(0, ($base_total_calc - ($daily_rate * $rental_days)) / $rental_days) : 0;
-
-        $currency_symbol = crcm_get_setting('currency_symbol', '€');
-
-        wp_localize_script(
-            'crcm-booking-form',
-            'crcmBookingData',
-            array(
-                'daily_rate'      => $daily_rate,
-                'extra_daily_rate'=> $extra_daily_rate,
-                'rental_days'     => $rental_days,
-                'currency_symbol' => $currency_symbol,
-                'days_label'      => __('giorni', 'custom-rental-manager'),
-                'free_label'      => __('Gratis', 'custom-rental-manager'),
-            )
-        );
-
-        $template_data = array(
-            'vehicle_id'       => $vehicle_id,
-            'pickup_date'      => $pickup_date,
-            'return_date'      => $return_date,
-            'pickup_time'      => $pickup_time,
-            'return_time'      => $return_time,
-            'pricing_data'     => $pricing_data,
-            'daily_rate'       => $daily_rate,
-            'rental_days'      => $rental_days,
-            'extra_daily_rate' => $extra_daily_rate,
-            'currency_symbol'  => $currency_symbol,
-        );
-
-        $output = apply_filters('crcm_booking_form', '', $atts, $template_data);
-
-        if (empty($output)) {
-            $output = '<p>' . esc_html__('Booking form template not found.', 'custom-rental-manager') . '</p>';
-        }
-
-        return $output;
-    }
-
-    /**
-     * Customer dashboard shortcode.
-     *
-     * @since 1.0.0
-     *
-     * @param array $atts Shortcode attributes.
-     * @return string Shortcode output.
-     */
-    public function customer_dashboard_shortcode($atts) {
-        if (!is_user_logged_in()) {
-            return '<p>' . esc_html__('Please log in to access your dashboard.', 'custom-rental-manager') . '</p>';
-        }
-
-        if (!crcm_user_is_customer()) {
-            return '<p>' . esc_html__('Access restricted to rental customers.', 'custom-rental-manager') . '</p>';
-        }
-
-        $output = apply_filters('crcm_customer_dashboard', '', $atts);
-
-        if (empty($output)) {
-            $output = '<p>' . esc_html__('Customer dashboard template not found.', 'custom-rental-manager') . '</p>';
-        }
-
-        return $output;
-    }
-    
-    /**
-     * Enqueue admin assets.
-     *
-     * @since 1.0.0
-     *
-     * @param string $hook Current admin page hook.
      * @return void
      */
     public function enqueue_admin_assets( $hook ) {
