@@ -11,6 +11,8 @@
 
 Il plugin **Custom Rental Car Manager** è un sistema completo e professionale per la gestione autonoleggio di auto e scooter, ideato per l'agenzia Costabilerent a Ischia. Include gestione veicoli, tariffe (base e personalizzate), disponibilità, servizi extra, assicurazioni, automazioni email, calendario dinamico e REST API. Le funzionalità front-end sono demandate al tema dedicato.
 
+A partire dalla versione corrente il plugin non include markup o componenti di interfaccia: form di ricerca, liste e checkout sono gestiti interamente dal tema tramite le API REST esposte.
+
 ## Caratteristiche principali
 
 - Gestione veicoli: modelli, stock, tariffe, immagini, servizi
@@ -18,6 +20,7 @@ Il plugin **Custom Rental Car Manager** è un sistema completo e professionale p
 - Disponibilità individuale, ricorrente e settimanale
 - Integrazione pagamenti Stripe via API
 - REST API per integrazione front-end su tema dedicato
+- Nessun output front-end: il tema consuma le API REST esposte
 - Calendario amministrativo in tempo reale
 - Automazioni email dinamiche
 - Compatibilità con PHP 8.0+, WP ultime versioni
@@ -35,13 +38,14 @@ Il plugin **Custom Rental Car Manager** è un sistema completo e professionale p
 
 ## Uso
 
-- Utilizza gli shortcode del tema `[crcm_search_form]`, `[crcm_vehicle_list]`, `[crcm_booking_form]`, `[crcm_customer_dashboard]`
-- Personalizza layout e stile in front-end tramite template override
+- Attiva il tema Costabilerent per ottenere form, liste e checkout
+- Il tema fornisce gli shortcode `[crcm_search_form]`, `[crcm_vehicle_list]`, `[crcm_booking_form]`, `[crcm_customer_dashboard]` che consumano le API REST del plugin
+- Personalizza layout e stile in front-end tramite template override del tema
 - Gestisci prenotazioni, veicoli, calendario in backend
 
-## Endpoint & Hook disponibili
+## Endpoint REST disponibili
 
-Il plugin espone endpoint REST che forniscono i dati degli shortcode e relativi hook per ulteriori personalizzazioni:
+Il plugin espone endpoint REST pubblici che il tema utilizza per renderizzare form, liste e checkout. Gli hook permettono al tema o ad altre estensioni di modificarne i dati:
 
 | Endpoint | Descrizione | Hook dati |
 | --- | --- | --- |

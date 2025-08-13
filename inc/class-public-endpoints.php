@@ -1,9 +1,8 @@
 <?php
 /**
- * Shortcode Data Endpoints.
+ * Public Data Endpoints.
  *
- * Converts legacy shortcodes into REST data providers
- * so the theme can render markup separately.
+ * Provides REST data for the theme to render forms, lists and checkouts.
  *
  * @package CustomRentalCarManager
  */
@@ -13,10 +12,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Class handling REST endpoints that expose data formerly delivered
- * by plugin shortcodes.
+ * Class handling public REST endpoints used by the theme.
  */
-class CRCM_Shortcode_Endpoints {
+class CRCM_Public_Endpoints {
 
     /**
      * Constructor.
